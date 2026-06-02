@@ -25,10 +25,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -106,6 +108,9 @@ fun DraftCanvas(
     var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "")) }
 
     var isDarkTheme by remember { mutableStateOf(false) }
+
+    var isDrawMenuOpen by remember { mutableStateOf(false) }
+    var activeSubMenu by remember { mutableStateOf<String?>(null) } // Tracks "Thickness", "Color", or "Brush"
 
     var isDrawingMode by remember { mutableStateOf(false) }
     var currentDrawingPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
@@ -350,6 +355,7 @@ fun DraftCanvas(
                 }
         ) {
 
+            // --- 1. RECORDING BACKGROUND ---
             Box(modifier = Modifier.fillMaxSize().liquefiable(liquidState)) {
                 GridBackground(scale = scale, offset = offset)
 
@@ -391,6 +397,50 @@ fun DraftCanvas(
 
             if (isUiVisible) {
 
+                // --- NEW: TOP LEFT ACTION BAR (BACK + UNDO/REDO) ---
+                Box(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 1. BACK BUTTON PILL
+                        Box(
+                            modifier = Modifier
+                                .shadow(16.dp, RoundedCornerShape(24.dp))
+                                .liquid(liquidState) { refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(24.dp) }
+                                .background(if (isDarkTheme) Color(0xCC2C2C2C) else Color(0xCCE0FFFFFF), RoundedCornerShape(24.dp))
+                                .border(1.dp, if (isDarkTheme) Color(0x40FFFFFF) else Color(0x60FFFFFF), RoundedCornerShape(24.dp))
+                                .clickable { /* TODO: Add Navigation Back */ }
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                        }
+
+                        // 2. UNDO / REDO PILL (Horizontal)
+                        Row(
+                            modifier = Modifier
+                                .shadow(16.dp, RoundedCornerShape(24.dp))
+                                .liquid(liquidState) { refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(24.dp) }
+                                .background(if (isDarkTheme) Color(0xCC2C2C2C) else Color(0xCCE0FFFFFF), RoundedCornerShape(24.dp))
+                                .border(1.dp, if (isDarkTheme) Color(0x40FFFFFF) else Color(0x60FFFFFF), RoundedCornerShape(24.dp))
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black)
+                            }
+                            // Vertical Divider Line
+                            Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color.Gray.copy(alpha = 0.3f)))
+
+                            IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black)
+                            }
+                        }
+                    }
+                }
+
                 // LIQUID SETTINGS TOGGLE
                 Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
                     IconButton(
@@ -406,7 +456,7 @@ fun DraftCanvas(
                     }
                 }
 
-                // LIQUID SETTINGS PANEL (REVERTED TO 2 SUPPORTED SLIDERS)
+                // LIQUID SETTINGS PANEL
                 AnimatedVisibility(
                     visible = isLiquidMenuOpen,
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp, end = 24.dp)
@@ -476,71 +526,85 @@ fun DraftCanvas(
                     }
                 }
 
-                Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(24.dp)) {
-
-                    Box(modifier = Modifier.align(Alignment.BottomStart)) {
-                        Column(
-                            modifier = Modifier
-                                .shadow(16.dp, RoundedCornerShape(24.dp))
-                                .liquid(liquidState) { refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(24.dp) }
-                                .background(if (isDarkTheme) Color(0xCC2C2C2C) else Color(0xCCE0FFFFFF), RoundedCornerShape(24.dp))
-                                .border(1.dp, if (isDarkTheme) Color(0x40FFFFFF) else Color(0x60FFFFFF), RoundedCornerShape(24.dp))
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black)
-                            }
-                            Box(modifier = Modifier.width(20.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                            IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black)
-                            }
-                        }
+                // --- PREMIUM BOTTOM WORKSPACE BAR ---
+                Box(modifier = Modifier.fillMaxSize()) {
+                    val activeMainTool = when {
+                        isDrawingMode -> "Draw"
+                        else -> "Pan"
                     }
-
-                    if (isDrawingMode) {
-                        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-                            PenStudioPanel(activeDrawColor = activeDrawColor, activeStrokeWidth = activeStrokeWidth, activeToolType = activeToolType, activeAlpha = activeAlpha, onColorChange = { activeDrawColor = it }, onStrokeWidthChange = { activeStrokeWidth = it }, onToolChange = { activeToolType = it }, onAlphaChange = { activeAlpha = it })
-                        }
-                    }
-
                     val deselectAll = { isDrawingMode = false; isConnectingMode = false; isLassoMode = false; connectingStartNodeId = null; selectedGroupIds = emptySet() }
 
-                    Box(modifier = Modifier.align(Alignment.BottomEnd)) {
-                        CanvasToolbar(
-                            isDrawingMode = isDrawingMode, isConnectingMode = isConnectingMode, isLassoMode = isLassoMode, isDarkTheme = isDarkTheme,
-                            onPanClick = { deselectAll() }, onDrawClick = { deselectAll(); isDrawingMode = true },
-                            onLassoClick = { deselectAll(); isLassoMode = true }, onConnectClick = { deselectAll(); isConnectingMode = true },
-                            onStickyClick = { elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); deselectAll(); viewModel.updateElements(elements.toList()) },
-                            onImageClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                            onPdfClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")) },
-                            onCodeClick = { elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onMicClick = { elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onShapeClick = { elements.add(CanvasElement.ShapeNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onTextClick = { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onFrameClick = { elements.add(CanvasElement.FrameNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onTaskListClick = { elements.add(CanvasElement.TaskListNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) },
-                            onAutoLayoutClick = { }, onUndoClick = { viewModel.undo() }, onRedoClick = { viewModel.redo() }, onThemeToggle = { isDarkTheme = !isDarkTheme },
-                            onShareClick = {
-                                coroutineScope.launch {
-                                    deselectAll(); selectedNoteId = null; isUiVisible = false
-                                    delay(150)
-                                    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                                    view.draw(android.graphics.Canvas(bitmap))
-                                    isUiVisible = true
-                                    val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "Draft_Export_${System.currentTimeMillis()}.png"); put(MediaStore.Images.Media.MIME_TYPE, "image/png") }
-                                    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                                    if (uri != null) {
-                                        context.contentResolver.openOutputStream(uri)?.use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                                        val intent = Intent(Intent.ACTION_SEND).apply { type = "image/png"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                                        context.startActivity(Intent.createChooser(intent, "Share Canvas"))
-                                    }
+                    // --- NEW: THE VERTICAL DRAW TOOL STACK & POPOUTS ---
+                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 108.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.Bottom // Aligns the popouts perfectly with the tools
+                        ) {
+                            // 1. The Vertical Stack
+                            com.flash.draft.ui.canvas.tools.DrawToolStack(
+                                isOpen = isDrawingMode && isDrawMenuOpen,
+                                activeColor = activeDrawColor,
+                                onBrushClick = {
+                                    activeToolType = "Pen"
+                                    activeSubMenu = if (activeSubMenu == "Brush") null else "Brush"
+                                },
+                                onEraserClick = {
+                                    activeToolType = "Eraser"
+                                    activeSubMenu = null // Eraser has no sub-menu
+                                },
+                                onColorClick = { activeSubMenu = if (activeSubMenu == "Color") null else "Color" },
+                                onThicknessClick = { activeSubMenu = if (activeSubMenu == "Thickness") null else "Thickness" }
+                            )
+
+                            // 2. The Horizontal Popouts
+                            Box {
+                                com.flash.draft.ui.canvas.tools.DrawThicknessMenu(
+                                    isOpen = activeSubMenu == "Thickness" && isDrawMenuOpen,
+                                    strokeWidth = activeStrokeWidth,
+                                    onStrokeWidthChange = { activeStrokeWidth = it }
+                                )
+
+                                com.flash.draft.ui.canvas.tools.DrawColorMenu(
+                                    isOpen = activeSubMenu == "Color" && isDrawMenuOpen,
+                                    activeColor = activeDrawColor,
+                                    onColorSelect = { activeDrawColor = it }
+                                )
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                        BottomNavBar(
+                            activeTool = activeMainTool,
+                            onToolSelect = { tool ->
+                                deselectAll()
+                                isDrawMenuOpen = false // Close menu when switching tools
+                                when (tool) {
+                                    "Draw" -> isDrawingMode = true
+                                    "Pan" -> { /* Defaults to panning */ }
+                                    "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) }
+                                    "Note" -> { elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) }
                                 }
+                            },
+                            onAddClick = {
+                                // TODO: We will build the expanding Insert Menu next!
+                            },
+                            showDynamicLeft = isDrawingMode,
+                            onDynamicLeftClick = {
+                                isDrawMenuOpen = !isDrawMenuOpen // Toggles the vertical stack!
+                            },
+                            dynamicLeftContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Brush, // Representing the Draw tool
+                                    contentDescription = "Draw Menu",
+                                    tint = if (isDarkTheme) Color.White else Color.Black,
+                                    modifier = Modifier.size(28.dp)
+                                )
                             }
                         )
                     }
                 }
-            }
+            } // END OF UI VISIBILITY BLOCK
         }
     }
 }
