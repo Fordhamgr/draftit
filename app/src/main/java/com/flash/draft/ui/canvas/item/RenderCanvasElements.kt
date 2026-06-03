@@ -35,18 +35,50 @@ fun RenderCanvasElements(
     onUpdateSelectedGroupIds: (Set<String>) -> Unit,
     onUpdateSelectedNoteId: (String?) -> Unit,
     onUpdateConnectingStartNodeId: (String?) -> Unit,
-    onUpdateScaleAndOffset: (Float, Offset) -> Unit
+    onUpdateScaleAndOffset: (Float, Offset) -> Unit,
+    onStartConnection: (String) -> Unit
 ) {
+    val screenTopLeft = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(0f, 0f), offset, scale)
+    val screenBottomRight = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(centerX * 2f, centerY * 2f), offset, scale)
+    // Add a 500px buffer to prevent popping when panning
+    val cullLeft = screenTopLeft.x - 500f
+    val cullTop = screenTopLeft.y - 500f
+    val cullRight = screenBottomRight.x + 500f
+    val cullBottom = screenBottomRight.y + 500f
+
     elements.toList().forEach { element ->
+        // --- VIEWPORT CULLING ---
+        if (element !is CanvasElement.Connector && element !is CanvasElement.Sketch) {
+            val center = getCenterPoint(element.id, elements)
+            val dims = getElementDimensions(element.id, elements)
+            if (center != null) {
+                val halfW = dims.first / 2f
+                val halfH = dims.second / 2f
+                val elLeft = center.x - halfW
+                val elTop = center.y - halfH
+                val elRight = center.x + halfW
+                val elBottom = center.y + halfH
+                
+                // If element is completely outside the cull bounds, skip rendering it
+                if (elRight < cullLeft || elLeft > cullRight || elBottom < cullTop || elTop > cullBottom) {
+                    return@forEach
+                }
+            }
+        }
+
         if (element is CanvasElement.FrameNode) {
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 FrameItem(
                     frameNode = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedFrame ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedFrame
@@ -99,14 +131,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.StickyNote) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 StickyNoteItem(
                     note = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNote ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedNote
@@ -146,14 +183,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.CodeBlock) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 CodeSnippetItem(
                     codeBlock = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedBlock ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedBlock
@@ -193,14 +235,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.ImageCard) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 ImageItem(
                     imageCard = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedImage ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedImage
@@ -224,7 +271,7 @@ fun RenderCanvasElements(
                         Toast.makeText(context, "Extracting subject...", Toast.LENGTH_SHORT).show()
                         StickerMaker.extractSubject(context, element.uriString) { newUri ->
                             if (newUri != null) {
-                                elements.add(CanvasElement.ImageCard(id = UUID.randomUUID().toString(), position = element.position + Offset(80f, 80f), uriString = newUri, width = element.width, height = element.height))
+                                elements.add(CanvasElement.ImageCard(id = UUID.randomUUID().toString(), position = element.position + Offset(80f, 80f), uriString = newUri, width = element.width, height = element.height, originalWidth = element.originalWidth, originalHeight = element.originalHeight))
                                 onUpdateElements(elements.toList())
                             } else {
                                 Toast.makeText(context, "No clear subject found", Toast.LENGTH_SHORT).show()
@@ -255,14 +302,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.TaskListNode) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 TaskListItem(
                     taskNode = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNode ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedNode
@@ -302,14 +354,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.PdfCard) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 PdfItem(
                     pdfCard = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedPdf ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedPdf
@@ -349,14 +406,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.AudioNote) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 AudioItem(
                     audioNote = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedAudio ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedAudio
@@ -396,14 +458,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.ShapeNode) {
+
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 ShapeItem(
                     shapeNode = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedShape ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedShape
@@ -443,14 +510,19 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.LabelNode) {
+        if (element is CanvasElement.LabelNode) {
+
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
+                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 LabelItem(
                     labelNode = element,
                     scale = scale,
                     offset = offset,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
+                    isConnectionTarget = isConnectionTarget,
+                    onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNode ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) elements[currentIndex] = updatedNode
@@ -489,4 +561,5 @@ fun RenderCanvasElements(
             }
         }
     }
+}
 }

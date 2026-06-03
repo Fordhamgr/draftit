@@ -33,37 +33,40 @@ import com.flash.draft.ui.canvas.item.getAdaptiveColor
 
 @Composable
 fun TaskListItem(
-    taskNode: CanvasElement.TaskListNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    taskNode: CanvasElement.TaskListNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.TaskListNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
     CanvasItemWrapper(
         position = taskNode.position, width = taskNode.width, height = taskNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = taskNode.isLocked, onLockedChange = { onUpdate(taskNode.copy(isLocked = it)) },
         isFullyDraggable = true, // Critical so we can scroll the list and tap checkboxes
         hasDefaultBackground = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest,
                 customMenuContent = {
             // TASK COLOR CUSTOMIZATION FIX
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val colors = listOf(Color.White, Color(0xFFFFF9C4), Color(0xFFE3F2FD), Color(0xFFE8F5E9), Color(0xFFFCE4EC))
-                colors.forEach { colorOption ->
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .background(colorOption, CircleShape)
-                            .border(1.dp, Color.LightGray, CircleShape)
-                            .clickable {
-                                onUpdate(taskNode.copy(color = colorOption))
-                                onSaveRequest()
-                            }
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val colors = listOf(Color.White, Color(0xFFFFF9C4), Color(0xFFE3F2FD), Color(0xFFE8F5E9), Color(0xFFFCE4EC))
+                    colors.forEach { colorOption ->
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(colorOption, CircleShape)
+                                .border(1.dp, Color.LightGray, CircleShape)
+                                .clickable {
+                                    onUpdate(taskNode.copy(color = colorOption))
+                                    onSaveRequest()
+                                }
+                        )
+                    }
                 }
             }
         }
-    ) {
-        Column(modifier = Modifier.fillMaxSize().background(taskNode.color).padding(12.dp)) {
+    ) { isLocked ->
+        Column(modifier = Modifier.fillMaxSize().background(taskNode.color.copy(alpha = 0.65f)).padding(12.dp)) {
             // Title
             BasicTextField(
                 value = taskNode.title,

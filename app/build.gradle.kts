@@ -68,4 +68,5 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("io.github.fletchmckee.liquid:liquid:1.1.1")
+    implementation("com.composables:icons-lucide-android:2.2.1")
 }

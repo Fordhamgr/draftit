@@ -23,13 +23,14 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun FrameItem(
-    frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.FrameNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
     CanvasItemWrapper(
         position = frameNode.position, width = frameNode.width, height = frameNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = frameNode.isLocked, onLockedChange = { onUpdate(frameNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // Transparent center!
         isFullyDraggable = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
@@ -49,7 +50,7 @@ fun FrameItem(
                     }
                 )
 
-                Box(modifier = Modifier.size(1.dp, 24.dp).background(Color.LightGray)) // Divider
+                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f))) // Divider
 
                 // Context Menu: Colors
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -63,7 +64,7 @@ fun FrameItem(
                 }
             }
         }
-    ) {
+    ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize()) {
             BasicTextField(
                 value = frameNode.title,
@@ -77,8 +78,8 @@ fun FrameItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(frameNode.color.copy(alpha = 0.05f)) // Very faint tint
-                    .border(3.dp, frameNode.color)
+                    .background(frameNode.color.copy(alpha = 0.2f)) // More visible for liquid lens
+                    .border(3.dp, frameNode.color.copy(alpha = 0.6f))
             )
         }
     }

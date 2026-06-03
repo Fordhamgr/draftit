@@ -28,7 +28,7 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun CodeSnippetItem(
-    codeBlock: CanvasElement.CodeBlock, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    codeBlock: CanvasElement.CodeBlock, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.CodeBlock) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
@@ -36,7 +36,8 @@ fun CodeSnippetItem(
 
     CanvasItemWrapper(
         position = codeBlock.position, width = codeBlock.width, height = codeBlock.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = codeBlock.isLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
         isFullyDraggable = false, // Critical so TextField works normally
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest,
@@ -45,15 +46,20 @@ fun CodeSnippetItem(
                 clipboardManager.setText(AnnotatedString(codeBlock.code))
             })
         }
-    ) {
+    ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1E1E1E))) {
             // Drag Header (macOS Terminal style)
             Box(
                 modifier = Modifier.fillMaxWidth().height(28.dp).background(Color(0xFF2D2D2D))
-                    .pointerInput(Unit) {
+                    .pointerInput(isLocked) {
                         detectDragGestures(
-                            onDragStart = { onSelect() }, onDragEnd = { onSaveRequest() },
-                            onDrag = { change, dragAmount -> change.consume(); onPositionDelta(dragAmount) }
+                            onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                            onDrag = { change, dragAmount -> 
+                                if (!isLocked) {
+                                    change.consume()
+                                    onPositionDelta(dragAmount)
+                                }
+                            }
                         )
                     }
             ) {
@@ -69,6 +75,7 @@ fun CodeSnippetItem(
             BasicTextField(
                 value = codeBlock.code,
                 onValueChange = { onUpdate(codeBlock.copy(code = it)); onSaveRequest() },
+                enabled = isSelected, // Fixes keyboard popping up on first tap
                 modifier = Modifier.fillMaxSize().padding(12.dp).onFocusChanged { if (it.isFocused) onSelect() },
                 textStyle = LocalTextStyle.current.merge(
                     TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFD4D4D4))

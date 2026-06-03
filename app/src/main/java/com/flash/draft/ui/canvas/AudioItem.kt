@@ -3,6 +3,8 @@ package com.flash.draft.ui.canvas
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -30,7 +32,7 @@ import java.util.UUID
 
 @Composable
 fun AudioItem(
-    audioNote: CanvasElement.AudioNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    audioNote: CanvasElement.AudioNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.AudioNote) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
@@ -132,12 +134,40 @@ fun AudioItem(
 
     CanvasItemWrapper(
         position = audioNote.position, width = audioNote.width, height = audioNote.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = audioNote.isLocked, onLockedChange = { onUpdate(audioNote.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest
-    ) {
+        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        customMenuContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // Title editing
+                androidx.compose.foundation.text.BasicTextField(
+                    value = audioNote.title,
+                    onValueChange = { onUpdate(audioNote.copy(title = it)) },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.Black, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                    modifier = Modifier.background(Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                // Color picking
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val colors = listOf(Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFFFFF9C4), Color(0xFFFCE4EC), Color(0xFFF3E5F5))
+                    colors.forEach { colorOption ->
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(colorOption, CircleShape)
+                                .border(if (audioNote.color == colorOption) 2.dp else 1.dp, if (audioNote.color == colorOption) Color.Blue else Color.LightGray, CircleShape)
+                                .clickable {
+                                    onUpdate(audioNote.copy(color = colorOption))
+                                    onSaveRequest()
+                                }
+                        )
+                    }
+                }
+            }
+        }
+    ) { isLocked ->
         Row(
-            modifier = Modifier.fillMaxSize().background(Color(0xFFE8F5E9)).padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxSize().background(audioNote.color).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -172,7 +202,7 @@ fun AudioItem(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         val displayTime = if (isPlaying) currentPlaybackPosition.toInt() / 1000 else audioNote.durationMs / 1000
                         Text(text = String.format("%02d:%02d", displayTime / 60, displayTime % 60), fontSize = 10.sp, color = Color.Gray)
-                        Text(text = "Voice Memo", fontSize = 10.sp, color = Color.Gray)
+                        Text(text = audioNote.title, fontSize = 10.sp, color = Color.Gray, maxLines = 1, modifier = Modifier.widthIn(max = 100.dp), overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
             }

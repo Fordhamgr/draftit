@@ -3,6 +3,10 @@ package com.flash.draft
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,19 +25,52 @@ import com.flash.draft.ui.canvas.CanvasViewModel
 import com.flash.draft.ui.canvas.DraftCanvas
 import com.flash.draft.ui.home.DashboardScreen // We are about to build this!
 
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
+
+@Composable
+fun AdaptiveLayout(content: @Composable () -> Unit) {
+    val configuration = LocalConfiguration.current
+    val currentDensity = LocalDensity.current
+    // 411f is the baseline width (e.g., Pixel phone).
+    val scaleFactor = configuration.screenWidthDp / 411f 
+    
+    // Cap scale factor to avoid comically huge UI on tablets
+    val clampedScale = scaleFactor.coerceIn(0.85f, 1.5f) 
+
+    val customDensity = Density(
+        density = currentDensity.density * clampedScale,
+        fontScale = currentDensity.fontScale * clampedScale
+    )
+    
+    CompositionLocalProvider(LocalDensity provides customDensity) {
+        content()
+    }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        
+        // Hide system bars for true immersive mode
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         // 1. Initialize the Multi-Project Repository
         val repo = NoteRepository(this)
 
         setContent {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                // 2. Setup Jetpack Navigation
+            AdaptiveLayout {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // 2. Setup Jetpack Navigation
                 val navController = rememberNavController()
 
                 NavHost(navController = navController, startDestination = "dashboard") {
@@ -70,10 +107,14 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                        DraftCanvas(viewModel = canvasViewModel)
+                        DraftCanvas(
+                            viewModel = canvasViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
                     }
                 }
             }
         }
     }
+}
 }

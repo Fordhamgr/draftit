@@ -8,6 +8,7 @@
 * **Code Generation:**
     * Output complete, runnable code blocks. Never use placeholders (e.g., `// ... existing code` or `/* logic here */`).
     * When modifying a file, only change the specific components requested. Do not silently delete or refactor unrelated logic.
+    * **Compilation Requirement:** Always compile the app (e.g., `.\gradlew assembleDebug`) after completing a set of changes. If the build is unsuccessful, you must automatically investigate and resolve the errors until compilation succeeds.
 * **Communication:**
     * Keep explanations extremely short and direct.
     * Output the code immediately without long introductory paragraphs.

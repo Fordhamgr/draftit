@@ -1,14 +1,24 @@
 package com.flash.draft
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
+import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -23,6 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.flash.draft.model.CanvasElement
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
+import com.flash.draft.ui.canvas.LocalLiquidState
+import com.flash.draft.ui.canvas.LocalLiquidRefraction
+import com.flash.draft.ui.canvas.LocalLiquidCurve
+import io.github.fletchmckee.liquid.liquid
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @Composable
 fun PremiumSegmentedControl(options: List<String>, selectedOption: String, onOptionSelected: (String) -> Unit, isDark: Boolean) {
@@ -58,6 +73,44 @@ fun PremiumSegmentedControl(options: List<String>, selectedOption: String, onOpt
     }
 }
 
+// A compact segmented control icon version for the dock
+@Composable
+fun DockSegmentedIconControl(
+    options: List<Pair<String, @Composable (Color) -> Unit>>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    isDark: Boolean
+) {
+    val containerBg = if (isDark) Color(0x33000000) else Color(0x0D000000)
+    val activeBg = if (isDark) Color(0xFF3A3A3C) else Color(0xFFFFFFFF)
+    val activeTint = if (isDark) Color.White else Color.Black
+    val inactiveTint = if (isDark) Color.Gray else Color.DarkGray
+
+    Row(
+        modifier = Modifier
+            .height(36.dp)
+            .background(containerBg, RoundedCornerShape(percent = 50))
+            .padding(2.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        options.forEach { (option, icon) ->
+            val isSelected = selectedOption == option
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) activeBg else Color.Transparent)
+                    .then(if (isSelected) Modifier.shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.1f)) else Modifier)
+                    .clickable { onOptionSelected(option) },
+                contentAlignment = Alignment.Center
+            ) {
+                icon(if (isSelected) activeTint else inactiveTint)
+            }
+        }
+    }
+}
+
 @Composable
 fun ConnectorStyleMenu(
     connector: CanvasElement.Connector,
@@ -66,58 +119,155 @@ fun ConnectorStyleMenu(
     onClose: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val bgColor = if (isDark) Color(0xE61C1C1E) else Color(0xF2F2F7) // Apple-style thick frosted glass
-    val borderColor = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
+    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
+    val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
     val colors = listOf(Color.Black, Color.Red, Color.Blue, Color(0xFF34C759), Color(0xFFFF9500), Color.Gray)
 
-    Column(
+    val liquidState = LocalLiquidState.current
+    val liquidRefraction = LocalLiquidRefraction.current
+    val liquidCurve = LocalLiquidCurve.current
+
+    val dockHeight = 56.dp
+    val pillShape = RoundedCornerShape(percent = 50)
+    
+    var isColorPickerExpanded by remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
-            .padding(bottom = 16.dp)
-            .width(320.dp) // Fixed premium width prevents squishing
-            .shadow(32.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-            .background(bgColor, RoundedCornerShape(24.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(24.dp))
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .height(dockHeight)
+            .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
+            .then(
+                if (liquidState != null) Modifier.liquid(liquidState) {
+                    refraction = liquidRefraction
+                    curve = liquidCurve
+                    shape = pillShape
+                } else Modifier
+            )
+            .background(glassBg, pillShape)
+            .border(1.dp, glassBorder, pillShape)
+            .clip(pillShape)
     ) {
-        // Top Header
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Path Style", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = if (isDark) Color.White else Color.Black)
-            IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, "Close", tint = Color.Gray) }
-        }
-
-        // Color Picker (Perfectly spaced)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            colors.forEach { color ->
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(color, CircleShape)
-                        .border(if (connector.color == color) 3.dp else 1.dp, if (connector.color == color) Color(0xFF007AFF) else Color.LightGray.copy(alpha = 0.5f), CircleShape)
-                        .clickable { onUpdate(connector.copy(color = color)) }
-                )
-            }
-        }
-
-        // Segments
-        PremiumSegmentedControl(listOf("Solid", "Dashed", "Dotted"), connector.lineStyle, { onUpdate(connector.copy(lineStyle = it)) }, isDark)
-        PremiumSegmentedControl(listOf("None", "End", "Both"), connector.arrowDirection, { onUpdate(connector.copy(arrowDirection = it)) }, isDark)
-
-        // Destructive Action Button
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0x1AFF3B30), RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onDelete() }
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxHeight().padding(horizontal = 8.dp).animateContentSize(animationSpec = tween(300)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Delete Path", color = Color(0xFFFF3B30), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            // Colors (Expandable)
+            Row(
+                modifier = Modifier
+                    .background(if (isDark) Color(0x33000000) else Color(0x0D000000), RoundedCornerShape(percent = 50))
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                    .animateContentSize(animationSpec = tween(300)),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isColorPickerExpanded) {
+                    colors.forEach { color ->
+                        val isSelected = connector.color == color
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(color, CircleShape)
+                                .border(if (isSelected) 2.dp else 1.dp, if (isSelected) Color(0xFF007AFF) else Color.LightGray.copy(alpha = 0.5f), CircleShape)
+                                .clickable { 
+                                    onUpdate(connector.copy(color = color))
+                                    isColorPickerExpanded = false
+                                }
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(connector.color, CircleShape)
+                            .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                            .clickable { isColorPickerExpanded = true }
+                    )
+                }
+            }
+            
+            // Only show the rest if color picker is NOT expanded to save space, or just show them anyway
+            // The prompt says "which is a single circle that expands to show more colors on click, saving space"
+            // Since it's a pill, it can just grow horizontally. We can show all elements always, it will just stretch.
+            
+            // Vertical Divider
+            Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
+
+            // Line Style Options
+            val lineStyleOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
+                "Solid" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        val stroke = 2.dp.toPx()
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                },
+                "Dashed" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        val stroke = 2.dp.toPx()
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f))
+                    }
+                },
+                "Dotted" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        val stroke = 2.dp.toPx()
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 10f), 0f))
+                    }
+                }
+            )
+            DockSegmentedIconControl(lineStyleOptions, connector.lineStyle, { onUpdate(connector.copy(lineStyle = it)) }, isDark)
+
+            // Arrow Direction Options
+            val arrowOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
+                "None" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        val stroke = 2.dp.toPx()
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                },
+                "End" to { color ->
+                    Icon(painterResource(id = LucideR.drawable.lucide_ic_arrow_right), contentDescription = "End", tint = color, modifier = Modifier.size(18.dp))
+                },
+                "Both" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        val stroke = 1.5.dp.toPx()
+                        val y = size.height / 2
+                        // Main line
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        // Left arrow
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(6.dp.toPx(), y - 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(6.dp.toPx(), y + 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        // Right arrow
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 6.dp.toPx(), y - 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 6.dp.toPx(), y + 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                }
+            )
+            DockSegmentedIconControl(arrowOptions, connector.arrowDirection, { onUpdate(connector.copy(arrowDirection = it)) }, isDark)
+
+            // Vertical Divider
+            Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
+
+            // Delete
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0x1AFF3B30), CircleShape)
+                    .clip(CircleShape)
+            ) {
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(20.dp))
+            }
+
+            // Close
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(if (isDark) Color(0x33000000) else Color(0x0D000000), CircleShape)
+                    .clip(CircleShape)
+            ) {
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_x), "Close", tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }

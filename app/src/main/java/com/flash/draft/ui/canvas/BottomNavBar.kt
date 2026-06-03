@@ -1,5 +1,7 @@
 package com.flash.draft.ui.canvas
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -10,15 +12,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.PanTool
-import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -64,7 +62,10 @@ fun BottomNavBar(
     )
 
     Box(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
+            .pointerInput(Unit) { detectDragGestures { _, _ -> } }
     ) {
 
         // ----------------------------------------------------
@@ -121,10 +122,10 @@ fun BottomNavBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // weight(1f) ensures absolute perfect symmetry. They share the space equally.
-                DockItem(Modifier.weight(1f), Icons.Default.PanTool, "Pan", activeTool == "Pan") { onToolSelect("Pan") }
-                DockItem(Modifier.weight(1f), Icons.Default.Create, "Draw", activeTool == "Draw") { onToolSelect("Draw") }
-                DockItem(Modifier.weight(1f), Icons.Default.TextFields, "Text", activeTool == "Text") { onToolSelect("Text") }
-                DockItem(Modifier.weight(1f), Icons.Default.StickyNote2, "Note", activeTool == "Note") { onToolSelect("Note") }
+                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_hand), "Pan", activeTool == "Pan") { onToolSelect("Pan") }
+                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_pen), "Draw", activeTool == "Draw") { onToolSelect("Draw") }
+                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_type), "Text", activeTool == "Text") { onToolSelect("Text") }
+                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_sticky_note), "Note", activeTool == "Note") { onToolSelect("Note") }
             }
         }
 
@@ -148,7 +149,7 @@ fun BottomNavBar(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                painter = painterResource(id = LucideR.drawable.lucide_ic_plus),
                 contentDescription = "Insert Menu",
                 tint = if (isDark) Color.White else Color.Black,
                 modifier = Modifier.size(28.dp)
@@ -160,7 +161,7 @@ fun BottomNavBar(
 @Composable
 private fun DockItem(
     modifier: Modifier = Modifier,
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     label: String,
     isActive: Boolean,
     onClick: () -> Unit

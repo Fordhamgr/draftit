@@ -1,5 +1,7 @@
 package com.flash.draft.ui.canvas
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,8 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -91,7 +91,7 @@ fun CanvasToolbar(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 @Composable
-                fun MenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, isActive: Boolean = false, onClick: () -> Unit) {
+                fun MenuRow(icon: androidx.compose.ui.graphics.painter.Painter, label: String, isActive: Boolean = false, onClick: () -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -107,23 +107,23 @@ fun CanvasToolbar(
                                 .size(36.dp)
                                 .background(if (isActive) activeTint.copy(alpha = 0.15f) else Color.Transparent, CircleShape),
                             contentAlignment = Alignment.Center
-                        ) { Icon(icon, contentDescription = label, tint = if (isActive) activeTint else iconTint, modifier = Modifier.size(20.dp)) }
+                        ) { Icon(painter = icon, contentDescription = label, tint = if (isActive) activeTint else iconTint, modifier = Modifier.size(20.dp)) }
                     }
                 }
 
-                MenuRow(Icons.Default.PanTool, "Pan", !isDrawingMode && !isConnectingMode && !isLassoMode) { onPanClick() }
-                MenuRow(Icons.Default.StickyNote2, "Note", false) { onStickyClick() }
-                MenuRow(Icons.Default.TextFields, "Text", false) { onTextClick() }
-                MenuRow(Icons.Default.Create, "Draw", isDrawingMode) { onDrawClick() }
-                MenuRow(Icons.Default.ArrowForward, "Connect", isConnectingMode) { onConnectClick() }
-                MenuRow(Icons.Default.Image, "Media", false) { onImageClick() }
-                MenuRow(Icons.Default.Mic, "Audio", false) { onMicClick() }
-                MenuRow(Icons.Default.Code, "Code", false) { onCodeClick() }
-                MenuRow(Icons.Default.Checklist, "Task", false) { onTaskListClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_hand), "Pan", !isDrawingMode && !isConnectingMode && !isLassoMode) { onPanClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_sticky_note), "Note", false) { onStickyClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_type), "Text", false) { onTextClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_pen), "Draw", isDrawingMode) { onDrawClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_arrow_right), "Connect", isConnectingMode) { onConnectClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_image), "Media", false) { onImageClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_mic), "Audio", false) { onMicClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_code), "Code", false) { onCodeClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_list_todo), "Task", false) { onTaskListClick() }
 
                 Box(modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth().height(1.dp).background(iconTint.copy(alpha = 0.1f)))
 
-                MenuRow(Icons.Default.Share, "Export", false) { onShareClick() }
+                MenuRow(painterResource(id = LucideR.drawable.lucide_ic_share), "Export", false) { onShareClick() }
             }
         }
 
@@ -139,7 +139,7 @@ fun CanvasToolbar(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                painter = painterResource(id = LucideR.drawable.lucide_ic_plus),
                 contentDescription = "Menu",
                 tint = if (isExpanded) Color.White else iconTint,
                 modifier = Modifier

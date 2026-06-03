@@ -1,12 +1,10 @@
 package com.flash.draft.ui.canvas
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -33,7 +31,7 @@ fun TopActionBar(
         // 1. The Back Button Pill
         LiquidGlassPill {
             IconButton(onClick = onBackClick, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = iconTint)
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_arrow_left), contentDescription = "Back", tint = iconTint)
             }
         }
 
@@ -44,14 +42,14 @@ fun TopActionBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onUndoClick, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = iconTint)
+                    Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = iconTint)
                 }
 
                 // Vertical Divider
                 Box(modifier = Modifier.width(1.dp).height(24.dp).background(dividerColor))
 
                 IconButton(onClick = onRedoClick, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = iconTint)
+                    Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = iconTint)
                 }
             }
         }

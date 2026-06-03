@@ -1,5 +1,7 @@
 package com.flash.draft.ui.home
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,9 +10,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -100,7 +99,7 @@ fun DashboardScreen(
                 .size(64.dp)
                 .shadow(16.dp, RoundedCornerShape(20.dp), spotColor = Color(0xFF2196F3))
         ) {
-            Icon(Icons.Default.Add, contentDescription = "New Board", modifier = Modifier.size(32.dp))
+            Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = "New Board", modifier = Modifier.size(32.dp))
         }
     }
 }
@@ -163,7 +162,7 @@ fun ProjectCard(
             }
 
             IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f))
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f))
             }
         }
     }

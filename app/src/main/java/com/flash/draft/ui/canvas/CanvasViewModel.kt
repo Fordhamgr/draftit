@@ -69,6 +69,13 @@ class CanvasViewModel(
             repository.saveElements(projectId, _elements.value) // <--- Updated
         }
     }
+
+    fun triggerImmediateSave() {
+        saveJob?.cancel()
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveElements(projectId, _elements.value)
+        }
+    }
     // --- LIQUID PHYSICS STATE ---
     private val _liquidRefraction = kotlinx.coroutines.flow.MutableStateFlow(0.5f)
     val liquidRefraction = _liquidRefraction.asStateFlow()
@@ -78,22 +85,13 @@ class CanvasViewModel(
 
     fun setLiquidRefraction(value: Float) { _liquidRefraction.value = value }
     fun setLiquidCurve(value: Float) { _liquidCurve.value = value }
+    
+    private val _liquidFrost = kotlinx.coroutines.flow.MutableStateFlow(2f)
+    val liquidFrost = _liquidFrost.asStateFlow()
+
+    private val _liquidDispersion = kotlinx.coroutines.flow.MutableStateFlow(0.05f)
+    val liquidDispersion = _liquidDispersion.asStateFlow()
+
+    fun setLiquidFrost(value: Float) { _liquidFrost.value = value }
+    fun setLiquidDispersion(value: Float) { _liquidDispersion.value = value }
 }
-private val _liquidRefraction = kotlinx.coroutines.flow.MutableStateFlow(0.5f)
-val liquidRefraction = _liquidRefraction.asStateFlow()
-
-private val _liquidCurve = kotlinx.coroutines.flow.MutableStateFlow(0.5f)
-val liquidCurve = _liquidCurve.asStateFlow()
-
-// NEW: Control the blur amount (Default low so toolbar is readable)
-private val _liquidFrost = kotlinx.coroutines.flow.MutableStateFlow(2f)
-val liquidFrost = _liquidFrost.asStateFlow()
-
-// NEW: Control the chromatic aberration (color splitting)
-private val _liquidDispersion = kotlinx.coroutines.flow.MutableStateFlow(0.05f)
-val liquidDispersion = _liquidDispersion.asStateFlow()
-
-fun setLiquidRefraction(value: Float) { _liquidRefraction.value = value }
-fun setLiquidCurve(value: Float) { _liquidCurve.value = value }
-fun setLiquidFrost(value: Float) { _liquidFrost.value = value }
-fun setLiquidDispersion(value: Float) { _liquidDispersion.value = value }

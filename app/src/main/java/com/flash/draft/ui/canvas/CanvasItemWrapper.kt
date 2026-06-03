@@ -1,10 +1,15 @@
 package com.flash.draft.ui.canvas
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+    import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,31 +37,28 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 import com.flash.draft.utils.ViewportMath
-
-import com.flash.draft.ui.canvas.LocalLiquidRefraction
-import com.flash.draft.ui.canvas.LocalLiquidCurve
-
-// FIX: We need the 'liquid' lens modifier here, NOT liquefiable!
 import io.github.fletchmckee.liquid.liquid
 import kotlin.math.roundToInt
 
 @Composable
 fun CanvasItemWrapper(
     position: Offset, width: Float, height: Float, scale: Float, canvasOffset: Offset,
-    isSelected: Boolean, isConnecting: Boolean, isFullyDraggable: Boolean = true,
-    hasDefaultBackground: Boolean = true,
+    isSelected: Boolean, isConnecting: Boolean, isLocked: Boolean = false, onLockedChange: (Boolean) -> Unit = {}, isFullyDraggable: Boolean = true,
+    isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    hasDefaultBackground: Boolean = true, backgroundAlpha: Float = 0.65f,
     onSelect: () -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDelete: () -> Unit, onSaveRequest: () -> Unit,
-    customMenuContent: @Composable () -> Unit = {}, content: @Composable () -> Unit
+    customMenuContent: @Composable () -> Unit = {}, content: @Composable (isLocked: Boolean) -> Unit
 ) {
     val screenPos = ViewportMath.worldToScreen(position, canvasOffset, scale)
     var isMultiTouch by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
-    var isLocked by remember { mutableStateOf(false) }
 
     val animatedShadow by animateDpAsState(targetValue = if (isDragging) 24.dp else 4.dp, animationSpec = tween(150), label = "shadow")
     val animatedScale by animateFloatAsState(targetValue = if (isDragging) 1.02f else 1f, animationSpec = tween(150), label = "scale")
     val isDark = LocalDarkTheme.current
+    
+
 
     Box(
         modifier = Modifier
@@ -86,7 +89,7 @@ fun CanvasItemWrapper(
                                 onDrag = { change, dragAmount ->
                                     if (!isLocked && !isMultiTouch) {
                                         change.consume()
-                                        onPositionDelta(dragAmount / scale)
+                                        onPositionDelta(dragAmount)
                                     }
                                 }
                             )
@@ -111,14 +114,25 @@ fun CanvasItemWrapper(
 
                 .then(if (hasDefaultBackground) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
 
-                // IMPORTANT: The alpha is 0.65f here so you can actually see the liquid distortion through the card's background color!
-                .then(if (hasDefaultBackground) Modifier.background(if (isDark) Color(0xFF1E1E1E).copy(alpha = 0.65f) else Color.White.copy(alpha = 0.65f), RoundedCornerShape(12.dp)) else Modifier)
+                // IMPORTANT: The alpha is backgroundAlpha here so you can optionally see the liquid distortion through the card's background color!
+                .then(if (hasDefaultBackground) Modifier.background(if (isDark) Color(0xFF1E1E1E).copy(alpha = backgroundAlpha) else Color.White.copy(alpha = backgroundAlpha), RoundedCornerShape(12.dp)) else Modifier)
 
                 .then(if (hasDefaultBackground) Modifier.clip(RoundedCornerShape(12.dp)) else Modifier)
                 .then(if (isConnecting) Modifier.border(4.dp, Color.Blue, RoundedCornerShape(12.dp)) else Modifier)
+                .then(
+                    if (isConnectionTarget) {
+                        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                        val pulseAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.3f, targetValue = 0.9f,
+                            animationSpec = infiniteRepeatable(animation = tween(1000, easing = LinearEasing), repeatMode = RepeatMode.Reverse),
+                            label = "pulseAlpha"
+                        )
+                        Modifier.border(4.dp, Color(0xFF00E676).copy(alpha = pulseAlpha), RoundedCornerShape(12.dp))
+                    } else Modifier
+                )
 
         ) {
-            content()
+            content(isLocked)
         }
 
         if (isSelected) {
@@ -155,29 +169,61 @@ fun CanvasItemWrapper(
                 }
             }
 
-            Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-16).dp)) {
+            Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-16).dp).wrapContentWidth(unbounded = true)) {
                 Box(modifier = Modifier.graphicsLayer { translationY = -size.height }) {
-                    Column(
-                        modifier = Modifier
-                            .wrapContentWidth()
-                            .shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.15f))
-                            .background(if (isDark) Color(0xCC1A1A1A) else Color(0xD9FFFFFF), RoundedCornerShape(24.dp))
-                            .border(1.dp, if (isDark) Color(0x22FFFFFF) else Color(0x44FFFFFF), RoundedCornerShape(24.dp))
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        customMenuContent()
-
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.Gray.copy(alpha = 0.2f)))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        // 1. Main Customization Panel
+                        Box(
+                            modifier = Modifier
+                                .wrapContentSize()
+                                .shadow(32.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.3f))
+                                .then(
+                                    if (LocalLiquidState.current != null) {
+                                        val currentRefraction = LocalLiquidRefraction.current
+                                        val currentCurve = LocalLiquidCurve.current
+                                        Modifier.liquid(LocalLiquidState.current!!) {
+                                            refraction = currentRefraction
+                                            curve = currentCurve
+                                            shape = RoundedCornerShape(24.dp)
+                                        }
+                                    } else Modifier
+                                )
+                                .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(24.dp))
+                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
+                                .padding(16.dp)
                         ) {
-                            Icon(if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(24.dp).clickable { isLocked = !isLocked })
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(24.dp).clickable { onDelete() })
+                            customMenuContent()
+                        }
+
+                        // 2. Utility Pill
+                        Column(
+                            modifier = Modifier
+                                .shadow(16.dp, androidx.compose.foundation.shape.RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                                .then(
+                                    if (LocalLiquidState.current != null) {
+                                        val currentRefraction = LocalLiquidRefraction.current
+                                        val currentCurve = LocalLiquidCurve.current
+                                        Modifier.liquid(LocalLiquidState.current!!) {
+                                            refraction = currentRefraction
+                                            curve = currentCurve
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+                                        }
+                                    } else Modifier
+                                )
+                                .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                                .padding(horizontal = 8.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { onConnectRequest() })
+                            Box(modifier = Modifier.width(16.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                            Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { onLockedChange(!isLocked) })
+                            Box(modifier = Modifier.width(16.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                            Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { onDelete() })
                         }
                     }
                 }

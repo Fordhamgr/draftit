@@ -26,42 +26,47 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun ShapeItem(
-    shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.ShapeNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
     CanvasItemWrapper(
         position = shapeNode.position, width = shapeNode.width, height = shapeNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = shapeNode.isLocked, onLockedChange = { onUpdate(shapeNode.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         hasDefaultBackground = false,
         onDelete = onDelete, onSaveRequest = onSaveRequest,
         customMenuContent = {
-            // Context Menu: Shape Types & Fill Toggle
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.CropSquare, "Rectangle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Rectangle")); onSaveRequest() })
-                Icon(Icons.Default.Circle, "Circle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Circle")); onSaveRequest() })
-                Icon(Icons.Default.ChangeHistory, "Triangle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Triangle")); onSaveRequest() })
-                Box(modifier = Modifier.size(1.dp, 24.dp).background(Color.LightGray)) // Divider
-                Icon(if (shapeNode.isFilled) Icons.Default.FormatColorFill else Icons.Outlined.FormatColorReset, "Toggle Fill", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(isFilled = !shapeNode.isFilled)); onSaveRequest() })
-            }
-            // Context Menu: Colors
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(0xFF2196F3, 0xFF4CAF50, 0xFFF44336, 0xFFFF9800, 0xFF9C27B0, 0xFF000000).forEach { colorVal ->
-                    val isSelectedColor = shapeNode.color == Color(colorVal)
-                    Box(modifier = Modifier.size(24.dp).background(Color(colorVal), CircleShape)
-                        .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color.Black else Color.LightGray, CircleShape)
-                        .clickable { onUpdate(shapeNode.copy(color = Color(colorVal))); onSaveRequest() }
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // Context Menu: Shape Types & Fill Toggle
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CropSquare, "Rectangle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Rectangle")); onSaveRequest() })
+                    Icon(Icons.Default.Circle, "Circle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Circle")); onSaveRequest() })
+                    Icon(Icons.Default.ChangeHistory, "Triangle", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(shapeType = "Triangle")); onSaveRequest() })
+                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f))) // Divider
+                    Icon(if (shapeNode.isFilled) Icons.Default.FormatColorFill else Icons.Outlined.FormatColorReset, "Toggle Fill", modifier = Modifier.size(24.dp).clickable { onUpdate(shapeNode.copy(isFilled = !shapeNode.isFilled)); onSaveRequest() })
+                }
+                
+                // Context Menu: Colors
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0xFF2196F3, 0xFF4CAF50, 0xFFF44336, 0xFFFF9800, 0xFF9C27B0, 0xFF000000).forEach { colorVal ->
+                        val isSelectedColor = shapeNode.color == Color(colorVal)
+                        Box(modifier = Modifier.size(24.dp).background(Color(colorVal), CircleShape)
+                            .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color.Black else Color.LightGray, CircleShape)
+                            .clickable { onUpdate(shapeNode.copy(color = Color(colorVal))); onSaveRequest() }
+                        )
+                    }
                 }
             }
         }
-    ) {
+    ) { isLocked ->
         Canvas(modifier = Modifier.fillMaxSize()) {
             val drawStyle = if (shapeNode.isFilled) Fill else Stroke(width = 8f)
+            val colorAlpha = if (shapeNode.isFilled) shapeNode.color.copy(alpha = 0.65f) else shapeNode.color
             when (shapeNode.shapeType) {
-                "Rectangle" -> drawRect(color = shapeNode.color, style = drawStyle)
-                "Circle" -> drawCircle(color = shapeNode.color, style = drawStyle)
+                "Rectangle" -> drawRect(color = colorAlpha, style = drawStyle)
+                "Circle" -> drawCircle(color = colorAlpha, style = drawStyle)
                 "Triangle" -> {
                     val path = Path().apply {
                         moveTo(size.width / 2f, 0f)
@@ -69,7 +74,7 @@ fun ShapeItem(
                         lineTo(0f, size.height)
                         close()
                     }
-                    drawPath(path = path, color = shapeNode.color, style = drawStyle)
+                    drawPath(path = path, color = colorAlpha, style = drawStyle)
                 }
             }
         }

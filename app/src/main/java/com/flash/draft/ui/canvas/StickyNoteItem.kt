@@ -32,7 +32,7 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun StickyNoteItem(
-    note: CanvasElement.StickyNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean,
+    note: CanvasElement.StickyNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.StickyNote) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
@@ -45,46 +45,55 @@ fun StickyNoteItem(
 
     CanvasItemWrapper(
         position = note.position, width = note.width, height = note.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting,
-        isFullyDraggable = false, // Critical so we don't block the TextField
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
+        isLocked = note.isLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
+        isFullyDraggable = false, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest,
         customMenuContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf("Sans", "Serif", "Mono", "Cursive").forEach { fontName ->
-                    val isSelectedFont = note.fontFamily == fontName || (note.fontFamily == "SansSerif" && fontName == "Sans")
-                    Text(
-                        text = fontName, fontSize = 12.sp, fontWeight = if (isSelectedFont) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelectedFont) Color.White else Color.Black,
-                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (isSelectedFont) Color.Blue else Color.LightGray.copy(alpha = 0.5f))
-                            .clickable { onUpdate(note.copy(fontFamily = fontName)); onSaveRequest() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    listOf("Sans", "Serif", "Mono", "Cursive").forEach { fontName ->
+                        val isSelectedFont = note.fontFamily == fontName || (note.fontFamily == "SansSerif" && fontName == "Sans")
+                        Text(
+                            text = fontName, fontSize = 12.sp, fontWeight = if (isSelectedFont) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelectedFont) Color.White else Color.Black,
+                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (isSelectedFont) Color.Blue else Color.LightGray.copy(alpha = 0.5f))
+                                .clickable { onUpdate(note.copy(fontFamily = fontName)); onSaveRequest() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Box(modifier = Modifier.size(1.dp, 16.dp).background(Color.LightGray))
+                    Icon(Icons.Default.Remove, contentDescription = "Smaller", modifier = Modifier.size(20.dp).clickable { if (note.fontSize > 10f) { onUpdate(note.copy(fontSize = note.fontSize - 2f)); onSaveRequest() } })
+                    Text("${note.fontSize.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Add, contentDescription = "Bigger", modifier = Modifier.size(20.dp).clickable { if (note.fontSize < 48f) { onUpdate(note.copy(fontSize = note.fontSize + 2f)); onSaveRequest() } })
                 }
-                Box(modifier = Modifier.size(1.dp, 16.dp).background(Color.LightGray))
-                Icon(Icons.Default.Remove, contentDescription = "Smaller", modifier = Modifier.size(20.dp).clickable { if (note.fontSize > 10f) { onUpdate(note.copy(fontSize = note.fontSize - 2f)); onSaveRequest() } })
-                Text("${note.fontSize.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.Add, contentDescription = "Bigger", modifier = Modifier.size(20.dp).clickable { if (note.fontSize < 48f) { onUpdate(note.copy(fontSize = note.fontSize + 2f)); onSaveRequest() } })
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                val colors = listOf(0xFFFFF9C4, 0xFFFFCDD2, 0xFFBBDEFB, 0xFFC8E6C9, 0xFFE1BEE7, 0xFFFFFFFF)
-                colors.forEach { colorVal ->
-                    val isSelectedColor = note.color == Color(colorVal)
-                    Box(modifier = Modifier.size(24.dp).background(Color(colorVal), CircleShape)
-                        .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color.Blue else Color.LightGray, CircleShape)
-                        .clickable { onUpdate(note.copy(color = Color(colorVal))); onSaveRequest() }
-                    )
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val colors = listOf(0xFFFFF9C4, 0xFFFFCDD2, 0xFFBBDEFB, 0xFFC8E6C9, 0xFFE1BEE7, 0xFFFFFFFF)
+                    colors.forEach { colorVal ->
+                        val isSelectedColor = note.color == Color(colorVal)
+                        Box(modifier = Modifier.size(24.dp).background(Color(colorVal), CircleShape)
+                            .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color.Blue else Color.LightGray, CircleShape)
+                            .clickable { onUpdate(note.copy(color = Color(colorVal))); onSaveRequest() }
+                        )
+                    }
                 }
             }
         }
-    ) {
+    ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize().background(note.color)) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(32.dp).background(Color.Black.copy(alpha = 0.1f))
-                    .pointerInput(Unit) {
+                    .pointerInput(isLocked) {
                         detectDragGestures(
-                            onDragStart = { onSelect() }, onDragEnd = { onSaveRequest() },
-                            onDrag = { change, dragAmount -> change.consume(); onPositionDelta(dragAmount) }
+                            onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                            onDrag = { change, dragAmount -> 
+                                if (!isLocked) {
+                                    change.consume()
+                                    onPositionDelta(dragAmount)
+                                }
+                            }
                         )
                     }
             ) {

@@ -1,15 +1,12 @@
 package com.flash.draft.ui.canvas
 
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.PanTool
-import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,17 +34,17 @@ fun MainBottomDock(
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DockItem(Icons.Default.PanTool, "Pan", activeTool == "Pan", iconTint, activeTint) { onToolSelect("Pan") }
-            DockItem(Icons.Default.Create, "Draw", activeTool == "Draw", iconTint, activeTint) { onToolSelect("Draw") }
-            DockItem(Icons.Default.TextFields, "Text", activeTool == "Text", iconTint, activeTint) { onToolSelect("Text") }
-            DockItem(Icons.Default.StickyNote2, "Note", activeTool == "Note", iconTint, activeTint) { onToolSelect("Note") }
+            DockItem(painterResource(id = LucideR.drawable.lucide_ic_hand), "Pan", activeTool == "Pan", iconTint, activeTint) { onToolSelect("Pan") }
+            DockItem(painterResource(id = LucideR.drawable.lucide_ic_pen), "Draw", activeTool == "Draw", iconTint, activeTint) { onToolSelect("Draw") }
+            DockItem(painterResource(id = LucideR.drawable.lucide_ic_type), "Text", activeTool == "Text", iconTint, activeTint) { onToolSelect("Text") }
+            DockItem(painterResource(id = LucideR.drawable.lucide_ic_sticky_note), "Note", activeTool == "Note", iconTint, activeTint) { onToolSelect("Note") }
         }
     }
 }
 
 @Composable
 private fun DockItem(
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     label: String,
     isActive: Boolean,
     tint: Color,

@@ -19,19 +19,12 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun CanvasDrawPipeline(
+fun CanvasBackgroundDrawPipeline(
     elements: List<CanvasElement>,
     scale: Float,
     offset: Offset,
     selectedConnectorId: String?,
-    isDarkTheme: Boolean,
-    selectedGroupIds: Set<String>,
-    currentDrawingPath: List<Offset>,
-    activeToolType: String,
-    activeDrawColor: Color,
-    activeAlpha: Float,
-    activeStrokeWidth: Float,
-    lassoPath: List<Offset>
+    isDarkTheme: Boolean
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         withTransform({
@@ -101,34 +94,102 @@ fun CanvasDrawPipeline(
                     if (connector.arrowDirection == "Both") drawArrow(start, end)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CanvasForegroundDrawPipeline(
+    elements: List<CanvasElement>,
+    scale: Float,
+    offset: Offset,
+    isDarkTheme: Boolean,
+    selectedGroupIds: Set<String>,
+    currentDrawingPath: List<Offset>,
+    activeToolType: String,
+    activeDrawColor: Color,
+    activeAlpha: Float,
+    activeStrokeWidth: Float,
+    lassoPath: List<Offset>
+) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        withTransform({
+            translate(left = offset.x, top = offset.y)
+            scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
+        }) {
+            // Helper function to build a smooth quadratic bezier path
+            fun buildSmoothPath(points: List<Offset>): Path {
+                val path = Path()
+                if (points.isNotEmpty()) {
+                    path.moveTo(points[0].x, points[0].y)
+                    for (i in 1 until points.size - 1) {
+                        val p1 = points[i]
+                        val p2 = points[i + 1]
+                        val midX = (p1.x + p2.x) / 2
+                        val midY = (p1.y + p2.y) / 2
+                        path.quadraticTo(p1.x, p1.y, midX, midY)
+                    }
+                    path.lineTo(points.last().x, points.last().y)
+                }
+                return path
+            }
 
             elements.filterIsInstance<CanvasElement.Sketch>().forEach { sketch ->
                 if (sketch.points.size > 1) {
+                    val path = buildSmoothPath(sketch.points)
+                    
                     val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
-                    val strokeColor = if (selectedGroupIds.contains(sketch.id)) Color.Blue else baseColor.copy(alpha = sketch.alpha)
-                    val blend = if (sketch.toolType == "Highlighter") BlendMode.Multiply else BlendMode.SrcOver
-                    for (i in 1 until sketch.points.size) {
-                        val p1 = sketch.points[i - 1]; val p2 = sketch.points[i]
-                        val distance = kotlin.math.sqrt((p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y))
-                        val targetWidth = (sketch.strokeWidth * (1f / (1f + (distance * 0.05f)))).coerceIn(sketch.strokeWidth * 0.3f, sketch.strokeWidth * 1.5f)
-                        drawLine(color = strokeColor, start = p1, end = p2, strokeWidth = targetWidth, cap = StrokeCap.Round, blendMode = blend)
+                    val isSelected = selectedGroupIds.contains(sketch.id)
+                    
+                    // Tool-specific properties
+                    val (strokeColor, blendMode, width) = when (sketch.toolType) {
+                        "Highlighter" -> {
+                            val c = if (isSelected) Color.Blue.copy(alpha = 0.5f) else baseColor.copy(alpha = 0.4f)
+                            Triple(c, BlendMode.Multiply, sketch.strokeWidth * 3f)
+                        }
+                        "Pencil" -> {
+                            val c = if (isSelected) Color.Blue else baseColor.copy(alpha = sketch.alpha * 0.4f)
+                            Triple(c, BlendMode.SrcOver, sketch.strokeWidth * 0.3f)
+                        }
+                        else -> { // Pen
+                            val c = if (isSelected) Color.Blue else baseColor.copy(alpha = sketch.alpha)
+                            Triple(c, BlendMode.SrcOver, sketch.strokeWidth)
+                        }
                     }
+
+                    drawPath(
+                        path = path,
+                        color = strokeColor,
+                        style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        blendMode = blendMode
+                    )
                 }
             }
 
             if (currentDrawingPath.size > 1) {
-                val blend = if (activeToolType == "Highlighter") BlendMode.Multiply else BlendMode.SrcOver
-                val activeColor = getAdaptiveColor(activeDrawColor, isDarkTheme).copy(alpha = activeAlpha)
-                for (i in 1 until currentDrawingPath.size) {
-                    val p1 = currentDrawingPath[i - 1]; val p2 = currentDrawingPath[i]
-                    val distance = kotlin.math.sqrt((p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y))
-                    val targetWidth = (activeStrokeWidth * (1f / (1f + (distance * 0.05f)))).coerceIn(activeStrokeWidth * 0.3f, activeStrokeWidth * 1.5f)
-                    drawLine(color = activeColor, start = p1, end = p2, strokeWidth = targetWidth, cap = StrokeCap.Round, blendMode = blend)
+                val path = buildSmoothPath(currentDrawingPath)
+                val baseColor = getAdaptiveColor(activeDrawColor, isDarkTheme)
+                
+                val (strokeColor, blendMode, width) = when (activeToolType) {
+                    "Highlighter" -> Triple(baseColor.copy(alpha = 0.4f), BlendMode.Multiply, activeStrokeWidth * 3f)
+                    "Pencil" -> Triple(baseColor.copy(alpha = activeAlpha * 0.4f), BlendMode.SrcOver, activeStrokeWidth * 0.3f)
+                    else -> Triple(baseColor.copy(alpha = activeAlpha), BlendMode.SrcOver, activeStrokeWidth) // Pen
                 }
+
+                drawPath(
+                    path = path,
+                    color = strokeColor,
+                    style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    blendMode = blendMode
+                )
             }
 
             if (lassoPath.size > 1) {
-                val path = Path().apply { moveTo(lassoPath.first().x, lassoPath.first().y); for (i in 1 until lassoPath.size) lineTo(lassoPath[i].x, lassoPath[i].y); close() }
+                val path = Path().apply { 
+                    moveTo(lassoPath.first().x, lassoPath.first().y)
+                    for (i in 1 until lassoPath.size) lineTo(lassoPath[i].x, lassoPath[i].y)
+                    close() 
+                }
                 drawPath(path, color = Color.Blue.copy(alpha = 0.1f))
                 drawPath(path, color = Color.Blue, style = Stroke(width = 2f / scale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / scale, 15f / scale))))
             }
