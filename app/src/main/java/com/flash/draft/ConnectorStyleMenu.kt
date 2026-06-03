@@ -216,33 +216,25 @@ fun ConnectorStyleMenu(
             )
             DockSegmentedIconControl(lineStyleOptions, connector.lineStyle, { onUpdate(connector.copy(lineStyle = it)) }, isDark)
 
-            // Arrow Direction Options
-            val arrowOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
-                "None" to { color ->
-                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
-                        val stroke = 2.dp.toPx()
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    }
-                },
-                "End" to { color ->
-                    Icon(painterResource(id = LucideR.drawable.lucide_ic_arrow_right), contentDescription = "End", tint = color, modifier = Modifier.size(18.dp))
-                },
-                "Both" to { color ->
-                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
-                        val stroke = 1.5.dp.toPx()
-                        val y = size.height / 2
-                        // Main line
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        // Left arrow
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(6.dp.toPx(), y - 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(6.dp.toPx(), y + 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        // Right arrow
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 6.dp.toPx(), y - 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), y), end = androidx.compose.ui.geometry.Offset(size.width - 6.dp.toPx(), y + 4.dp.toPx()), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    }
-                }
-            )
-            DockSegmentedIconControl(arrowOptions, connector.arrowDirection, { onUpdate(connector.copy(arrowDirection = it)) }, isDark)
+            // Thickness Adjuster
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            ) {
+                Text("Size", color = if (isDark) Color.LightGray else Color.DarkGray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                androidx.compose.material3.Slider(
+                    value = connector.strokeWidth,
+                    onValueChange = { onUpdate(connector.copy(strokeWidth = it)) },
+                    valueRange = 2f..20f,
+                    modifier = Modifier.width(100.dp),
+                    colors = androidx.compose.material3.SliderDefaults.colors(
+                        thumbColor = if (isDark) Color.White else Color.Black,
+                        activeTrackColor = if (isDark) Color.White else Color.Black,
+                        inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                    )
+                )
+            }
 
             // Vertical Divider
             Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))

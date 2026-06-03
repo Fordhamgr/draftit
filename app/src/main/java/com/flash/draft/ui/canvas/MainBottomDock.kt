@@ -27,7 +27,7 @@ fun MainBottomDock(
 ) {
     val isDark = LocalDarkTheme.current
     val iconTint = if (isDark) Color.White else Color(0xFF1D1D1F)
-    val activeTint = Color(0xFF2196F3)
+    val activeTint = if (isDark) Color.White else Color.Black
 
     LiquidGlassPill {
         Row(

@@ -53,7 +53,7 @@ sealed class CanvasElement {
         val color: Color = Color.Companion.Black,
         val strokeWidth: Float = 4f,
         val lineStyle: String = "Solid", // "Solid", "Dashed", "Dotted"
-        val arrowDirection: String = "End", // "None", "End", "Both"
+        val arrowDirection: String = "Both", // "None", "End", "Both"
         val arrowShape: String = "Filled", // "Open", "Filled", "Circle", "Diamond"
         val routing: String = "Straight", // Prepping for Tier 2 curvature!
         val isLocked: Boolean = false

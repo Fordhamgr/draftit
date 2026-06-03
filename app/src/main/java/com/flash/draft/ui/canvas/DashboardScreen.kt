@@ -27,6 +27,16 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.ui.platform.LocalLocale
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FileDownload
+import java.io.BufferedReader
+import java.io.InputStreamReader
+
 @Composable
 fun DashboardScreen(
     repository: NoteRepository,
@@ -39,6 +49,26 @@ fun DashboardScreen(
 
     val bgColor = if (isDark) Color(0xFF121212) else Color(0xFFF5F5F7)
     val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
+    val context = LocalContext.current
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val reader = BufferedReader(InputStreamReader(inputStream))
+                val jsonContent = reader.use { it.readText() }
+                val newProjectId = repository.importProject(jsonContent)
+                if (newProjectId != null) {
+                    projects = repository.getAllProjects()
+                    Toast.makeText(context, "Project imported successfully!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Invalid project file format.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error reading file.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -53,13 +83,31 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             // Premium Header
-            Text(
-                text = "All Boards",
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                color = textColor,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "All canvas",
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor
+                )
+                
+                IconButton(
+                    onClick = { /* TODO Help */ },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.White.copy(alpha = if (isDark) 0.1f else 0.8f), RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(24.dp))
+                ) {
+                    Text("?", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = textColor)
+                }
+            }
 
             if (projects.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -87,19 +135,37 @@ fun DashboardScreen(
             }
         }
 
-        // Floating Action Button (Glassmorphism inspired)
-        FloatingActionButton(
-            onClick = onCreateNewProject,
-            containerColor = Color(0xFF2196F3),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(20.dp),
+        // Floating Actions at the bottom (Pill)
+        Row(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(32.dp)
-                .size(64.dp)
-                .shadow(16.dp, RoundedCornerShape(20.dp), spotColor = Color(0xFF2196F3))
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+                .shadow(16.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                .background(Color.White.copy(alpha = if (isDark) 0.15f else 0.85f), RoundedCornerShape(32.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(32.dp))
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = "New Board", modifier = Modifier.size(32.dp))
+            TextButton(
+                onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Icon(Icons.Filled.FileDownload, contentDescription = "Import", modifier = Modifier.size(20.dp), tint = textColor)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Import", fontWeight = FontWeight.Medium, color = textColor)
+            }
+
+            Button(
+                onClick = onCreateNewProject,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1), contentColor = Color.White),
+                shape = RoundedCornerShape(24.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = "New Project", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("New Project", fontWeight = FontWeight.Medium)
+            }
         }
     }
 }
@@ -111,7 +177,7 @@ fun ProjectCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val cardBg = if (isDark) Color(0xFF1E1E1E) else Color.White
+    val cardBg = Color.White.copy(alpha = if (isDark) 0.1f else 0.7f)
     val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
     val dateColor = if (isDark) Color.Gray else Color(0xFF86868B)
 
@@ -121,9 +187,10 @@ fun ProjectCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(16.dp))
-            .background(cardBg, RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
+            .shadow(12.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.1f))
+            .background(cardBg, RoundedCornerShape(24.dp))
+            .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.6f), RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
             .clickable { onClick() }
     ) {
         // Thumbnail Area (Mocking a preview)
@@ -131,7 +198,7 @@ fun ProjectCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(140.dp)
-                .background(Color(0xFFE5E5EA).copy(alpha = if (isDark) 0.1f else 0.5f)),
+                .background(Color.White.copy(alpha = if (isDark) 0.05f else 0.4f)),
             contentAlignment = Alignment.Center
         ) {
             // Future feature: Actually draw miniaturized elements here based on project.previewElements

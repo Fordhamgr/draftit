@@ -94,4 +94,8 @@ class CanvasViewModel(
 
     fun setLiquidFrost(value: Float) { _liquidFrost.value = value }
     fun setLiquidDispersion(value: Float) { _liquidDispersion.value = value }
+
+    fun getRawProjectJson(): String? {
+        return repository.getRawJson(projectId)
+    }
 }

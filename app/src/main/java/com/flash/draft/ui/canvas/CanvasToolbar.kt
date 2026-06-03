@@ -47,7 +47,7 @@ fun CanvasToolbar(
     val glassBg = if (isDarkTheme) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
     val glassBorder = if (isDarkTheme) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
     val iconTint = if (isDarkTheme) Color.White else Color(0xFF1D1D1F)
-    val activeTint = Color(0xFF2196F3)
+    val activeTint = if (isDarkTheme) Color.White else Color.Black
 
     // --- GRAB DYNAMIC LIQUID STATE ---
     val liquidState = LocalLiquidState.current

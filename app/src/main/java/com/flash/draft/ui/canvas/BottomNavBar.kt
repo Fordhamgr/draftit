@@ -167,7 +167,7 @@ private fun DockItem(
     onClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val activeTint = Color(0xFF2196F3)
+    val activeTint = if (isDark) Color.White else Color.Black
     val inactiveTint = if (isDark) Color.LightGray else Color.DarkGray
     val currentTint = if (isActive) activeTint else inactiveTint
     val bgTint = if (isActive) activeTint.copy(alpha = 0.15f) else Color.Transparent

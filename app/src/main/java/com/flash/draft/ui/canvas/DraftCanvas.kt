@@ -61,7 +61,12 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.draw.drawWithContent
+import android.graphics.pdf.PdfDocument
+import android.widget.Toast
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -159,6 +164,7 @@ fun DraftCanvas(
 
     var isUiVisible by remember { mutableStateOf(true) }
     val view = LocalView.current
+    val graphicsLayer = rememberGraphicsLayer()
 
     LaunchedEffect(elementsState) {
         if (elements.toList() != elementsState) {
@@ -222,6 +228,76 @@ fun DraftCanvas(
             isDrawingMode = false; isConnectingMode = false; isLassoMode = false
             logAction("Imported Photo")
             viewModel.updateElements(elements.toList())
+        }
+    }
+
+    val exportProjectLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            val json = viewModel.getRawProjectJson()
+            if (json != null) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(json.toByteArray())
+                    }
+                    Toast.makeText(context, "Project exported successfully!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error exporting project.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            isExportMenuOpen = false
+        }
+    }
+
+    val exportPictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                try {
+                    val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                    val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(finalBitmap)
+                    canvas.drawColor(android.graphics.Color.WHITE)
+                    canvas.drawBitmap(swBitmap, 0f, 0f, null)
+
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    }
+                    Toast.makeText(context, "Picture exported successfully!", Toast.LENGTH_SHORT).show()
+                } catch(e: Exception) {
+                    Toast.makeText(context, "Error exporting picture.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            isExportMenuOpen = false
+        }
+    }
+
+    val exportPdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                try {
+                    val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                    val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(finalBitmap)
+                    canvas.drawColor(android.graphics.Color.WHITE)
+                    canvas.drawBitmap(swBitmap, 0f, 0f, null)
+
+                    val pdfDocument = android.graphics.pdf.PdfDocument()
+                    val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(finalBitmap.width, finalBitmap.height, 1).create()
+                    val page = pdfDocument.startPage(pageInfo)
+                    page.canvas.drawBitmap(finalBitmap, 0f, 0f, null)
+                    pdfDocument.finishPage(page)
+                    
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        pdfDocument.writeTo(stream)
+                    }
+                    pdfDocument.close()
+                    Toast.makeText(context, "PDF exported successfully!", Toast.LENGTH_SHORT).show()
+                } catch(e: Exception) {
+                    Toast.makeText(context, "Error exporting PDF.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            isExportMenuOpen = false
         }
     }
 
@@ -436,7 +512,16 @@ fun DraftCanvas(
         ) {
 
             // --- 1. RECORDING BACKGROUND ---
-            Box(modifier = Modifier.fillMaxSize().liquefiable(liquidState)) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .liquefiable(liquidState)
+                .drawWithContent {
+                    graphicsLayer.record {
+                        this@drawWithContent.drawContent()
+                    }
+                    drawLayer(graphicsLayer)
+                }
+            ) {
                 GridBackground(scale = scale, offset = offset)
 
                 CanvasBackgroundDrawPipeline(
@@ -531,7 +616,7 @@ fun DraftCanvas(
                                     onClick = { isExportMenuOpen = true },
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    Icon(Icons.Default.Share, "Export", tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.Share, "Export", tint = Color.Black, modifier = Modifier.size(24.dp))
                                 }
                             } else {
                                 Column(
@@ -539,10 +624,9 @@ fun DraftCanvas(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    val itemModifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { isExportMenuOpen = false }.padding(vertical = 8.dp, horizontal = 12.dp)
-                                    Text("As a Project", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black, modifier = itemModifier)
-                                    Text("As PDF", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black, modifier = itemModifier)
-                                    Text("As Picture", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black, modifier = itemModifier)
+                                    Text("As a Project", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Board.json") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                                    Text("As PDF", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                                    Text("As Picture", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 12.dp))
                                 }
                             }
                         }

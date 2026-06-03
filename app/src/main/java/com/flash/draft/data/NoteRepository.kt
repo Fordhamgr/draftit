@@ -247,4 +247,23 @@ class NoteRepository(context: Context) {
         }
         return elements
     }
+
+    fun getRawJson(projectId: String): String? {
+        val file = File(projectsDir, "$projectId.json")
+        if (!file.exists()) return null
+        return try { file.readText() } catch (e: Exception) { null }
+    }
+
+    fun importProject(jsonContent: String): String? {
+        return try {
+            // Validate it's a JSON array format expected for our projects
+            org.json.JSONArray(jsonContent)
+            val newId = java.util.UUID.randomUUID().toString()
+            val file = File(projectsDir, "$newId.json")
+            file.writeText(jsonContent)
+            newId
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
