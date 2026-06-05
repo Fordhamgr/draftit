@@ -69,4 +69,9 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("io.github.fletchmckee.liquid:liquid:1.1.1")
     implementation("com.composables:icons-lucide-android:2.2.1")
+    implementation(libs.androidx.ink.authoring)
+    implementation(libs.androidx.ink.geometry)
+    implementation(libs.androidx.ink.brush)
+    implementation(libs.androidx.ink.rendering)
+    implementation(libs.androidx.ink.strokes)
 }

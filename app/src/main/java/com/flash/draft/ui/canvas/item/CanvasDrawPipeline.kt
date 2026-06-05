@@ -2,6 +2,7 @@ package com.flash.draft.ui.canvas.item
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -11,9 +12,15 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.nativeCanvas
+import android.graphics.Matrix
+import androidx.ink.strokes.*
+import androidx.ink.brush.StockBrushes
+import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import com.flash.draft.model.CanvasElement
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -161,85 +168,89 @@ fun CanvasForegroundDrawPipeline(
     offset: Offset,
     isDarkTheme: Boolean,
     selectedGroupIds: Set<String>,
-    currentDrawingPath: List<Offset>,
+    currentDrawingPath: List<com.flash.draft.model.InkPoint>,
     activeToolType: String,
     activeDrawColor: Color,
     activeAlpha: Float,
     activeStrokeWidth: Float,
     lassoPath: List<Offset>
 ) {
+    val renderer = remember { CanvasStrokeRenderer.create() }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
+        drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
+            nativeCanvas.save()
+            nativeCanvas.translate(offset.x, offset.y)
+            nativeCanvas.scale(scale, scale)
+
+            // Render existing sketches
+            elements.filterIsInstance<CanvasElement.Sketch>().forEach { sketch ->
+                if (sketch.points.size > 1) {
+                    val batch = MutableStrokeInputBatch()
+                    var lastTime = -1L
+                    sketch.points.forEach { p ->
+                        val safeTime = if (p.timeMillis < lastTime) lastTime else p.timeMillis
+                        lastTime = safeTime
+                        batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, p.x, p.y, safeTime, p.pressure)
+                    }
+                    
+                    val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
+                    val isSelected = selectedGroupIds.contains(sketch.id)
+                    val alpha = if (isSelected) 0.5f else sketch.alpha
+
+                    val family = when (sketch.toolType) {
+                        "Highlighter" -> StockBrushes.highlighterV1
+                        "Pencil" -> StockBrushes.markerV1 // Fallback
+                        else -> StockBrushes.markerV1
+                    }
+                    val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
+                        family,
+                        baseColor.copy(alpha = alpha).toArgb(),
+                        sketch.strokeWidth,
+                        0.1f
+                    )
+
+                    val stroke = Stroke(brush, batch)
+                    renderer.draw(nativeCanvas, stroke, Matrix())
+                }
+            }
+
+            // Render current drawing path
+            if (currentDrawingPath.size > 1) {
+                val batch = MutableStrokeInputBatch()
+                var lastTime = -1L
+                currentDrawingPath.forEach { p ->
+                    val safeTime = if (p.timeMillis < lastTime) lastTime else p.timeMillis
+                    lastTime = safeTime
+                    batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, p.x, p.y, safeTime, p.pressure)
+                }
+                
+                val baseColor = getAdaptiveColor(activeDrawColor, isDarkTheme)
+                val family = when (activeToolType) {
+                    "Highlighter" -> StockBrushes.highlighterV1
+                    "Pencil" -> StockBrushes.markerV1
+                    else -> StockBrushes.markerV1
+                }
+                val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
+                    family,
+                    baseColor.copy(alpha = activeAlpha).toArgb(),
+                    activeStrokeWidth,
+                    0.1f
+                )
+
+                val stroke = Stroke(brush, batch)
+                renderer.draw(nativeCanvas, stroke, Matrix())
+            }
+            
+            nativeCanvas.restore()
+        }
+
+        // Draw lasso path in standard Compose layer
         withTransform({
             translate(left = offset.x, top = offset.y)
             scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
         }) {
-            // Helper function to build a smooth quadratic bezier path
-            fun buildSmoothPath(points: List<Offset>): Path {
-                val path = Path()
-                if (points.isNotEmpty()) {
-                    path.moveTo(points[0].x, points[0].y)
-                    for (i in 1 until points.size - 1) {
-                        val p1 = points[i]
-                        val p2 = points[i + 1]
-                        val midX = (p1.x + p2.x) / 2
-                        val midY = (p1.y + p2.y) / 2
-                        path.quadraticTo(p1.x, p1.y, midX, midY)
-                    }
-                    path.lineTo(points.last().x, points.last().y)
-                }
-                return path
-            }
-
-            elements.filterIsInstance<CanvasElement.Sketch>().forEach { sketch ->
-                if (sketch.points.size > 1) {
-                    val path = buildSmoothPath(sketch.points)
-                    
-                    val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
-                    val isSelected = selectedGroupIds.contains(sketch.id)
-                    
-                    // Tool-specific properties
-                    val (strokeColor, blendMode, width) = when (sketch.toolType) {
-                        "Highlighter" -> {
-                            val c = if (isSelected) Color.Blue.copy(alpha = 0.5f) else baseColor.copy(alpha = 0.4f)
-                            Triple(c, BlendMode.Multiply, sketch.strokeWidth * 3f)
-                        }
-                        "Pencil" -> {
-                            val c = if (isSelected) Color.Blue else baseColor.copy(alpha = sketch.alpha * 0.4f)
-                            Triple(c, BlendMode.SrcOver, sketch.strokeWidth * 0.3f)
-                        }
-                        else -> { // Pen
-                            val c = if (isSelected) Color.Blue else baseColor.copy(alpha = sketch.alpha)
-                            Triple(c, BlendMode.SrcOver, sketch.strokeWidth)
-                        }
-                    }
-
-                    drawPath(
-                        path = path,
-                        color = strokeColor,
-                        style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                        blendMode = blendMode
-                    )
-                }
-            }
-
-            if (currentDrawingPath.size > 1) {
-                val path = buildSmoothPath(currentDrawingPath)
-                val baseColor = getAdaptiveColor(activeDrawColor, isDarkTheme)
-                
-                val (strokeColor, blendMode, width) = when (activeToolType) {
-                    "Highlighter" -> Triple(baseColor.copy(alpha = 0.4f), BlendMode.Multiply, activeStrokeWidth * 3f)
-                    "Pencil" -> Triple(baseColor.copy(alpha = activeAlpha * 0.4f), BlendMode.SrcOver, activeStrokeWidth * 0.3f)
-                    else -> Triple(baseColor.copy(alpha = activeAlpha), BlendMode.SrcOver, activeStrokeWidth) // Pen
-                }
-
-                drawPath(
-                    path = path,
-                    color = strokeColor,
-                    style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                    blendMode = blendMode
-                )
-            }
-
             if (lassoPath.size > 1) {
                 val path = Path().apply { 
                     moveTo(lassoPath.first().x, lassoPath.first().y)
@@ -247,7 +258,7 @@ fun CanvasForegroundDrawPipeline(
                     close() 
                 }
                 drawPath(path, color = Color.Blue.copy(alpha = 0.1f))
-                drawPath(path, color = Color.Blue, style = Stroke(width = 2f / scale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / scale, 15f / scale))))
+                drawPath(path, color = Color.Blue, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f / scale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / scale, 15f / scale))))
             }
         }
     }

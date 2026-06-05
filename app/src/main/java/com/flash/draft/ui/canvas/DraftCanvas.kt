@@ -85,6 +85,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flash.draft.ConnectorStyleMenu
 import com.flash.draft.PenStudioPanel
 import com.flash.draft.model.CanvasElement
+import com.flash.draft.model.InkPoint
 import com.flash.draft.utils.GridBackground
 import com.flash.draft.utils.ViewportMath
 
@@ -139,7 +140,7 @@ fun DraftCanvas(
     var connectingStartNodeId by remember { mutableStateOf<String?>(null) }
 
     var isLassoMode by remember { mutableStateOf(false) }
-    val currentDrawingPath = remember { mutableStateListOf<Offset>() }
+    val currentDrawingPath = remember { mutableStateListOf<InkPoint>() }
     val lassoPath = remember { mutableStateListOf<Offset>() }
     var selectedGroupIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -320,7 +321,7 @@ fun DraftCanvas(
                 if (el is CanvasElement.StickyNote) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.ImageCard) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.PdfCard) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.Sketch) elements[idx] = el.copy(points = el.points.map { it + delta })
+                if (el is CanvasElement.Sketch) elements[idx] = el.copy(points = el.points.map { it.copy(x = it.x + delta.x, y = it.y + delta.y) })
                 if (el is CanvasElement.CodeBlock) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.AudioNote) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.ShapeNode) elements[idx] = el.copy(position = el.position + delta)
@@ -388,7 +389,12 @@ fun DraftCanvas(
                         detectDragGestures(
                             onDragStart = { startPos ->
                                 if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, offset, scale)) }
-                                else { currentDrawingPath.clear(); currentDrawingPath.add(ViewportMath.screenToWorld(startPos, offset, scale)) }
+                                else { 
+                                    currentDrawingPath.clear()
+                                    val worldPoint = ViewportMath.screenToWorld(startPos, offset, scale)
+                                    // Use a default time and pressure for the start point since detectDragGestures doesn't provide them initially
+                                    currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())) 
+                                }
                             },
                             onDrag = { change, _ ->
                                 val newPoint = ViewportMath.screenToWorld(change.position, offset, scale)
@@ -397,12 +403,14 @@ fun DraftCanvas(
                                     if (activeToolType == "Eraser") {
                                         val eraseRadius = activeStrokeWidth * 1.5f
                                         elements.removeAll { el ->
-                                            el is CanvasElement.Sketch && el.points.any { p -> (p - newPoint).getDistance() < eraseRadius }
+                                            el is CanvasElement.Sketch && el.points.any { p -> (Offset(p.x, p.y) - newPoint).getDistance() < eraseRadius }
                                         }
                                         // Defer viewModel.updateElements to onDragEnd for smooth erasing!
                                     } else {
                                         val lastPoint = currentDrawingPath.lastOrNull()
-                                        if (lastPoint == null || (newPoint - lastPoint).getDistance() > (3f / scale)) { currentDrawingPath.add(newPoint) }
+                                        if (lastPoint == null || (Offset(newPoint.x, newPoint.y) - Offset(lastPoint.x, lastPoint.y)).getDistance() > (3f / scale)) { 
+                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, change.pressure, change.uptimeMillis)) 
+                                        }
                                     }
                                 }
                             },
@@ -421,7 +429,7 @@ fun DraftCanvas(
                                     elements.forEach { el ->
                                         val center = getCenterPoint(el.id, elements)
                                         if (center != null && ViewportMath.isPointInPolygon(center, lassoPath)) capturedIds.add(el.id)
-                                        else if (el is CanvasElement.Sketch && ViewportMath.isPointInPolygon(el.points.first(), lassoPath)) capturedIds.add(el.id)
+                                        else if (el is CanvasElement.Sketch && ViewportMath.isPointInPolygon(Offset(el.points.first().x, el.points.first().y), lassoPath)) capturedIds.add(el.id)
                                     }
                                     selectedGroupIds = capturedIds; lassoPath.clear(); isLassoMode = false
                                 } else if (currentDrawingPath.size > 1 && activeToolType != "Eraser") {

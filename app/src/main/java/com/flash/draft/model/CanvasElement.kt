@@ -4,6 +4,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import java.util.UUID
 
+data class InkPoint(
+    val x: Float,
+    val y: Float,
+    val pressure: Float = 1f,
+    val timeMillis: Long = 0L
+)
+
 sealed class CanvasElement {
     abstract val id: String
 
@@ -22,7 +29,7 @@ sealed class CanvasElement {
     // NEW: The data structure for a freehand drawing
     data class Sketch(
         override val id: String,
-        val points: List<Offset>,
+        val points: List<InkPoint>,
         val color: Color = Color.Companion.Black,
         val strokeWidth: Float = 6f,
         val toolType: String = "Pen", // "Pen", "Highlighter"

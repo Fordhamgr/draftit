@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.flash.draft.model.CanvasElement
+import com.flash.draft.model.InkPoint
 import com.flash.draft.model.Project
 import org.json.JSONArray
 import org.json.JSONObject
@@ -117,6 +118,8 @@ class NoteRepository(context: Context) {
                         val pointObj = JSONObject()
                         pointObj.put("x", point.x.toDouble())
                         pointObj.put("y", point.y.toDouble())
+                        pointObj.put("pressure", point.pressure.toDouble())
+                        pointObj.put("timeMillis", point.timeMillis)
                         pointsArray.put(pointObj)
                     }
                     jsonObject.put("points", pointsArray)
@@ -219,8 +222,18 @@ class NoteRepository(context: Context) {
                         "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif")))
                         "sketch" -> {
                             val pointsArray = obj.getJSONArray("points")
-                            val points = mutableListOf<Offset>()
-                            for (j in 0 until pointsArray.length()) { val pObj = pointsArray.getJSONObject(j); points.add(Offset(pObj.getDouble("x").toFloat(), pObj.getDouble("y").toFloat())) }
+                            val points = mutableListOf<InkPoint>()
+                            for (j in 0 until pointsArray.length()) { 
+                                val pObj = pointsArray.getJSONObject(j)
+                                points.add(
+                                    InkPoint(
+                                        x = pObj.getDouble("x").toFloat(), 
+                                        y = pObj.getDouble("y").toFloat(),
+                                        pressure = pObj.optDouble("pressure", 1.0).toFloat(),
+                                        timeMillis = pObj.optLong("timeMillis", 0L)
+                                    )
+                                ) 
+                            }
                             elements.add(CanvasElement.Sketch(id, points, Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 6.0).toFloat(), obj.optString("toolType", "Pen"), obj.optDouble("alpha", 1.0).toFloat()))
                         }
                         "image" -> elements.add(CanvasElement.ImageCard(id, pos, obj.getString("uri"), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("originalWidth", obj.optDouble("width", 200.0)).toFloat(), obj.optDouble("originalHeight", obj.optDouble("height", 200.0)).toFloat(), obj.optDouble("alpha", 1.0).toFloat(), obj.optDouble("rotation", 0.0).toFloat(), obj.optDouble("scaleX", 1.0).toFloat(), obj.optDouble("scaleY", 1.0).toFloat(), obj.optBoolean("isLocked", false)))
