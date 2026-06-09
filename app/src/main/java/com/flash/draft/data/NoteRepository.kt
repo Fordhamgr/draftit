@@ -61,6 +61,7 @@ class NoteRepository(context: Context) {
         elements.forEach { element ->
             val jsonObject = JSONObject()
             jsonObject.put("id", element.id)
+            element.hyperlinkTarget?.let { jsonObject.put("hyperlinkTarget", it) }
 
             when (element) {
                 is CanvasElement.StickyNote -> {
@@ -217,9 +218,9 @@ class NoteRepository(context: Context) {
                     val pos = Offset(obj.optDouble("x", 0.0).toFloat(), obj.optDouble("y", 0.0).toFloat())
 
                     when (type) {
-                        "pdf" -> elements.add(CanvasElement.PdfCard(id, pos, obj.getString("uriString"), obj.getString("fileName"), obj.getString("fileSize"), obj.optDouble("width", 260.0).toFloat(), obj.optDouble("height", 140.0).toFloat()))
-                        "code" -> elements.add(CanvasElement.CodeBlock(id, pos, obj.optString("code", ""), obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 180.0).toFloat()))
-                        "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif")))
+                        "pdf" -> elements.add(CanvasElement.PdfCard(id, pos, obj.getString("uriString"), obj.getString("fileName"), obj.getString("fileSize"), obj.optDouble("width", 260.0).toFloat(), obj.optDouble("height", 140.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "code" -> elements.add(CanvasElement.CodeBlock(id, pos, obj.optString("code", ""), obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 180.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif"), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "sketch" -> {
                             val pointsArray = obj.getJSONArray("points")
                             val points = mutableListOf<InkPoint>()
@@ -234,21 +235,21 @@ class NoteRepository(context: Context) {
                                     )
                                 ) 
                             }
-                            elements.add(CanvasElement.Sketch(id, points, Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 6.0).toFloat(), obj.optString("toolType", "Pen"), obj.optDouble("alpha", 1.0).toFloat()))
+                            elements.add(CanvasElement.Sketch(id, points, Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 6.0).toFloat(), obj.optString("toolType", "Pen"), obj.optDouble("alpha", 1.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         }
-                        "image" -> elements.add(CanvasElement.ImageCard(id, pos, obj.getString("uri"), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("originalWidth", obj.optDouble("width", 200.0)).toFloat(), obj.optDouble("originalHeight", obj.optDouble("height", 200.0)).toFloat(), obj.optDouble("alpha", 1.0).toFloat(), obj.optDouble("rotation", 0.0).toFloat(), obj.optDouble("scaleX", 1.0).toFloat(), obj.optDouble("scaleY", 1.0).toFloat(), obj.optBoolean("isLocked", false)))
-                        "audio" -> elements.add(CanvasElement.AudioNote(id, pos, obj.optString("audioPath", ""), obj.optInt("durationMs", 0), false, obj.optDouble("width", 240.0).toFloat(), obj.optDouble("height", 80.0).toFloat()))
-                        "shape" -> elements.add(CanvasElement.ShapeNode(id, pos, obj.optDouble("width", 150.0).toFloat(), obj.optDouble("height", 150.0).toFloat(), obj.optString("shapeType", "Rectangle"), Color(obj.optString("color", "4280399603").toULong()), obj.optBoolean("isFilled", true)))
-                        "connector" -> elements.add(CanvasElement.Connector(id, obj.getString("startId"), obj.getString("endId"), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 4.0).toFloat(), obj.optString("lineStyle", "Solid"), obj.optString("arrowDirection", "End"), obj.optString("arrowShape", "Filled"), obj.optString("routing", "Straight")))
-                        "label" -> elements.add(CanvasElement.LabelNode(id, pos, obj.optString("text", ""), obj.optDouble("width", 250.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("fontSize", 24.0).toFloat(), obj.optBoolean("isBold", false)))
-                        "frame" -> elements.add(CanvasElement.FrameNode(id, pos, obj.optDouble("width", 400.0).toFloat(), obj.optDouble("height", 300.0).toFloat(), obj.optString("title", "New Frame"), Color(obj.optString("color", "4288585374").toULong()), obj.optBoolean("isMagnetic", false)))
+                        "image" -> elements.add(CanvasElement.ImageCard(id, pos, obj.getString("uri"), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("originalWidth", obj.optDouble("width", 200.0)).toFloat(), obj.optDouble("originalHeight", obj.optDouble("height", 200.0)).toFloat(), obj.optDouble("alpha", 1.0).toFloat(), obj.optDouble("rotation", 0.0).toFloat(), obj.optDouble("scaleX", 1.0).toFloat(), obj.optDouble("scaleY", 1.0).toFloat(), obj.optBoolean("isLocked", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "audio" -> elements.add(CanvasElement.AudioNote(id, pos, obj.optString("audioPath", ""), obj.optInt("durationMs", 0), false, obj.optDouble("width", 240.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "shape" -> elements.add(CanvasElement.ShapeNode(id, pos, obj.optDouble("width", 150.0).toFloat(), obj.optDouble("height", 150.0).toFloat(), obj.optString("shapeType", "Rectangle"), Color(obj.optString("color", "4280399603").toULong()), obj.optBoolean("isFilled", true), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "connector" -> elements.add(CanvasElement.Connector(id, obj.getString("startId"), obj.getString("endId"), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 4.0).toFloat(), obj.optString("lineStyle", "Solid"), obj.optString("arrowDirection", "End"), obj.optString("arrowShape", "Filled"), obj.optString("routing", "Straight"), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "label" -> elements.add(CanvasElement.LabelNode(id, pos, obj.optString("text", ""), obj.optDouble("width", 250.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("fontSize", 24.0).toFloat(), obj.optBoolean("isBold", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "frame" -> elements.add(CanvasElement.FrameNode(id, pos, obj.optDouble("width", 400.0).toFloat(), obj.optDouble("height", 300.0).toFloat(), obj.optString("title", "New Frame"), Color(obj.optString("color", "4288585374").toULong()), obj.optBoolean("isMagnetic", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "tasklist" -> {
                             val tasksList = mutableListOf<CanvasElement.TaskItem>()
                             if (obj.has("tasks")) {
                                 val tasksArray = obj.getJSONArray("tasks")
                                 for (j in 0 until tasksArray.length()) { val tObj = tasksArray.getJSONObject(j); tasksList.add(CanvasElement.TaskItem(tObj.getString("id"), tObj.getString("text"), tObj.getBoolean("isCompleted"))) }
                             }
-                            elements.add(CanvasElement.TaskListNode(id, pos, obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 350.0).toFloat(), obj.optString("title", "To-Do List"), if (tasksList.isEmpty()) listOf(CanvasElement.TaskItem(text = "New task")) else tasksList, Color(obj.optString("color", "4294967295").toULong())))
+                            elements.add(CanvasElement.TaskListNode(id, pos, obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 350.0).toFloat(), obj.optString("title", "To-Do List"), if (tasksList.isEmpty()) listOf(CanvasElement.TaskItem(text = "New task")) else tasksList, Color(obj.optString("color", "4294967295").toULong()), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         }
                     }
                 } catch (e: Exception) {
@@ -278,5 +279,47 @@ class NoteRepository(context: Context) {
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun saveScenes(projectId: String, scenes: List<com.flash.draft.model.Scene>) {
+        val file = File(projectsDir, "${projectId}_scenes.json")
+        val jsonArray = JSONArray()
+        scenes.forEach { scene ->
+            val obj = JSONObject()
+            obj.put("id", scene.id)
+            obj.put("name", scene.name)
+            obj.put("offsetX", scene.offsetX.toDouble())
+            obj.put("offsetY", scene.offsetY.toDouble())
+            obj.put("scale", scene.scale.toDouble())
+            jsonArray.put(obj)
+        }
+        file.writeText(jsonArray.toString())
+    }
+
+    fun loadScenes(projectId: String): List<com.flash.draft.model.Scene> {
+        val file = File(projectsDir, "${projectId}_scenes.json")
+        if (!file.exists()) return emptyList()
+        val jsonString = file.readText()
+        if (jsonString.isBlank()) return emptyList()
+        
+        val scenes = mutableListOf<com.flash.draft.model.Scene>()
+        try {
+            val jsonArray = JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                scenes.add(
+                    com.flash.draft.model.Scene(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        offsetX = obj.getDouble("offsetX").toFloat(),
+                        offsetY = obj.getDouble("offsetY").toFloat(),
+                        scale = obj.getDouble("scale").toFloat()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            // Log or ignore
+        }
+        return scenes
     }
 }

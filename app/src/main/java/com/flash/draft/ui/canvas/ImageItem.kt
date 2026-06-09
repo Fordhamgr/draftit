@@ -46,7 +46,7 @@ fun ImageItem(
         isLocked = imageCard.isLocked, onLockedChange = { onUpdate(imageCard.copy(isLocked = it)) },
         hasDefaultBackground = false, // FIX: Allows PNG transparency to show!
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = imageCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(imageCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             val isDark = LocalDarkTheme.current
             

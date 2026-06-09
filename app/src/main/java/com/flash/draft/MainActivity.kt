@@ -109,7 +109,8 @@ class MainActivity : ComponentActivity() {
 
                         DraftCanvas(
                             viewModel = canvasViewModel,
-                            onBack = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() },
+                            onNavigateToBoard = { boardId -> navController.navigate("canvas/$boardId") }
                         )
                     }
                 }

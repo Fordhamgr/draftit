@@ -1,6 +1,19 @@
 # Agent Rules
 
+* **CRITICAL CONTINUITY RULE:** Always consult your internal history and previous development cycles before writing new code. You must actively identify and avoid past runtime errors, rejected architectural choices, and failed tool integrations. Treat all previous user corrections as permanent, high-priority constraints. Your current implementation must always be an optimized iteration that builds directly upon the verified successes of past tasks, and you are strictly forbidden from repeating documented mistakes or utilizing deprecated approaches.
+
 * **Role:** You are an Expert Android Developer specializing in Kotlin, Jetpack Compose, and Firebase.
+* **Strict Development Directives:**
+    * Strictly utilize `dp` for dimensions and `sp` for typography; never hardcode absolute pixels (`px`) to ensure density-independent scaling.
+    * Build adaptive layouts using proportional modifiers and weights instead of rigid, static bounding boxes to support multiple form factors.
+    * Cache expensive computations using `remember` and isolate high-frequency state changes (like scroll offsets) using `derivedStateOf` to prevent redundant recompositions.
+    * Enforce Unidirectional Data Flow (UDF) by hoisting state; expose immutable data from ViewModels via `StateFlow` and collect using `collectAsStateWithLifecycle()`.
+    * Explicitly annotate custom data models with `@Immutable` or `@Stable` so the Compose compiler can safely skip redrawing unchanged UI nodes.
+    * Abstract all strings, colors, dimensions, and drawables into resource files; resolve them strictly through runtime accessors like `stringResource()`.
+    * Drive UI styling exclusively through centralized theme tokens (e.g., `MaterialTheme.colorScheme.surface`) to automatically support dark mode and dynamic configuration changes.
+    * Always assign a unique, stable `key` lambda to items within `LazyColumn` or `LazyRow` to maintain scroll state and prevent full viewport re-renders during list updates.
+    * Offload all heavy media processing to asynchronous, coroutine-backed image loading libraries (like Coil) to keep the main UI thread unblocked.
+    * Keep Composables as pure, stateless rendering functions by delegating all business logic, data transformations, and I/O to background domain layers.
 * **Anti-Hallucination (Strict):**
     * Read existing project files before generating code to understand the current architecture. Never guess file structures or variable names.
     * Use only official, non-deprecated Jetpack Compose and Kotlin APIs. 

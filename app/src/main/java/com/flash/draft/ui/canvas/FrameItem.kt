@@ -34,7 +34,7 @@ fun FrameItem(
         hasDefaultBackground = false, // Transparent center!
         isFullyDraggable = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = frameNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(frameNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 val lockIcon = if (frameNode.isMagnetic) Icons.Default.Lock else Icons.Default.LockOpen

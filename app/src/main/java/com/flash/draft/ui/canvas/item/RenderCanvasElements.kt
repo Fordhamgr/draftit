@@ -36,7 +36,9 @@ fun RenderCanvasElements(
     onUpdateSelectedNoteId: (String?) -> Unit,
     onUpdateConnectingStartNodeId: (String?) -> Unit,
     onUpdateScaleAndOffset: (Float, Offset) -> Unit,
-    onStartConnection: (String) -> Unit
+    onStartConnection: (String) -> Unit,
+    onNavigateToScene: (String) -> Unit,
+    onNavigateToBoard: (String) -> Unit
 ) {
     val screenTopLeft = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(0f, 0f), offset, scale)
     val screenBottomRight = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(centerX * 2f, centerY * 2f), offset, scale)
@@ -80,8 +82,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedFrame ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedFrame
+                        if (updatedFrame.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedFrame
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -145,8 +153,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNote ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedNote
+                        if (updatedNote.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedNote
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -197,8 +211,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedBlock ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedBlock
+                        if (updatedBlock.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedBlock
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -249,8 +269,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedImage ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedImage
+                        if (updatedImage.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedImage
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -316,8 +342,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNode ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedNode
+                        if (updatedNode.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedNode
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -368,8 +400,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedPdf ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedPdf
+                        if (updatedPdf.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedPdf
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -420,8 +458,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedAudio ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedAudio
+                        if (updatedAudio.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedAudio
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -472,8 +516,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedShape ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedShape
+                        if (updatedShape.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedShape
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -510,7 +560,6 @@ fun RenderCanvasElements(
         }
 
         if (element is CanvasElement.LabelNode) {
-        if (element is CanvasElement.LabelNode) {
 
             key(element.id) {
                 val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
@@ -524,8 +573,14 @@ fun RenderCanvasElements(
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = { onStartConnection(element.id) },
                     onUpdate = { updatedNode ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) elements[currentIndex] = updatedNode
+                        if (updatedNode.hyperlinkTarget == "TELEPORT") {
+                            val target = element.hyperlinkTarget!!
+                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
+                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
+                        } else {
+                            val currentIndex = elements.indexOfFirst { it.id == element.id }
+                            if (currentIndex != -1) elements[currentIndex] = updatedNode
+                        }
                     },
                     onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
                     onSizeDelta = { delta ->
@@ -561,5 +616,4 @@ fun RenderCanvasElements(
             }
         }
     }
-}
 }

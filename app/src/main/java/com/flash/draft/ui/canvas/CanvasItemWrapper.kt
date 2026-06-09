@@ -1,5 +1,8 @@
 package com.flash.draft.ui.canvas
 
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextStyle
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,8 +11,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
-    import androidx.compose.foundation.border
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,8 +24,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,9 +43,14 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 import com.flash.draft.utils.ViewportMath
 import io.github.fletchmckee.liquid.liquid
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -46,17 +59,26 @@ fun CanvasItemWrapper(
     isSelected: Boolean, isConnecting: Boolean, isLocked: Boolean = false, onLockedChange: (Boolean) -> Unit = {}, isFullyDraggable: Boolean = true,
     isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     hasDefaultBackground: Boolean = true, backgroundAlpha: Float = 0.65f,
+    hyperlinkTarget: String? = null, onLinkUpdate: (String?) -> Unit = {},
     onSelect: () -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDelete: () -> Unit, onSaveRequest: () -> Unit,
-    customMenuContent: @Composable () -> Unit = {}, content: @Composable (isLocked: Boolean) -> Unit
+    customMenuContent: (@Composable () -> Unit)? = null, content: @Composable (isLocked: Boolean) -> Unit
 ) {
     val screenPos = ViewportMath.worldToScreen(position, canvasOffset, scale)
     var isMultiTouch by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
+    // Zoom cooldown: stays true briefly after pinch ends to prevent accidental taps/drags
+    var isZooming by remember { mutableStateOf(false) }
+    var zoomCooldownJob by remember { mutableStateOf<Job?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val animatedShadow by animateDpAsState(targetValue = if (isDragging) 24.dp else 4.dp, animationSpec = tween(150), label = "shadow")
     val animatedScale by animateFloatAsState(targetValue = if (isDragging) 1.02f else 1f, animationSpec = tween(150), label = "scale")
     val isDark = LocalDarkTheme.current
+    val density = LocalDensity.current.density
+    
+    var isEditingLink by remember { mutableStateOf(false) }
+    var linkTargetInput by remember(hyperlinkTarget) { mutableStateOf(hyperlinkTarget ?: "") }
     
 
 
@@ -68,8 +90,24 @@ fun CanvasItemWrapper(
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        if (event.changes.size > 1) isMultiTouch = true
-                        if (event.changes.none { it.pressed }) isMultiTouch = false
+                        if (event.changes.size > 1) {
+                            isMultiTouch = true
+                            isZooming = true
+                            zoomCooldownJob?.cancel()
+                        }
+                        if (event.changes.none { it.pressed }) {
+                            if (isMultiTouch) {
+                                isMultiTouch = false
+                                // Keep isZooming true for a short cooldown so that the
+                                // finger-lift at the end of a pinch doesn't trigger a
+                                // tap or drag on the card underneath.
+                                zoomCooldownJob?.cancel()
+                                zoomCooldownJob = coroutineScope.launch {
+                                    delay(200L)
+                                    isZooming = false
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -78,16 +116,16 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(Unit) { detectTapGestures(onTap = { if (!isMultiTouch) onSelect() }) }
+                .pointerInput(Unit) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) onSelect() }) }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isMultiTouch && !isLocked) { isDragging = true; onSelect() } },
+                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; onSelect() } },
                                 onDragEnd = { isDragging = false; onSaveRequest() },
                                 onDragCancel = { isDragging = false; onSaveRequest() },
                                 onDrag = { change, dragAmount ->
-                                    if (!isLocked && !isMultiTouch) {
+                                    if (!isLocked && !isMultiTouch && !isZooming) {
                                         change.consume()
                                         onPositionDelta(dragAmount)
                                     }
@@ -149,9 +187,9 @@ fun CanvasItemWrapper(
                                 detectDragGestures(
                                     onDragEnd = { onSaveRequest() },
                                     onDrag = { change, dragAmount ->
-                                        if (!isLocked && !isMultiTouch) {
+                                        if (!isLocked && !isMultiTouch && !isZooming) {
                                             change.consume()
-                                            onSizeDelta(dragAmount / scale)
+                                            onSizeDelta((dragAmount / density) / scale)
                                         }
                                     }
                                 )
@@ -172,62 +210,83 @@ fun CanvasItemWrapper(
             Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-16).dp).wrapContentWidth(unbounded = true)) {
                 Box(modifier = Modifier.graphicsLayer { translationY = -size.height }) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .wrapContentSize()
+                            .shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                            .then(
+                                if (LocalLiquidState.current != null) {
+                                    val currentRefraction = LocalLiquidRefraction.current
+                                    val currentCurve = LocalLiquidCurve.current
+                                    Modifier.liquid(LocalLiquidState.current!!) {
+                                        refraction = currentRefraction
+                                        curve = currentCurve
+                                        shape = RoundedCornerShape(24.dp)
+                                    }
+                                } else Modifier
+                            )
+                            .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(24.dp))
+                            .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 1. Main Customization Panel
-                        Box(
-                            modifier = Modifier
-                                .wrapContentSize()
-                                .shadow(32.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.3f))
-                                .then(
-                                    if (LocalLiquidState.current != null) {
-                                        val currentRefraction = LocalLiquidRefraction.current
-                                        val currentCurve = LocalLiquidCurve.current
-                                        Modifier.liquid(LocalLiquidState.current!!) {
-                                            refraction = currentRefraction
-                                            curve = currentCurve
-                                            shape = RoundedCornerShape(24.dp)
-                                        }
-                                    } else Modifier
-                                )
-                                .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(24.dp))
-                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
-                                .padding(16.dp)
-                        ) {
+                        if (customMenuContent != null) {
                             customMenuContent()
+                            Box(modifier = Modifier.width(1.dp).height(48.dp).background(Color.Gray.copy(alpha = 0.3f)))
                         }
 
-                        // 2. Utility Pill
-                        Column(
-                            modifier = Modifier
-                                .shadow(16.dp, androidx.compose.foundation.shape.RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-                                .then(
-                                    if (LocalLiquidState.current != null) {
-                                        val currentRefraction = LocalLiquidRefraction.current
-                                        val currentCurve = LocalLiquidCurve.current
-                                        Modifier.liquid(LocalLiquidState.current!!) {
-                                            refraction = currentRefraction
-                                            curve = currentCurve
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
-                                        }
-                                    } else Modifier
+                        // Utility Items Grid (2x3 or flow)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { onConnectRequest() })
+                                
+                                val hasHyperlink = hyperlinkTarget != null
+                                Icon(Icons.Default.Link, contentDescription = "Link", tint = if (hasHyperlink) Color(0xFF4CAF50) else Color.Gray, modifier = Modifier.size(22.dp).clickable { isEditingLink = !isEditingLink })
+                                
+                                val isTeleportable = hasHyperlink && (
+                                    (hyperlinkTarget!!.startsWith("scene:") && hyperlinkTarget.length > "scene:".length) || 
+                                    (hyperlinkTarget.startsWith("board:") && hyperlinkTarget.length > "board:".length)
                                 )
-                                .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                                .padding(horizontal = 8.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { onConnectRequest() })
-                            Box(modifier = Modifier.width(16.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                            Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { onLockedChange(!isLocked) })
-                            Box(modifier = Modifier.width(16.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                            Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { onDelete() })
+                                if (isTeleportable) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Teleport", tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp).clickable { onLinkUpdate("TELEPORT") })
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { onLockedChange(!isLocked) })
+                                Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { onDelete() })
+                            }
+                        }
+                    }
+                        
+                        // 3. Link Editor Dialog (Inline next to pill)
+                        androidx.compose.animation.AnimatedVisibility(visible = isEditingLink) {
+                            Box(
+                                modifier = Modifier
+                                    .shadow(16.dp, RoundedCornerShape(12.dp))
+                                    .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(12.dp))
+                                    .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(12.dp))
+                                    .padding(8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    BasicTextField(
+                                        value = linkTargetInput,
+                                        onValueChange = { linkTargetInput = it },
+                                        textStyle = TextStyle(color = if (isDark) Color.White else Color.Black, fontSize = 14.sp),
+                                        modifier = Modifier.width(120.dp).background(if (isDark) Color(0xFF333333) else Color(0xFFEEEEEE), RoundedCornerShape(4.dp)).padding(4.dp),
+                                        decorationBox = { innerTextField ->
+                                            if (linkTargetInput.isEmpty()) Text("scene:X or board:Y", color = Color.Gray, fontSize = 12.sp)
+                                            innerTextField()
+                                        }
+                                    )
+                                    Icon(Icons.Default.Check, "Save Link", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp).clickable {
+                                        onLinkUpdate(linkTargetInput.takeIf { it.isNotBlank() })
+                                        isEditingLink = false
+                                    })
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
     }
 }

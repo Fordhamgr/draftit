@@ -49,32 +49,37 @@ fun StickyNoteItem(
         isLocked = note.isLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
         isFullyDraggable = false, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = note.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(note.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Row 1: Font Family
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     listOf("Sans", "Serif", "Mono", "Cursive").forEach { fontName ->
                         val isSelectedFont = note.fontFamily == fontName || (note.fontFamily == "SansSerif" && fontName == "Sans")
                         Text(
                             text = fontName, fontSize = 12.sp, fontWeight = if (isSelectedFont) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelectedFont) Color.White else Color.Black,
-                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (isSelectedFont) Color.Blue else Color.LightGray.copy(alpha = 0.5f))
+                            color = if (isSelectedFont) Color.White else Color.Gray,
+                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (isSelectedFont) Color(0xFF2196F3) else Color.Transparent)
                                 .clickable { onUpdate(note.copy(fontFamily = fontName)); onSaveRequest() }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
-                    Box(modifier = Modifier.size(1.dp, 16.dp).background(Color.LightGray))
-                    Icon(Icons.Default.Remove, contentDescription = "Smaller", modifier = Modifier.size(20.dp).clickable { if (note.fontSize > 10f) { onUpdate(note.copy(fontSize = note.fontSize - 2f)); onSaveRequest() } })
-                    Text("${note.fontSize.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.Add, contentDescription = "Bigger", modifier = Modifier.size(20.dp).clickable { if (note.fontSize < 48f) { onUpdate(note.copy(fontSize = note.fontSize + 2f)); onSaveRequest() } })
                 }
                 
+                // Row 2: Size
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Remove, contentDescription = "Smaller", modifier = Modifier.size(20.dp).clickable { if (note.fontSize > 10f) { onUpdate(note.copy(fontSize = note.fontSize - 2f)); onSaveRequest() } }, tint = Color.Gray)
+                    Text("${note.fontSize.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Icon(Icons.Default.Add, contentDescription = "Bigger", modifier = Modifier.size(20.dp).clickable { if (note.fontSize < 48f) { onUpdate(note.copy(fontSize = note.fontSize + 2f)); onSaveRequest() } }, tint = Color.Gray)
+                }
+                
+                // Row 3: Colors
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val colors = listOf(0xFFFFF9C4, 0xFFFFCDD2, 0xFFBBDEFB, 0xFFC8E6C9, 0xFFE1BEE7, 0xFFFFFFFF)
                     colors.forEach { colorVal ->
                         val isSelectedColor = note.color == Color(colorVal)
                         Box(modifier = Modifier.size(24.dp).background(Color(colorVal), CircleShape)
-                            .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color.Blue else Color.LightGray, CircleShape)
+                            .border(if (isSelectedColor) 2.dp else 1.dp, if (isSelectedColor) Color(0xFF2196F3) else Color.LightGray, CircleShape)
                             .clickable { onUpdate(note.copy(color = Color(colorVal))); onSaveRequest() }
                         )
                     }

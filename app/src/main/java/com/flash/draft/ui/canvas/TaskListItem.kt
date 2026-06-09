@@ -44,11 +44,12 @@ fun TaskListItem(
         isFullyDraggable = true, // Critical so we can scroll the list and tap checkboxes
         hasDefaultBackground = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
-                customMenuContent = {
-            // TASK COLOR CUSTOMIZATION FIX
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = taskNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(taskNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        customMenuContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // TASK COLOR CUSTOMIZATION
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Theme", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
                     val colors = listOf(Color.White, Color(0xFFFFF9C4), Color(0xFFE3F2FD), Color(0xFFE8F5E9), Color(0xFFFCE4EC))
                     colors.forEach { colorOption ->
                         Box(

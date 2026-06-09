@@ -137,18 +137,20 @@ fun AudioItem(
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
         isLocked = audioNote.isLocked, onLockedChange = { onUpdate(audioNote.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = audioNote.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(audioNote.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                // Title editing
-                androidx.compose.foundation.text.BasicTextField(
-                    value = audioNote.title,
-                    onValueChange = { onUpdate(audioNote.copy(title = it)) },
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.Black, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                    modifier = Modifier.background(Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-                // Color picking
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Title editing
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = audioNote.title,
+                        onValueChange = { onUpdate(audioNote.copy(title = it)) },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.Black, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp).width(120.dp)
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Color picking
                     val colors = listOf(Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFFFFF9C4), Color(0xFFFCE4EC), Color(0xFFF3E5F5))
                     colors.forEach { colorOption ->
                         Box(

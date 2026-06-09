@@ -40,7 +40,7 @@ fun CodeSnippetItem(
         isLocked = codeBlock.isLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
         isFullyDraggable = false, // Critical so TextField works normally
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Icon(Icons.Default.ContentCopy, "Copy Code", modifier = Modifier.size(24.dp).clickable {
                 clipboardManager.setText(AnnotatedString(codeBlock.code))

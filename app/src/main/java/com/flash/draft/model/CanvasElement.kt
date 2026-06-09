@@ -13,6 +13,7 @@ data class InkPoint(
 
 sealed class CanvasElement {
     abstract val id: String
+    abstract val hyperlinkTarget: String?  // null = no link, "scene:<id>" or "board:<id>"
 
     data class StickyNote(
         override val id: String,
@@ -23,7 +24,8 @@ sealed class CanvasElement {
         val height: Float = 200f,
         val fontSize: Float = 16f,
         val fontFamily: String = "SansSerif",
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     // NEW: The data structure for a freehand drawing
@@ -34,7 +36,8 @@ sealed class CanvasElement {
         val strokeWidth: Float = 6f,
         val toolType: String = "Pen", // "Pen", "Highlighter"
         val alpha: Float = 1f,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     // NEW: The Image Element
@@ -50,7 +53,8 @@ sealed class CanvasElement {
         val rotation: Float = 0f,
         val scaleX: Float = 1f,
         val scaleY: Float = 1f,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class Connector(
@@ -63,7 +67,8 @@ sealed class CanvasElement {
         val arrowDirection: String = "Both", // "None", "End", "Both"
         val arrowShape: String = "Filled", // "Open", "Filled", "Circle", "Diamond"
         val routing: String = "Straight", // Prepping for Tier 2 curvature!
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
     data class PdfCard(
         override val id: String,
@@ -73,7 +78,8 @@ sealed class CanvasElement {
         val fileSize: String,
         val width: Float = 260f,
         val height: Float = 140f,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class CodeBlock(
@@ -82,7 +88,8 @@ sealed class CanvasElement {
         val code: String = "// Paste your code here\nfun start() {\n    \n}",
         val width: Float = 280f,
         val height: Float = 180f,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class AudioNote(
@@ -95,7 +102,8 @@ sealed class CanvasElement {
         val height: Float = 80f,
         val title: String = "Voice Memo",
         val color: Color = Color(0xFFE8F5E9),
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class ShapeNode(
@@ -106,7 +114,8 @@ sealed class CanvasElement {
         val shapeType: String = "Rectangle", // "Rectangle", "Circle", "Triangle"
         val color: Color = Color(0xFF2196F3),
         val isFilled: Boolean = true,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class LabelNode(
@@ -123,7 +132,8 @@ sealed class CanvasElement {
         val fontFamily: String = "SansSerif",
         val textAlign: String = "Left",
         val backgroundColor: Color = Color.Companion.Transparent,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class FrameNode(
@@ -134,7 +144,8 @@ sealed class CanvasElement {
         val title: String = "New Frame",
         val color: Color = Color(0xFF9E9E9E),
         val isMagnetic: Boolean = false, // FIX: Off by default!
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 
     data class TaskItem(
@@ -151,6 +162,7 @@ sealed class CanvasElement {
         val title: String = "To-Do List",
         val tasks: List<TaskItem> = listOf(TaskItem(text = "New task")),
         val color: Color = Color.Companion.White,
-        val isLocked: Boolean = false
+        val isLocked: Boolean = false,
+        override val hyperlinkTarget: String? = null
     ) : CanvasElement()
 }

@@ -15,11 +15,13 @@ import androidx.compose.ui.unit.dp
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 import io.github.fletchmckee.liquid.liquid
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.graphics.Shape
 @Composable
 fun LiquidGlassPill(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(24.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     content: @Composable BoxScope.() -> Unit
 ) {
     val isDark = LocalDarkTheme.current
@@ -47,7 +49,7 @@ fun LiquidGlassPill(
             .background(glassBg, shape)
             .border(1.dp, glassBorder, shape)
             .clip(shape)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(contentPadding),
         content = content
     )
 }

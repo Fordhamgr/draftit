@@ -49,10 +49,23 @@ fun LabelItem(
         hasDefaultBackground = false, // <-- Makes it transparent!
         isFullyDraggable = false, // Critical for text editing
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest,
+        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                // Font Family & Size
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Row 1: Typography tools & Alignment
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FormatBold, "Bold", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isBold = !labelNode.isBold)); onSaveRequest() }, tint = if (labelNode.isBold) Color(0xFF2196F3) else Color.Gray)
+                    Icon(Icons.Default.FormatItalic, "Italic", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isItalic = !labelNode.isItalic)); onSaveRequest() }, tint = if (labelNode.isItalic) Color(0xFF2196F3) else Color.Gray)
+                    Icon(Icons.Default.FormatUnderlined, "Underline", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isUnderline = !labelNode.isUnderline)); onSaveRequest() }, tint = if (labelNode.isUnderline) Color(0xFF2196F3) else Color.Gray)
+                    
+                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                    
+                    Icon(Icons.Default.FormatAlignLeft, "Left", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Left")); onSaveRequest() }, tint = if (labelNode.textAlign == "Left") Color(0xFF2196F3) else Color.Gray)
+                    Icon(Icons.Default.FormatAlignCenter, "Center", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Center")); onSaveRequest() }, tint = if (labelNode.textAlign == "Center") Color(0xFF2196F3) else Color.Gray)
+                    Icon(Icons.Default.FormatAlignRight, "Right", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Right")); onSaveRequest() }, tint = if (labelNode.textAlign == "Right") Color(0xFF2196F3) else Color.Gray)
+                }
+                
+                // Row 2: Fonts & Size
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     listOf("Sans", "Serif", "Mono", "Cursive").forEach { fontName ->
                         val isSelectedFont = labelNode.fontFamily == fontName || (labelNode.fontFamily == "SansSerif" && fontName == "Sans")
@@ -75,20 +88,7 @@ fun LabelItem(
                     )
                 }
 
-                // Text Formatting & Alignment
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.FormatBold, "Bold", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isBold = !labelNode.isBold)); onSaveRequest() }, tint = if (labelNode.isBold) Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatItalic, "Italic", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isItalic = !labelNode.isItalic)); onSaveRequest() }, tint = if (labelNode.isItalic) Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatUnderlined, "Underline", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isUnderline = !labelNode.isUnderline)); onSaveRequest() }, tint = if (labelNode.isUnderline) Color(0xFF2196F3) else Color.Gray)
-                    
-                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                    
-                    Icon(Icons.Default.FormatAlignLeft, "Left", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Left")); onSaveRequest() }, tint = if (labelNode.textAlign == "Left") Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatAlignCenter, "Center", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Center")); onSaveRequest() }, tint = if (labelNode.textAlign == "Center") Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatAlignRight, "Right", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Right")); onSaveRequest() }, tint = if (labelNode.textAlign == "Right") Color(0xFF2196F3) else Color.Gray)
-                }
-
-                // Text Color & Background Color
+                // Row 3: Colors
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("T", fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
                     listOf(0xFF000000, 0xFFFFFFFF, 0xFF2196F3, 0xFF4CAF50, 0xFFF44336).forEach { colorVal ->
@@ -134,35 +134,6 @@ fun LabelItem(
                     }
                 }
         ) {
-            // Drag Handle for Text Box
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = (-24).dp)
-                        .size(32.dp, 24.dp)
-                        .background(Color.Gray.copy(alpha = 0.2f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                        .pointerInput(isLocked) {
-                            detectDragGestures(
-                                onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
-                                onDrag = { change, dragAmount -> 
-                                    if (!isLocked) {
-                                        change.consume()
-                                        onPositionDelta(dragAmount)
-                                    }
-                                }
-                            )
-                        }
-                ) {
-                    Icon(
-                        painter = androidx.compose.ui.res.painterResource(id = com.composables.icons.lucide.R.drawable.lucide_ic_grip_horizontal),
-                        contentDescription = "Drag",
-                        tint = Color.DarkGray,
-                        modifier = Modifier.align(Alignment.Center).size(16.dp)
-                    )
-                }
-            }
-
             // The Text Field
             BasicTextField(
                 value = labelNode.text,
@@ -188,6 +159,43 @@ fun LabelItem(
                     }
                 )
             )
+
+            // Drag Handle for Text Box (drawn last so it's on top of the text field)
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-32).dp) // Shifts the touch target so the visible handle sits entirely above the box
+                        .size(64.dp, 48.dp) // Massive touch slop area
+                        .pointerInput(isLocked) {
+                            detectDragGestures(
+                                onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                                onDrag = { change, dragAmount -> 
+                                    if (!isLocked) {
+                                        change.consume()
+                                        onPositionDelta(dragAmount)
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp, 16.dp) // Visible handle
+                            .background(Color.Gray.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(id = com.composables.icons.lucide.R.drawable.lucide_ic_grip_horizontal),
+                            contentDescription = "Drag",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+
         }
     }
 }

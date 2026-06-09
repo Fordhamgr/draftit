@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -118,7 +119,8 @@ val LocalLiquidCurve = compositionLocalOf { 0.5f }
 @Composable
 fun DraftCanvas(
     viewModel: CanvasViewModel,
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onNavigateToBoard: (String) -> Unit = {}
 ) {
     var scale by remember { mutableStateOf(0.7f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -129,6 +131,9 @@ fun DraftCanvas(
     var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "")) }
 
     var isDarkTheme by remember { mutableStateOf(false) }
+
+    var isScenesMenuOpen by remember { mutableStateOf(false) }
+    var sceneToExport by remember { mutableStateOf<com.flash.draft.model.Scene?>(null) }
 
     var isDrawMenuOpen by remember { mutableStateOf(false) }
     var isInsertMenuOpen by remember { mutableStateOf(false) }
@@ -160,6 +165,24 @@ fun DraftCanvas(
     var panJob: Job? by remember { mutableStateOf(null) }
     val coroutineScope = rememberCoroutineScope()
 
+    fun navigateToScene(scene: com.flash.draft.model.Scene) {
+        panJob?.cancel()
+        coroutineScope.launch {
+            val startScale = scale
+            val startOffset = offset
+            val targetOffset = Offset(scene.offsetX, scene.offsetY)
+            val targetScale = scene.scale
+            androidx.compose.animation.core.animate(
+                initialValue = 0f, 
+                targetValue = 1f, 
+                animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+            ) { progress, _ ->
+                scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
+                offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
+            }
+        }
+    }
+
     val elementsState by viewModel.elements.collectAsStateWithLifecycle()
     val elements = remember { mutableStateListOf<CanvasElement>() }
 
@@ -174,9 +197,6 @@ fun DraftCanvas(
         }
     }
 
-    fun logAction(action: String) {
-        Log.d("CanvasEngine", "ACTION: $action | Zoom: $scale | Elements: ${elements.size}")
-    }
 
     fun getFileInfo(uri: Uri): Pair<String, String> {
         var name = "Document.pdf"
@@ -199,7 +219,6 @@ fun DraftCanvas(
             val (fileName, fileSize) = getFileInfo(uri)
             val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)
             elements.add(CanvasElement.PdfCard(id = UUID.randomUUID().toString(), position = dropPos, uriString = uri.toString(), fileName = fileName, fileSize = fileSize))
-            logAction("Imported PDF")
             viewModel.updateElements(elements.toList())
         }
     }
@@ -227,7 +246,6 @@ fun DraftCanvas(
             
             elements.add(CanvasElement.ImageCard(id = UUID.randomUUID().toString(), position = dropPos, uriString = uri.toString(), width = scaledW, height = scaledH, originalWidth = origW, originalHeight = origH))
             isDrawingMode = false; isConnectingMode = false; isLassoMode = false
-            logAction("Imported Photo")
             viewModel.updateElements(elements.toList())
         }
     }
@@ -302,6 +320,52 @@ fun DraftCanvas(
         }
     }
 
+    val exportScenePdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null && sceneToExport != null) {
+            val scene = sceneToExport!!
+            val sw = view.width
+            val sh = view.height
+            if (sw > 0 && sh > 0) {
+                coroutineScope.launch {
+                    try {
+                        val originalScale = scale
+                        val originalOffset = offset
+                        
+                        scale = scene.scale
+                        offset = androidx.compose.ui.geometry.Offset(scene.offsetX, scene.offsetY)
+                        kotlinx.coroutines.delay(400) // Wait for recomposition
+                        
+                        val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                        val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                        val finalBitmap = android.graphics.Bitmap.createBitmap(sw, sh, android.graphics.Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(finalBitmap)
+                        canvas.drawColor(android.graphics.Color.WHITE)
+                        canvas.drawBitmap(swBitmap, 0f, 0f, null)
+                        
+                        val pdfDocument = android.graphics.pdf.PdfDocument()
+                        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(sw, sh, 1).create()
+                        val page = pdfDocument.startPage(pageInfo)
+                        page.canvas.drawBitmap(finalBitmap, 0f, 0f, null)
+                        pdfDocument.finishPage(page)
+                        
+                        context.contentResolver.openOutputStream(uri)?.use { stream ->
+                            pdfDocument.writeTo(stream)
+                        }
+                        pdfDocument.close()
+                        Toast.makeText(context, "Scene exported to PDF successfully!", Toast.LENGTH_SHORT).show()
+                        
+                        // Restore original camera
+                        scale = originalScale
+                        offset = originalOffset
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Error exporting Scene PDF.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            sceneToExport = null
+        }
+    }
+
     fun bringToFront(noteId: String) {
         val index = elements.indexOfFirst { it.id == noteId }
         if (index > -1 && index != elements.lastIndex) { val note = elements.removeAt(index); elements.add(note) }
@@ -335,7 +399,6 @@ fun DraftCanvas(
     fun finishConnection(endNodeId: String) {
         val startId = connectingStartNodeId ?: return
         elements.add(CanvasElement.Connector(id = UUID.randomUUID().toString(), startId = startId, endId = endNodeId, color = defaultConnectorStyle.color, strokeWidth = defaultConnectorStyle.strokeWidth, lineStyle = defaultConnectorStyle.lineStyle, arrowDirection = defaultConnectorStyle.arrowDirection, arrowShape = defaultConnectorStyle.arrowShape))
-        logAction("Created Connection")
         viewModel.updateElements(elements.toList())
         connectingStartNodeId = null; isConnectingMode = false
     }
@@ -357,18 +420,24 @@ fun DraftCanvas(
                 .pointerInput(Unit) {
                     val touchSlop = viewConfiguration.touchSlop
                     var pastSlop = false
+                    var zoomAccumulator = 1f
+                    var panAccumulator = Offset.Zero
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             if (event.changes.any { it.pressed }) { panJob?.cancel() }
 
-                            if (event.changes.size > 1) {
+                            val activePointers = event.changes.count { it.pressed }
+
+                            if (activePointers > 1) {
                                 val zoomChange = event.calculateZoom()
                                 val panChange = event.calculatePan()
                                 val centroid = event.calculateCentroid()
 
                                 if (!pastSlop) {
-                                    if (zoomChange < 0.95f || zoomChange > 1.05f || panChange.getDistance() > touchSlop) {
+                                    zoomAccumulator *= zoomChange
+                                    panAccumulator += panChange
+                                    if (zoomAccumulator < 0.97f || zoomAccumulator > 1.03f || panAccumulator.getDistance() > touchSlop) {
                                         pastSlop = true
                                     }
                                 }
@@ -376,15 +445,22 @@ fun DraftCanvas(
                                 if (pastSlop) {
                                     val (newScale, newOffset) = ViewportMath.calculateCameraTransform(scale, offset, centroid, panChange, zoomChange)
                                     scale = newScale; offset = newOffset
-                                    event.changes.forEach { if (it.pressed) it.consume() }
                                 }
-                            } else {
+                                event.changes.forEach { if (it.pressed) it.consume() }
+                            } else if (activePointers == 1 && pastSlop) {
+                                // One finger still down after a pinch — consume to prevent
+                                // the remaining finger from triggering a card tap or drag.
+                                event.changes.forEach { it.consume() }
+                            } else if (activePointers == 0) {
+                                // All fingers released — reset for the next gesture.
                                 pastSlop = false
+                                zoomAccumulator = 1f
+                                panAccumulator = Offset.Zero
                             }
                         }
                     }
                 }
-                .pointerInput(isDrawingMode, isConnectingMode, isLassoMode) {
+                .pointerInput(isDrawingMode, isLassoMode) {
                     if (isDrawingMode || isLassoMode) {
                         detectDragGestures(
                             onDragStart = { startPos ->
@@ -434,11 +510,9 @@ fun DraftCanvas(
                                     selectedGroupIds = capturedIds; lassoPath.clear(); isLassoMode = false
                                 } else if (currentDrawingPath.size > 1 && activeToolType != "Eraser") {
                                     elements.add(CanvasElement.Sketch(id = UUID.randomUUID().toString(), points = currentDrawingPath.toList(), color = activeDrawColor, strokeWidth = activeStrokeWidth, toolType = activeToolType, alpha = activeAlpha))
-                                    logAction("Saved Ink Stroke")
                                     viewModel.updateElements(elements.toList())
                                     currentDrawingPath.clear()
                                 } else if (activeToolType == "Eraser") {
-                                    logAction("Erased Ink Strokes")
                                     viewModel.updateElements(elements.toList())
                                     currentDrawingPath.clear()
                                 }
@@ -470,39 +544,6 @@ fun DraftCanvas(
                 }
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onDoubleTap = { tapPos ->
-                            panJob?.cancel()
-                            coroutineScope.launch {
-                                val targetScale = if (scale > 1.2f) 1f else 2f
-                                val worldTap = ViewportMath.screenToWorld(tapPos, offset, scale)
-                                val targetOffset = tapPos - (worldTap * targetScale)
-                                
-                                val startScale = scale
-                                val startOffset = offset
-                                
-                                androidx.compose.animation.core.animate(
-                                    initialValue = 0f, 
-                                    targetValue = 1f, 
-                                    animationSpec = androidx.compose.animation.core.tween(300)
-                                ) { progress, _ ->
-                                    scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
-                                    offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
-                                }
-                            }
-                            logAction("Double-Tap Zoom to Target")
-                        },
-                        onPress = { tapPos ->
-                            val worldTap = ViewportMath.screenToWorld(tapPos, offset, scale)
-                            val hitConnector = elements.filterIsInstance<CanvasElement.Connector>().any { conn ->
-                                val centerStart = getCenterPoint(conn.startId, elements); val centerEnd = getCenterPoint(conn.endId, elements)
-                                if (centerStart != null && centerEnd != null) {
-                                    val (startW, startH) = getElementDimensions(conn.startId, elements); val (endW, endH) = getElementDimensions(conn.endId, elements)
-                                    val start = getRectangleIntersection(centerStart, centerEnd, startW, startH, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endW, endH, 25f)
-                                    distancePointToSegment(worldTap, start, end) < (60f / scale)
-                                } else false
-                            }
-                            if (!hitConnector) { selectedConnectorId = null; selectedNoteId = null; connectingStartNodeId = null; selectedGroupIds = emptySet(); focusManager.clearFocus() }
-                        },
                         onTap = { tapPos ->
                             val worldTap = ViewportMath.screenToWorld(tapPos, offset, scale)
                             val tappedConnector = elements.filterIsInstance<CanvasElement.Connector>().find { conn ->
@@ -513,7 +554,11 @@ fun DraftCanvas(
                                     distancePointToSegment(worldTap, start, end) < (60f / scale)
                                 } else false
                             }
-                            if (tappedConnector != null) { selectedConnectorId = tappedConnector.id; selectedNoteId = null; selectedGroupIds = emptySet() }
+                            if (tappedConnector != null) {
+                                selectedConnectorId = tappedConnector.id; selectedNoteId = null; selectedGroupIds = emptySet()
+                            } else {
+                                selectedConnectorId = null; selectedNoteId = null; connectingStartNodeId = null; isConnectingMode = false; selectedGroupIds = emptySet(); focusManager.clearFocus()
+                            }
                         }
                     )
                 }
@@ -566,7 +611,12 @@ fun DraftCanvas(
                     onStartConnection = { startNodeId: String -> 
                         isConnectingMode = true
                         connectingStartNodeId = startNodeId
-                    }
+                    },
+                    onNavigateToScene = { sceneIdentifier ->
+                        val scene = viewModel.scenes.value.find { it.id == sceneIdentifier || it.name == sceneIdentifier }
+                        if (scene != null) navigateToScene(scene)
+                    },
+                    onNavigateToBoard = onNavigateToBoard
                 )
 
                 CanvasForegroundDrawPipeline(
@@ -581,28 +631,27 @@ fun DraftCanvas(
 
                 // --- TOP LEFT ACTION BAR (BACK) ---
                 Box(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .shadow(16.dp, RoundedCornerShape(24.dp))
-                            .liquid(liquidState) { refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(24.dp) }
-                            .background(if (isDarkTheme) Color(0xCC2C2C2C) else Color(0xCCE0FFFFFF), RoundedCornerShape(24.dp))
-                            .border(1.dp, if (isDarkTheme) Color(0x40FFFFFF) else Color(0x60FFFFFF), RoundedCornerShape(24.dp))
-                            .clickable { onBack() }
-                            .padding(12.dp),
-                        contentAlignment = Alignment.Center
+                    LiquidGlassPill(
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
-                // CLICK OUTSIDE OVERLAY FOR EXPORT MENU
-                if (isExportMenuOpen) {
+                // CLICK OUTSIDE OVERLAY FOR EXPORT & SCENES MENUS
+                if (isExportMenuOpen || isScenesMenuOpen) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null
-                            ) { isExportMenuOpen = false }
+                            ) { 
+                                isExportMenuOpen = false
+                                isScenesMenuOpen = false
+                            }
                     )
                 }
 
@@ -611,39 +660,41 @@ fun DraftCanvas(
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         
                         // EXPORT BUTTON / MENU
-                        val exportWidth by androidx.compose.animation.core.animateDpAsState(targetValue = if (isExportMenuOpen) 160.dp else 48.dp, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))
-                        val exportHeight by androidx.compose.animation.core.animateDpAsState(targetValue = if (isExportMenuOpen) 152.dp else 48.dp, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))
-                        val exportShape = RoundedCornerShape(24.dp)
-                        
                         LiquidGlassPill(
-                            modifier = Modifier.width(exportWidth).height(exportHeight),
-                            shape = exportShape
+                            shape = RoundedCornerShape(24.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            if (!isExportMenuOpen) {
-                                IconButton(
-                                    onClick = { isExportMenuOpen = true },
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(Icons.Default.Share, "Export", tint = Color.Black, modifier = Modifier.size(24.dp))
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.SpaceEvenly
-                                ) {
-                                    Text("As a Project", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Board.json") }.padding(vertical = 14.dp, horizontal = 12.dp))
-                                    Text("As PDF", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 12.dp))
-                                    Text("As Picture", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                                if (!isExportMenuOpen) {
+                                    IconButton(
+                                        onClick = { isExportMenuOpen = true },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(Icons.Default.Share, "Export", tint = Color.Black, modifier = Modifier.size(24.dp))
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier.width(160.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Text("As a Project", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Board.json") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                                        Text("As PDF", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                                        Text("As Picture", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 12.dp))
+                                    }
                                 }
                             }
                         }
 
                         // UNDO / REDO PILL
-                        LiquidGlassPill(shape = CircleShape) {
+                        LiquidGlassPill(
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 12.dp)
+                        ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.width(48.dp)
                             ) {
                                 IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
                                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black)
@@ -654,9 +705,58 @@ fun DraftCanvas(
                                 }
                             }
                         }
+
+                        // SCENES MENU (Morphing)
+                        LiquidGlassPill(
+                            shape = RoundedCornerShape(24.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                                if (!isScenesMenuOpen) {
+                                    IconButton(onClick = { isScenesMenuOpen = true }, modifier = Modifier.size(48.dp)) {
+                                        Icon(Icons.Default.Layers, contentDescription = "Scenes", tint = if (isDarkTheme) Color.White else Color.Black)
+                                    }
+                                } else {
+                                    val scenes by viewModel.scenes.collectAsStateWithLifecycle()
+                                    ScenesMenu(
+                                        scenes = scenes,
+                                        projectId = viewModel.projectId,
+                                        onClose = { isScenesMenuOpen = false },
+                                        onCaptureScene = {
+                                            coroutineScope.launch {
+                                                try {
+                                                    val sceneId = viewModel.addScene("Scene ${scenes.size + 1}", offset.x, offset.y, scale)
+                                                    val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                                                    val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                                    
+                                                    // Scale to thumbnail (max 480px width)
+                                                    val ratio = swBitmap.height.toFloat() / swBitmap.width.toFloat()
+                                                    val thumbWidth = 480
+                                                    val thumbHeight = (thumbWidth * ratio).toInt()
+                                                    val thumbBitmap = android.graphics.Bitmap.createScaledBitmap(swBitmap, thumbWidth, thumbHeight, true)
+                                                    
+                                                    val file = java.io.File(context.filesDir, "projects/${viewModel.projectId}_scene_${sceneId}_thumb.png")
+                                                    file.outputStream().use { 
+                                                        thumbBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) 
+                                                    }
+                                                } catch (e: Exception) {
+                                                    // Ignore thumbnail failure
+                                                }
+                                            }
+                                        },
+                                        onNavigateToScene = { navigateToScene(it) },
+                                        onRenameScene = { id, newName -> viewModel.renameScene(id, newName) },
+                                        onDeleteScene = { viewModel.removeScene(it) },
+                                        onExportScene = { 
+                                            sceneToExport = it
+                                            exportScenePdfLauncher.launch("${it.name}.pdf") 
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-
 
                 val showConnectorMenu = selectedConnectorId != null || isConnectingMode
                 val activeConnector = when {
