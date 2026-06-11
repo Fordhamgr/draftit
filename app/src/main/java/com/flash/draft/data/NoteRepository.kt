@@ -114,16 +114,20 @@ class NoteRepository(context: Context) {
                     jsonObject.put("strokeWidth", element.strokeWidth.toDouble())
                     jsonObject.put("toolType", element.toolType)
                     jsonObject.put("alpha", element.alpha.toDouble())
-                    val pointsArray = JSONArray()
-                    element.points.forEach { point ->
-                        val pointObj = JSONObject()
-                        pointObj.put("x", point.x.toDouble())
-                        pointObj.put("y", point.y.toDouble())
-                        pointObj.put("pressure", point.pressure.toDouble())
-                        pointObj.put("timeMillis", point.timeMillis)
-                        pointsArray.put(pointObj)
+                    val xArr = JSONArray()
+                    val yArr = JSONArray()
+                    val pArr = JSONArray()
+                    val tArr = JSONArray()
+                    for (i in element.xCoords.indices) {
+                        xArr.put(element.xCoords[i].toDouble())
+                        yArr.put(element.yCoords[i].toDouble())
+                        pArr.put(element.pressures[i].toDouble())
+                        tArr.put(element.times[i])
                     }
-                    jsonObject.put("points", pointsArray)
+                    jsonObject.put("xCoords", xArr)
+                    jsonObject.put("yCoords", yArr)
+                    jsonObject.put("pressures", pArr)
+                    jsonObject.put("times", tArr)
                 }
                 is CanvasElement.AudioNote -> {
                     jsonObject.put("type", "audio")
@@ -222,20 +226,43 @@ class NoteRepository(context: Context) {
                         "code" -> elements.add(CanvasElement.CodeBlock(id, pos, obj.optString("code", ""), obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 180.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif"), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "sketch" -> {
-                            val pointsArray = obj.getJSONArray("points")
-                            val points = mutableListOf<InkPoint>()
-                            for (j in 0 until pointsArray.length()) { 
-                                val pObj = pointsArray.getJSONObject(j)
-                                points.add(
-                                    InkPoint(
-                                        x = pObj.getDouble("x").toFloat(), 
-                                        y = pObj.getDouble("y").toFloat(),
-                                        pressure = pObj.optDouble("pressure", 1.0).toFloat(),
-                                        timeMillis = pObj.optLong("timeMillis", 0L)
-                                    )
-                                ) 
+                            val xCoords: FloatArray
+                            val yCoords: FloatArray
+                            val pressures: FloatArray
+                            val times: LongArray
+                            
+                            if (obj.has("xCoords")) {
+                                val xArr = obj.getJSONArray("xCoords")
+                                val yArr = obj.getJSONArray("yCoords")
+                                val pArr = obj.getJSONArray("pressures")
+                                val tArr = obj.getJSONArray("times")
+                                val size = xArr.length()
+                                xCoords = FloatArray(size)
+                                yCoords = FloatArray(size)
+                                pressures = FloatArray(size)
+                                times = LongArray(size)
+                                for (j in 0 until size) {
+                                    xCoords[j] = xArr.getDouble(j).toFloat()
+                                    yCoords[j] = yArr.getDouble(j).toFloat()
+                                    pressures[j] = pArr.getDouble(j).toFloat()
+                                    times[j] = tArr.getLong(j)
+                                }
+                            } else {
+                                val pointsArray = obj.getJSONArray("points")
+                                val size = pointsArray.length()
+                                xCoords = FloatArray(size)
+                                yCoords = FloatArray(size)
+                                pressures = FloatArray(size)
+                                times = LongArray(size)
+                                for (j in 0 until size) { 
+                                    val pObj = pointsArray.getJSONObject(j)
+                                    xCoords[j] = pObj.getDouble("x").toFloat()
+                                    yCoords[j] = pObj.getDouble("y").toFloat()
+                                    pressures[j] = pObj.optDouble("pressure", 1.0).toFloat()
+                                    times[j] = pObj.optLong("timeMillis", 0L)
+                                }
                             }
-                            elements.add(CanvasElement.Sketch(id, points, Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 6.0).toFloat(), obj.optString("toolType", "Pen"), obj.optDouble("alpha", 1.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                            elements.add(CanvasElement.Sketch(id, xCoords, yCoords, pressures, times, Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 6.0).toFloat(), obj.optString("toolType", "Pen"), obj.optDouble("alpha", 1.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         }
                         "image" -> elements.add(CanvasElement.ImageCard(id, pos, obj.getString("uri"), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("originalWidth", obj.optDouble("width", 200.0)).toFloat(), obj.optDouble("originalHeight", obj.optDouble("height", 200.0)).toFloat(), obj.optDouble("alpha", 1.0).toFloat(), obj.optDouble("rotation", 0.0).toFloat(), obj.optDouble("scaleX", 1.0).toFloat(), obj.optDouble("scaleY", 1.0).toFloat(), obj.optBoolean("isLocked", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "audio" -> elements.add(CanvasElement.AudioNote(id, pos, obj.optString("audioPath", ""), obj.optInt("durationMs", 0), false, obj.optDouble("width", 240.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))

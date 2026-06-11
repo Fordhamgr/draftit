@@ -31,14 +31,56 @@ sealed class CanvasElement {
     // NEW: The data structure for a freehand drawing
     data class Sketch(
         override val id: String,
-        val points: List<InkPoint>,
+        val xCoords: FloatArray,
+        val yCoords: FloatArray,
+        val pressures: FloatArray,
+        val times: LongArray,
         val color: Color = Color.Companion.Black,
         val strokeWidth: Float = 6f,
         val toolType: String = "Pen", // "Pen", "Highlighter"
         val alpha: Float = 1f,
         val isLocked: Boolean = false,
         override val hyperlinkTarget: String? = null
-    ) : CanvasElement()
+    ) : CanvasElement() {
+        @Transient
+        var cachedStroke: androidx.ink.strokes.Stroke? = null
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as Sketch
+
+            if (id != other.id) return false
+            if (!xCoords.contentEquals(other.xCoords)) return false
+            if (!yCoords.contentEquals(other.yCoords)) return false
+            if (!pressures.contentEquals(other.pressures)) return false
+            if (!times.contentEquals(other.times)) return false
+            if (color != other.color) return false
+            if (strokeWidth != other.strokeWidth) return false
+            if (toolType != other.toolType) return false
+            if (alpha != other.alpha) return false
+            if (isLocked != other.isLocked) return false
+            if (hyperlinkTarget != other.hyperlinkTarget) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = id.hashCode()
+            result = 31 * result + xCoords.contentHashCode()
+            result = 31 * result + yCoords.contentHashCode()
+            result = 31 * result + pressures.contentHashCode()
+            result = 31 * result + times.contentHashCode()
+            result = 31 * result + color.hashCode()
+            result = 31 * result + strokeWidth.hashCode()
+            result = 31 * result + toolType.hashCode()
+            result = 31 * result + alpha.hashCode()
+            result = 31 * result + isLocked.hashCode()
+            result = 31 * result + (hyperlinkTarget?.hashCode() ?: 0)
+            return result
+        }
+    }
 
     // NEW: The Image Element
     data class ImageCard(

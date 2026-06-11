@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -159,11 +160,45 @@ fun DraftCanvas(
     val liquidRefraction by viewModel.liquidRefraction.collectAsStateWithLifecycle(initialValue = 0.5f)
     val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle(initialValue = 0.5f)
     var isExportMenuOpen by remember { mutableStateOf(false) }
+    var isExporting by remember { mutableStateOf(false) }
 
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     var panJob: Job? by remember { mutableStateOf(null) }
     val coroutineScope = rememberCoroutineScope()
+    
+    // PERF LOGGING: Measure entire canvas recomposition
+    val recomposeStart = System.nanoTime()
+    DisposableEffect(Unit) {
+        onDispose { }
+    }
+    SideEffect {
+        val elapsed = (System.nanoTime() - recomposeStart) / 1_000_000f
+        Log.d("DraftCanvasPerf", "DraftCanvas recomposed in ${elapsed}ms")
+    }
+    
+    // PERF LOGGING: Monitor actual frame rate and detect stutters
+    var frameCount by remember { mutableStateOf(0) }
+    var lastFpsTime by remember { mutableStateOf(System.nanoTime()) }
+    LaunchedEffect(Unit) {
+        var lastFrameTime = System.nanoTime()
+        while (isActive) {
+            withFrameNanos { time ->
+                frameCount++
+                val dtMs = (time - lastFrameTime) / 1_000_000f
+                if (dtMs > 18f && lastFrameTime != 0L) { // Stutter detected
+                    Log.w("DraftCanvasPerf", "Frame Drop: ${dtMs}ms")
+                }
+                lastFrameTime = time
+                
+                if (time - lastFpsTime > 1_000_000_000L) {
+                    Log.d("DraftCanvasPerf", "FPS: $frameCount")
+                    frameCount = 0
+                    lastFpsTime = time
+                }
+            }
+        }
+    }
 
     fun navigateToScene(scene: com.flash.draft.model.Scene) {
         panJob?.cancel()
@@ -271,7 +306,11 @@ fun DraftCanvas(
         if (uri != null) {
             coroutineScope.launch {
                 try {
+                    isExporting = true
+                    delay(100) // Allow recomposition and drawWithContent to record the layer
                     val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                    isExporting = false
+                    
                     val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                     val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
                     val canvas = android.graphics.Canvas(finalBitmap)
@@ -283,6 +322,7 @@ fun DraftCanvas(
                     }
                     Toast.makeText(context, "Picture exported successfully!", Toast.LENGTH_SHORT).show()
                 } catch(e: Exception) {
+                    isExporting = false
                     Toast.makeText(context, "Error exporting picture.", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -294,7 +334,11 @@ fun DraftCanvas(
         if (uri != null) {
             coroutineScope.launch {
                 try {
+                    isExporting = true
+                    delay(100) // Allow recomposition and drawWithContent to record the layer
                     val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                    isExporting = false
+                    
                     val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                     val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
                     val canvas = android.graphics.Canvas(finalBitmap)
@@ -313,6 +357,7 @@ fun DraftCanvas(
                     pdfDocument.close()
                     Toast.makeText(context, "PDF exported successfully!", Toast.LENGTH_SHORT).show()
                 } catch(e: Exception) {
+                    isExporting = false
                     Toast.makeText(context, "Error exporting PDF.", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -385,7 +430,13 @@ fun DraftCanvas(
                 if (el is CanvasElement.StickyNote) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.ImageCard) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.PdfCard) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.Sketch) elements[idx] = el.copy(points = el.points.map { it.copy(x = it.x + delta.x, y = it.y + delta.y) })
+                if (el is CanvasElement.Sketch) {
+                    val newX = FloatArray(el.xCoords.size) { i -> el.xCoords[i] + delta.x }
+                    val newY = FloatArray(el.yCoords.size) { i -> el.yCoords[i] + delta.y }
+                    val newEl = el.copy(xCoords = newX, yCoords = newY)
+                    newEl.cachedStroke = null
+                    elements[idx] = newEl
+                }
                 if (el is CanvasElement.CodeBlock) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.AudioNote) elements[idx] = el.copy(position = el.position + delta)
                 if (el is CanvasElement.ShapeNode) elements[idx] = el.copy(position = el.position + delta)
@@ -479,7 +530,7 @@ fun DraftCanvas(
                                     if (activeToolType == "Eraser") {
                                         val eraseRadius = activeStrokeWidth * 1.5f
                                         elements.removeAll { el ->
-                                            el is CanvasElement.Sketch && el.points.any { p -> (Offset(p.x, p.y) - newPoint).getDistance() < eraseRadius }
+                                            el is CanvasElement.Sketch && (0 until el.xCoords.size).any { i -> (Offset(el.xCoords[i], el.yCoords[i]) - newPoint).getDistance() < eraseRadius }
                                         }
                                         // Defer viewModel.updateElements to onDragEnd for smooth erasing!
                                     } else {
@@ -505,11 +556,36 @@ fun DraftCanvas(
                                     elements.forEach { el ->
                                         val center = getCenterPoint(el.id, elements)
                                         if (center != null && ViewportMath.isPointInPolygon(center, lassoPath)) capturedIds.add(el.id)
-                                        else if (el is CanvasElement.Sketch && ViewportMath.isPointInPolygon(Offset(el.points.first().x, el.points.first().y), lassoPath)) capturedIds.add(el.id)
+                                        else if (el is CanvasElement.Sketch && el.xCoords.isNotEmpty() && ViewportMath.isPointInPolygon(Offset(el.xCoords.first(), el.yCoords.first()), lassoPath)) capturedIds.add(el.id)
                                     }
                                     selectedGroupIds = capturedIds; lassoPath.clear(); isLassoMode = false
                                 } else if (currentDrawingPath.size > 1 && activeToolType != "Eraser") {
-                                    elements.add(CanvasElement.Sketch(id = UUID.randomUUID().toString(), points = currentDrawingPath.toList(), color = activeDrawColor, strokeWidth = activeStrokeWidth, toolType = activeToolType, alpha = activeAlpha))
+                                    fun rdp(pts: List<InkPoint>, eps: Float): List<InkPoint> {
+                                        if (pts.size < 3) return pts
+                                        var dmax = 0f; var index = 0
+                                        val first = pts.first(); val last = pts.last()
+                                        for (i in 1 until pts.lastIndex) {
+                                            val d = distancePointToSegment(Offset(pts[i].x, pts[i].y), Offset(first.x, first.y), Offset(last.x, last.y))
+                                            if (d > dmax) { index = i; dmax = d }
+                                        }
+                                        if (dmax > eps) {
+                                            val res1 = rdp(pts.subList(0, index + 1), eps)
+                                            val res2 = rdp(pts.subList(index, pts.size), eps)
+                                            return res1.dropLast(1) + res2
+                                        }
+                                        return listOf(first, last)
+                                    }
+                                    val simplified = rdp(currentDrawingPath.toList(), 1f / scale)
+                                    val size = simplified.size
+                                    val xArr = FloatArray(size)
+                                    val yArr = FloatArray(size)
+                                    val pArr = FloatArray(size)
+                                    val tArr = LongArray(size)
+                                    for (i in 0 until size) {
+                                        val p = simplified[i]
+                                        xArr[i] = p.x; yArr[i] = p.y; pArr[i] = p.pressure; tArr[i] = p.timeMillis
+                                    }
+                                    elements.add(CanvasElement.Sketch(id = UUID.randomUUID().toString(), xCoords = xArr, yCoords = yArr, pressures = pArr, times = tArr, color = activeDrawColor, strokeWidth = activeStrokeWidth, toolType = activeToolType, alpha = activeAlpha))
                                     viewModel.updateElements(elements.toList())
                                     currentDrawingPath.clear()
                                 } else if (activeToolType == "Eraser") {
@@ -563,30 +639,52 @@ fun DraftCanvas(
                     )
                 }
         ) {
-
-            // --- 1. RECORDING BACKGROUND ---
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .liquefiable(liquidState)
-                .drawWithContent {
-                    graphicsLayer.record {
-                        this@drawWithContent.drawContent()
-                    }
-                    drawLayer(graphicsLayer)
+                SideEffect {
+                    Log.d("DraftCanvasPerf", "BoxWithConstraints lambda recomposed!")
                 }
-            ) {
-                GridBackground(scale = scale, offset = offset)
 
-                CanvasBackgroundDrawPipeline(
-                    elements = elements, scale = scale, offset = offset, selectedConnectorId = selectedConnectorId,
-                    isDarkTheme = isDarkTheme
-                )
+                // Culling removed: GPU graphicsLayer efficiently clips off-screen elements natively.
 
-                RenderCanvasElements(
-                    elements = elements,
-                    scale = scale,
-                    offset = offset,
-                    selectedNoteId = selectedNoteId,
+                // GridBackground(scaleProvider = { scale }, offsetProvider = { offset })
+
+                // --- 1. RECORDING BACKGROUND ---
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .liquefiable(liquidState)
+                    .drawWithContent {
+                        val drawStart = System.nanoTime()
+                        if (isExporting) {
+                            graphicsLayer.record {
+                                this@drawWithContent.drawContent()
+                            }
+                        }
+                        drawContent()
+                        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
+                        if (elapsed > 5f && isExporting) {
+                            Log.d("DraftCanvasPerf", "drawWithContent (graphicsLayer.record) took ${elapsed}ms")
+                        }
+                    }
+                ) {
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = offset.x
+                            translationY = offset.y
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        }
+                    ) {
+                        CanvasBackgroundDrawPipeline(
+                            elements = elements, scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
+                            isDarkTheme = isDarkTheme
+                        )
+
+                        RenderCanvasElements(
+                            elements = elements,
+                            scale = 1f,
+                            offset = androidx.compose.ui.geometry.Offset.Zero,
+                        selectedNoteId = selectedNoteId,
                     selectedGroupIds = selectedGroupIds,
                     connectingStartNodeId = connectingStartNodeId,
                     isConnectingMode = isConnectingMode,
@@ -619,13 +717,21 @@ fun DraftCanvas(
                     onNavigateToBoard = onNavigateToBoard
                 )
 
-                CanvasForegroundDrawPipeline(
-                    elements = elements, scale = scale, offset = offset,
-                    isDarkTheme = isDarkTheme, selectedGroupIds = selectedGroupIds, currentDrawingPath = currentDrawingPath,
-                    activeToolType = activeToolType, activeDrawColor = activeDrawColor, activeAlpha = activeAlpha,
-                    activeStrokeWidth = activeStrokeWidth, lassoPath = lassoPath
-                )
-            }
+                        CanvasForegroundDrawPipeline(
+                            elements = elements,
+                            cameraScaleProvider = { scale },
+                            cameraOffsetProvider = { offset },
+                            isDarkTheme = isDarkTheme,
+                            selectedGroupIds = selectedGroupIds,
+                            currentDrawingPath = currentDrawingPath,
+                            activeToolType = activeToolType,
+                            activeDrawColor = activeDrawColor,
+                            activeAlpha = activeAlpha,
+                            activeStrokeWidth = activeStrokeWidth,
+                            lassoPath = lassoPath
+                        )
+                    }
+                }
 
             if (isUiVisible) {
 

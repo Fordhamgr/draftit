@@ -26,8 +26,7 @@ fun distancePointToSegment(p: Offset, v: Offset, w: Offset): Float {
     return (p - proj).getDistance()
 }
 
-fun getCenterPoint(elementId: String, elements: List<CanvasElement>): Offset? {
-    val el = elements.find { it.id == elementId }
+fun getCenterPoint(el: CanvasElement): Offset? {
     return when (el) {
         is CanvasElement.StickyNote -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
         is CanvasElement.ImageCard -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
@@ -42,8 +41,12 @@ fun getCenterPoint(elementId: String, elements: List<CanvasElement>): Offset? {
     }
 }
 
-fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Pair<Float, Float> {
-    val el = elements.find { it.id == elementId }
+fun getCenterPoint(elementId: String, elements: List<CanvasElement>): Offset? {
+    val el = elements.find { it.id == elementId } ?: return null
+    return getCenterPoint(el)
+}
+
+fun getElementDimensions(el: CanvasElement): Pair<Float, Float> {
     return when (el) {
         is CanvasElement.StickyNote -> Pair(el.width, el.height)
         is CanvasElement.ImageCard -> Pair(el.width, el.height)
@@ -56,6 +59,11 @@ fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Pair
         is CanvasElement.TaskListNode -> Pair(el.width, el.height)
         else -> Pair(50f, 50f)
     }
+}
+
+fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Pair<Float, Float> {
+    val el = elements.find { it.id == elementId } ?: return Pair(50f, 50f)
+    return getElementDimensions(el)
 }
 
 fun getRectangleIntersection(centerStart: Offset, centerEnd: Offset, width: Float, height: Float, padding: Float = 25f): Offset {

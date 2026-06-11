@@ -3,6 +3,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import com.flash.draft.model.CanvasElement
 import com.flash.draft.ui.canvas.* // Pulls in FrameItem, StickyNoteItem, etc.
@@ -49,95 +50,6 @@ fun RenderCanvasElements(
     val cullBottom = screenBottomRight.y + 500f
 
     elements.toList().forEach { element ->
-        // --- VIEWPORT CULLING ---
-        if (element !is CanvasElement.Connector && element !is CanvasElement.Sketch) {
-            val center = getCenterPoint(element.id, elements)
-            val dims = getElementDimensions(element.id, elements)
-            if (center != null) {
-                val halfW = dims.first / 2f
-                val halfH = dims.second / 2f
-                val elLeft = center.x - halfW
-                val elTop = center.y - halfH
-                val elRight = center.x + halfW
-                val elBottom = center.y + halfH
-                
-                // If element is completely outside the cull bounds, skip rendering it
-                if (elRight < cullLeft || elLeft > cullRight || elBottom < cullTop || elTop > cullBottom) {
-                    return@forEach
-                }
-            }
-        }
-
-        if (element is CanvasElement.FrameNode) {
-
-            key(element.id) {
-                val isGroupedOrConnecting = connectingStartNodeId == element.id || selectedGroupIds.contains(element.id)
-                val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
-                FrameItem(
-                    frameNode = element,
-                    scale = scale,
-                    offset = offset,
-                    isSelected = selectedNoteId == element.id,
-                    isConnecting = isGroupedOrConnecting,
-                    isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedFrame ->
-                        if (updatedFrame.hyperlinkTarget == "TELEPORT") {
-                            val target = element.hyperlinkTarget!!
-                            if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
-                            else if (target.startsWith("board:")) onNavigateToBoard(target.removePrefix("board:"))
-                        } else {
-                            val currentIndex = elements.indexOfFirst { it.id == element.id }
-                            if (currentIndex != -1) elements[currentIndex] = updatedFrame
-                        }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
-                        val currentIndex = elements.indexOfFirst { it.id == element.id }
-                        if (currentIndex != -1) {
-                            val el = elements[currentIndex] as CanvasElement.FrameNode
-                            elements[currentIndex] = el.copy(
-                                width = (el.width + delta.x).coerceAtLeast(150f),
-                                height = (el.height + delta.y).coerceAtLeast(100f)
-                            )
-                        }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
-                        elements.removeAll { it.id == element.id }
-                        elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
-                        onResetSelectedNoteId()
-                        onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
-                                val newGroup = mutableSetOf(element.id)
-                                if (element.isMagnetic) {
-                                    val fx = element.position.x; val fy = element.position.y
-                                    val fw = element.width; val fh = element.height
-                                    elements.forEach { el ->
-                                        if (el.id != element.id && el !is CanvasElement.Connector) {
-                                            val center = getCenterPoint(el.id, elements)
-                                            if (center != null && center.x >= fx && center.x <= fx + fw && center.y >= fy && center.y <= fy + fh) {
-                                                newGroup.add(el.id)
-                                            }
-                                        }
-                                    }
-                                }
-                                onUpdateSelectedGroupIds(newGroup)
-                                onUpdateSelectedNoteId(element.id)
-                                onSendToBack(element.id)
-                            }
-                        }
-                    }
-                )
-            }
-        }
-
         if (element is CanvasElement.StickyNote) {
 
 
@@ -146,13 +58,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 StickyNoteItem(
                     note = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedNote ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNote: CanvasElement.StickyNote ->
                         if (updatedNote.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -161,9 +73,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedNote
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.StickyNote
@@ -172,15 +84,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(100f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -191,7 +103,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -204,13 +116,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 CodeSnippetItem(
                     codeBlock = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedBlock ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedBlock: CanvasElement.CodeBlock ->
                         if (updatedBlock.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -219,9 +131,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedBlock
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.CodeBlock
@@ -230,15 +142,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(100f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -249,7 +161,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -262,13 +174,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 ImageItem(
                     imageCard = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedImage ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedImage: CanvasElement.ImageCard ->
                         if (updatedImage.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -277,9 +189,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedImage
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.ImageCard
@@ -288,7 +200,7 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(100f)
                             )
                         }
-                    },
+ } },
                     onDuplicate = {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
                         onUpdateElements(elements.toList())
@@ -304,14 +216,14 @@ fun RenderCanvasElements(
                             }
                         }
                     },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -322,7 +234,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -335,13 +247,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 TaskListItem(
                     taskNode = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedNode ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNode: CanvasElement.TaskListNode ->
                         if (updatedNode.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -350,9 +262,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedNode
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.TaskListNode
@@ -361,15 +273,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(150f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -380,7 +292,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -393,13 +305,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 PdfItem(
                     pdfCard = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedPdf ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedPdf: CanvasElement.PdfCard ->
                         if (updatedPdf.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -408,9 +320,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedPdf
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.PdfCard
@@ -419,15 +331,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(80f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -438,7 +350,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -451,13 +363,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 AudioItem(
                     audioNote = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedAudio ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedAudio: CanvasElement.AudioNote ->
                         if (updatedAudio.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -466,9 +378,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedAudio
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.AudioNote
@@ -477,15 +389,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(60f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -496,7 +408,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -509,13 +421,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 ShapeItem(
                     shapeNode = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedShape ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedShape: CanvasElement.ShapeNode ->
                         if (updatedShape.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -524,9 +436,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedShape
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.ShapeNode
@@ -535,15 +447,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(50f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -554,7 +466,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }
@@ -566,13 +478,13 @@ fun RenderCanvasElements(
                 val isConnectionTarget = isConnectingMode && connectingStartNodeId != null && connectingStartNodeId != element.id
                 LabelItem(
                     labelNode = element,
-                    scale = scale,
-                    offset = offset,
+                    scale = 1f,
+                    offset = androidx.compose.ui.geometry.Offset.Zero,
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
-                    onConnectRequest = { onStartConnection(element.id) },
-                    onUpdate = { updatedNode ->
+                    onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNode: CanvasElement.LabelNode ->
                         if (updatedNode.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
                             if (target.startsWith("scene:")) onNavigateToScene(target.removePrefix("scene:"))
@@ -581,9 +493,9 @@ fun RenderCanvasElements(
                             val currentIndex = elements.indexOfFirst { it.id == element.id }
                             if (currentIndex != -1) elements[currentIndex] = updatedNode
                         }
-                    },
-                    onPositionDelta = { delta -> onMoveGroup(delta, element.id) },
-                    onSizeDelta = { delta ->
+ } },
+                    onPositionDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset -> onMoveGroup(delta, element.id) } },
+                    onSizeDelta = remember(element.id) { { delta: androidx.compose.ui.geometry.Offset ->
                         val currentIndex = elements.indexOfFirst { it.id == element.id }
                         if (currentIndex != -1) {
                             val el = elements[currentIndex] as CanvasElement.LabelNode
@@ -592,15 +504,15 @@ fun RenderCanvasElements(
                                 height = (el.height + delta.y).coerceAtLeast(40f)
                             )
                         }
-                    },
-                    onSaveRequest = { onUpdateElements(elements.toList()) },
-                    onDelete = {
+ } },
+                    onSaveRequest = remember(element.id) { { onUpdateElements(elements.toList()) } },
+                    onDelete = remember(element.id) { {
                         elements.removeAll { it.id == element.id }
                         elements.removeAll { it is CanvasElement.Connector && (it.startId == element.id || it.endId == element.id) }
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
-                    },
-                    onSelect = {
+                    } },
+                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
                         if (isConnectingMode) {
                             if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
                             else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
@@ -611,7 +523,7 @@ fun RenderCanvasElements(
                                 onBringToFront(element.id)
                             }
                         }
-                    }
+                    } }
                 )
             }
         }

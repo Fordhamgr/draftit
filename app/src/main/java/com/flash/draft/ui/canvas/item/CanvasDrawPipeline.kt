@@ -34,129 +34,114 @@ fun CanvasBackgroundDrawPipeline(
     selectedConnectorId: String?,
     isDarkTheme: Boolean
 ) {
+    // DO NOT use remember here. We need the latest elements map every time it recomposes.
+    // Building the map takes < 1ms for hundreds of elements.
+    val elementMap = elements.associateBy { it.id }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
+        val drawStart = System.nanoTime()
+
+        // 1. ALLOCATE ALL HEAVY OBJECTS OUTSIDE THE DRAW LOOP
+        val shadowOffset = Offset(8f, 16f)
+        val shadowColor = Color.Black.copy(alpha = 0.15f)
+        val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f)
+        val dottedEffect = PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f)
+
+        // Shared Path object to avoid allocating memory for every arrow
+        val sharedPath = Path()
+
         withTransform({
             translate(left = offset.x, top = offset.y)
             scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
         }) {
             elements.filterIsInstance<CanvasElement.Connector>().forEach { connector ->
-                val centerStart = getCenterPoint(connector.startId, elements)
-                val centerEnd = getCenterPoint(connector.endId, elements)
-                if (centerStart != null && centerEnd != null) {
-                    val (startW, startH) = getElementDimensions(connector.startId, elements)
-                    val (endW, endH) = getElementDimensions(connector.endId, elements)
-                    val start = getRectangleIntersection(centerStart, centerEnd, startW, startH, 25f)
-                    val end = getRectangleIntersection(centerEnd, centerStart, endW, endH, 25f)
-                    val isSelected = selectedConnectorId == connector.id
-                    val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
-                    val drawStroke = connector.strokeWidth
+                val startEl = elementMap[connector.startId]
+                val endEl = elementMap[connector.endId]
+                if (startEl != null && endEl != null) {
+                    val centerStart = getCenterPoint(startEl)
+                    val centerEnd = getCenterPoint(endEl)
+                    if (centerStart != null && centerEnd != null) {
+                        val (startW, startH) = getElementDimensions(startEl)
+                        val (endW, endH) = getElementDimensions(endEl)
+                        val start = getRectangleIntersection(centerStart, centerEnd, startW, startH, 25f)
+                        val end = getRectangleIntersection(centerEnd, centerStart, endW, endH, 25f)
+                        val isSelected = selectedConnectorId == connector.id
+                        val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
+                        val drawStroke = connector.strokeWidth
 
-                    val shadowOffset = Offset(8f, 16f)
-                    val shadowColor = Color.Black.copy(alpha = 0.15f)
-
-                    if (isSelected) drawLine(color = Color.Blue.copy(alpha = 0.2f), start = start, end = end, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
-                    val effect = when (connector.lineStyle) {
-                        "Dashed" -> PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f)
-                        "Dotted" -> PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f)
-                        else -> null
-                    }
-                    
-                    val shadowStrokePaint = androidx.compose.ui.graphics.Paint().apply {
-                        color = shadowColor
-                        style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                        strokeWidth = drawStroke
-                        strokeCap = StrokeCap.Round
-                        strokeJoin = StrokeJoin.Round
-                        pathEffect = effect
-                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-                    }
-                    val shadowFillPaint = androidx.compose.ui.graphics.Paint().apply {
-                        color = shadowColor
-                        style = androidx.compose.ui.graphics.PaintingStyle.Fill
-                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-                    }
-
-                    // Draw Line Shadow
-                    drawIntoCanvas { canvas ->
-                        val linePath = Path().apply {
-                            moveTo(start.x + shadowOffset.x, start.y + shadowOffset.y)
-                            lineTo(end.x + shadowOffset.x, end.y + shadowOffset.y)
-                        }
-                        canvas.drawPath(linePath, shadowStrokePaint)
-                    }
-                    // Draw Line Main
-                    drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
-
-                    fun drawArrow(tip: Offset, base: Offset, isShadow: Boolean = false) {
-                        val angle = atan2(tip.y - base.y, tip.x - base.x)
-                        val arrowLen = 20f + (drawStroke * 1.5f)
-                        val arrowAng = Math.PI / 6
+                        if (isSelected) drawLine(color = Color.Blue.copy(alpha = 0.2f), start = start, end = end, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
                         
-                        val tX = if (isShadow) tip.x + shadowOffset.x else tip.x
-                        val tY = if (isShadow) tip.y + shadowOffset.y else tip.y
-                        val colorToDraw = if (isShadow) shadowColor else drawColor
+                        val effect = when (connector.lineStyle) {
+                            "Dashed" -> dashedEffect
+                            "Dotted" -> dottedEffect
+                            else -> null
+                        }
 
-                        when (connector.arrowShape) {
-                            "Open" -> {
-                                val path = Path().apply {
-                                    moveTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
-                                    lineTo(tX, tY)
-                                    lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
+                        // Draw Line Shadow (Native Compose is hardware accelerated, much faster than BlurMaskFilter)
+                        drawLine(color = shadowColor, start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
+                        
+                        // Draw Line Main
+                        drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
+
+                        fun drawArrow(tip: Offset, base: Offset, isShadow: Boolean = false) {
+                            val angle = atan2(tip.y - base.y, tip.x - base.x)
+                            val arrowLen = 20f + (drawStroke * 1.5f)
+                            val arrowAng = Math.PI / 6
+                            
+                            val tX = if (isShadow) tip.x + shadowOffset.x else tip.x
+                            val tY = if (isShadow) tip.y + shadowOffset.y else tip.y
+                            val colorToDraw = if (isShadow) shadowColor else drawColor
+
+                            when (connector.arrowShape) {
+                                "Open" -> {
+                                    sharedPath.rewind()
+                                    sharedPath.moveTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
+                                    sharedPath.lineTo(tX, tY)
+                                    sharedPath.lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
+                                    
+                                    drawPath(sharedPath, colorToDraw, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
                                 }
-                                if (isShadow) {
-                                    drawIntoCanvas { it.drawPath(path, shadowStrokePaint) }
-                                } else {
-                                    drawPath(path, colorToDraw, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                }
-                            }
-                            "Filled", "Diamond" -> {
-                                val path = Path().apply {
+                                "Filled", "Diamond" -> {
+                                    sharedPath.rewind()
                                     if (connector.arrowShape == "Filled") {
-                                        moveTo(tX, tY)
-                                        lineTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
-                                        lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
-                                        close()
+                                        sharedPath.moveTo(tX, tY)
+                                        sharedPath.lineTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
+                                        sharedPath.lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
+                                        sharedPath.close()
                                     } else {
                                         val midX = tX - (arrowLen / 1.5f) * cos(angle).toFloat()
                                         val midY = tY - (arrowLen / 1.5f) * sin(angle).toFloat()
                                         val endX = tX - (arrowLen * 1.3f) * cos(angle).toFloat()
                                         val endY = tY - (arrowLen * 1.3f) * sin(angle).toFloat()
-                                        moveTo(tX, tY)
-                                        lineTo(midX - (arrowLen / 2) * sin(angle).toFloat(), midY + (arrowLen / 2) * cos(angle).toFloat())
-                                        lineTo(endX, endY)
-                                        lineTo(midX + (arrowLen / 2) * sin(angle).toFloat(), midY - (arrowLen / 2) * cos(angle).toFloat())
-                                        close()
+                                        sharedPath.moveTo(tX, tY)
+                                        sharedPath.lineTo(midX - (arrowLen / 2) * sin(angle).toFloat(), midY + (arrowLen / 2) * cos(angle).toFloat())
+                                        sharedPath.lineTo(endX, endY)
+                                        sharedPath.lineTo(midX + (arrowLen / 2) * sin(angle).toFloat(), midY - (arrowLen / 2) * cos(angle).toFloat())
+                                        sharedPath.close()
                                     }
+                                    drawPath(sharedPath, colorToDraw, style = Fill)
                                 }
-                                if (isShadow) {
-                                    drawIntoCanvas { it.drawPath(path, shadowFillPaint) }
-                                } else {
-                                    drawPath(path, colorToDraw, style = Fill)
-                                }
-                            }
-                            "Circle" -> {
-                                val center = Offset(tX - (arrowLen / 2) * cos(angle).toFloat(), tY - (arrowLen / 2) * sin(angle).toFloat())
-                                if (isShadow) {
-                                    val path = Path().apply {
-                                        addOval(androidx.compose.ui.geometry.Rect(center = center, radius = arrowLen / 2))
-                                    }
-                                    drawIntoCanvas { it.drawPath(path, shadowFillPaint) }
-                                } else {
+                                "Circle" -> {
+                                    val center = Offset(tX - (arrowLen / 2) * cos(angle).toFloat(), tY - (arrowLen / 2) * sin(angle).toFloat())
                                     drawCircle(color = colorToDraw, radius = arrowLen / 2, center = center)
                                 }
                             }
                         }
+                        
+                        // Draw Arrow Shadows
+                        if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = true)
+                        if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = true)
+                        
+                        // Draw Arrow Main
+                        if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = false)
+                        if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = false)
                     }
-                    
-                    // Draw Arrow Shadows
-                    if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = true)
-                    if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = true)
-                    
-                    // Draw Arrow Main
-                    if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = false)
-                    if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = false)
                 }
             }
+        }
+        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
+        if (elapsed > 2f) {
+            android.util.Log.d("DraftCanvasPerf", "CanvasBackgroundDrawPipeline took ${elapsed}ms")
         }
     }
 }
@@ -164,8 +149,8 @@ fun CanvasBackgroundDrawPipeline(
 @Composable
 fun CanvasForegroundDrawPipeline(
     elements: List<CanvasElement>,
-    scale: Float,
-    offset: Offset,
+    cameraScaleProvider: () -> Float,
+    cameraOffsetProvider: () -> Offset,
     isDarkTheme: Boolean,
     selectedGroupIds: Set<String>,
     currentDrawingPath: List<com.flash.draft.model.InkPoint>,
@@ -178,41 +163,66 @@ fun CanvasForegroundDrawPipeline(
     val renderer = remember { CanvasStrokeRenderer.create() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
+        val drawStart = System.nanoTime()
+
         drawIntoCanvas { canvas ->
             val nativeCanvas = canvas.nativeCanvas
             nativeCanvas.save()
-            nativeCanvas.translate(offset.x, offset.y)
-            nativeCanvas.scale(scale, scale)
 
-            // Render existing sketches
+            // Render existing sketches (Let GPU handle Viewport Culling)
             elements.filterIsInstance<CanvasElement.Sketch>().forEach { sketch ->
-                if (sketch.points.size > 1) {
-                    val batch = MutableStrokeInputBatch()
-                    var lastTime = -1L
-                    sketch.points.forEach { p ->
-                        val safeTime = if (p.timeMillis < lastTime) lastTime else p.timeMillis
-                        lastTime = safeTime
-                        batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, p.x, p.y, safeTime, p.pressure)
+                if (sketch.xCoords.size > 1) {
+                    if (sketch.cachedStroke == null) {
+                        val batch = MutableStrokeInputBatch()
+                        var lastTime = -1L
+                        for (i in sketch.xCoords.indices) {
+                            val safeTime = if (sketch.times[i] < lastTime) lastTime else sketch.times[i]
+                            lastTime = safeTime
+                            batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, sketch.xCoords[i], sketch.yCoords[i], safeTime, sketch.pressures[i])
+                        }
+                        
+                        val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
+                        val family = when (sketch.toolType) {
+                            "Highlighter" -> StockBrushes.highlighterV1
+                            "Pencil" -> StockBrushes.markerV1
+                            else -> StockBrushes.markerV1
+                        }
+                        val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
+                            family,
+                            baseColor.copy(alpha = sketch.alpha).toArgb(),
+                            sketch.strokeWidth,
+                            0.1f
+                        )
+                        sketch.cachedStroke = Stroke(brush, batch)
                     }
-                    
-                    val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
+
+                    var strokeToDraw = sketch.cachedStroke
                     val isSelected = selectedGroupIds.contains(sketch.id)
-                    val alpha = if (isSelected) 0.5f else sketch.alpha
-
-                    val family = when (sketch.toolType) {
-                        "Highlighter" -> StockBrushes.highlighterV1
-                        "Pencil" -> StockBrushes.markerV1 // Fallback
-                        else -> StockBrushes.markerV1
+                    if (isSelected && strokeToDraw != null) {
+                        val batch = MutableStrokeInputBatch()
+                        var lastTime = -1L
+                        for (i in sketch.xCoords.indices) {
+                            val safeTime = if (sketch.times[i] < lastTime) lastTime else sketch.times[i]
+                            lastTime = safeTime
+                            batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, sketch.xCoords[i], sketch.yCoords[i], safeTime, sketch.pressures[i])
+                        }
+                        val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
+                        val family = when (sketch.toolType) {
+                            "Highlighter" -> StockBrushes.highlighterV1
+                            "Pencil" -> StockBrushes.markerV1
+                            else -> StockBrushes.markerV1
+                        }
+                        val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
+                            family,
+                            baseColor.copy(alpha = 0.5f).toArgb(),
+                            sketch.strokeWidth,
+                            0.1f
+                        )
+                        strokeToDraw = Stroke(brush, batch)
                     }
-                    val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
-                        family,
-                        baseColor.copy(alpha = alpha).toArgb(),
-                        sketch.strokeWidth,
-                        0.1f
-                    )
-
-                    val stroke = Stroke(brush, batch)
-                    renderer.draw(nativeCanvas, stroke, Matrix())
+                    if (strokeToDraw != null) {
+                        renderer.draw(nativeCanvas, strokeToDraw, Matrix())
+                    }
                 }
             }
 
@@ -246,20 +256,20 @@ fun CanvasForegroundDrawPipeline(
             nativeCanvas.restore()
         }
 
-        // Draw lasso path in standard Compose layer
-        withTransform({
-            translate(left = offset.x, top = offset.y)
-            scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
-        }) {
-            if (lassoPath.size > 1) {
-                val path = Path().apply { 
-                    moveTo(lassoPath.first().x, lassoPath.first().y)
-                    for (i in 1 until lassoPath.size) lineTo(lassoPath[i].x, lassoPath[i].y)
-                    close() 
-                }
-                drawPath(path, color = Color.Blue.copy(alpha = 0.1f))
-                drawPath(path, color = Color.Blue, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f / scale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / scale, 15f / scale))))
+        // Draw lasso path in standard Compose layer (already translated/scaled by parent graphicsLayer)
+        if (lassoPath.size > 1) {
+            val path = Path().apply { 
+                moveTo(lassoPath.first().x, lassoPath.first().y)
+                for (i in 1 until lassoPath.size) lineTo(lassoPath[i].x, lassoPath[i].y)
+                close() 
             }
+            drawPath(path, color = Color.Blue.copy(alpha = 0.1f))
+            val cameraScale = cameraScaleProvider()
+            drawPath(path, color = Color.Blue, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f / cameraScale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / cameraScale, 15f / cameraScale))))
+        }
+        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
+        if (elapsed > 2f) {
+            android.util.Log.d("DraftCanvasPerf", "CanvasForegroundDrawPipeline took ${elapsed}ms")
         }
     }
 }
