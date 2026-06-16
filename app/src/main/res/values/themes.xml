@@ -2,4 +2,13 @@
 <resources>
 
     <style name="Theme.Draftit" parent="android:Theme.Material.Light.NoActionBar" />
+    
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Background color of the splash screen -->
+        <item name="windowSplashScreenBackground">#121212</item>
+        <!-- Use the default launcher icon -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <!-- The theme to apply after the splash screen finishes -->
+        <item name="postSplashScreenTheme">@style/Theme.Draftit</item>
+    </style>
 </resources>

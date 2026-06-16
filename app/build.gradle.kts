@@ -2,6 +2,9 @@
     plugins {
         alias(libs.plugins.android.application)
         alias(libs.plugins.kotlin.compose)
+        // TODO: UNCOMMENT these two lines after adding your google-services.json to the app/ folder!
+        // alias(libs.plugins.google.services)
+        // alias(libs.plugins.firebase.crashlytics)
     }
 
 
@@ -21,11 +24,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -74,6 +79,15 @@ dependencies {
     implementation(libs.androidx.ink.brush)
     implementation(libs.androidx.ink.rendering)
     implementation(libs.androidx.ink.strokes)
+    
+    // Play Store Production Dependencies
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.play.review)
+
+    // Firebase (Crashlytics & Analytics)
+    // implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Uncomment when google-services.json is added
+    // implementation("com.google.firebase:firebase-analytics")
+    // implementation("com.google.firebase:firebase-crashlytics")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

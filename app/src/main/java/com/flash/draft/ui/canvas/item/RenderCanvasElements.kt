@@ -64,6 +64,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNote: CanvasElement.StickyNote ->
                         if (updatedNote.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -122,6 +126,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedBlock: CanvasElement.CodeBlock ->
                         if (updatedBlock.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -201,10 +209,10 @@ fun RenderCanvasElements(
                             )
                         }
  } },
-                    onDuplicate = {
+                    onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
                         onUpdateElements(elements.toList())
-                    },
+                    } },
                     onMakeSticker = {
                         Toast.makeText(context, "Extracting subject...", Toast.LENGTH_SHORT).show()
                         StickerMaker.extractSubject(context, element.uriString) { newUri ->
@@ -253,6 +261,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNode: CanvasElement.TaskListNode ->
                         if (updatedNode.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -311,6 +323,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedPdf: CanvasElement.PdfCard ->
                         if (updatedPdf.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -369,6 +385,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedAudio: CanvasElement.AudioNote ->
                         if (updatedAudio.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -427,6 +447,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedShape: CanvasElement.ShapeNode ->
                         if (updatedShape.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!
@@ -484,6 +508,10 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
+                    onDuplicate = remember(element.id) { {
+                        elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
+                        onUpdateElements(elements.toList())
+                    } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedNode: CanvasElement.LabelNode ->
                         if (updatedNode.hyperlinkTarget == "TELEPORT") {
                             val target = element.hyperlinkTarget!!

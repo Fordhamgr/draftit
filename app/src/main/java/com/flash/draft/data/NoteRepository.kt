@@ -6,9 +6,11 @@ import androidx.compose.ui.graphics.Color
 import com.flash.draft.model.CanvasElement
 import com.flash.draft.model.InkPoint
 import com.flash.draft.model.Project
+import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
 class NoteRepository(context: Context) {
     // We now save to a dedicated "projects" folder inside filesDir
@@ -24,14 +26,27 @@ class NoteRepository(context: Context) {
 
     fun getAllProjects(): List<Project> {
         val files = projectsDir.listFiles() ?: return emptyList()
-        return files.filter { it.extension == "json" }
-            .map { file ->
+        return files.filter { it.extension == "json" && !it.name.contains("_scenes") && !it.name.contains("_meta") }
+            .mapNotNull { file ->
                 val projectId = file.nameWithoutExtension
                 val elements = loadElements(projectId)
+                val scenes = loadScenes(projectId)
+                val metaFile = File(projectsDir, "${projectId}_meta.json")
+                
+                // Garbage Collection for empty ghost projects
+                if (elements.isEmpty() && scenes.isEmpty() && !metaFile.exists()) {
+                    android.util.Log.d("DraftDataSync", "GC: Deleting ghost project $projectId")
+                    file.delete()
+                    File(projectsDir, "${projectId}_scenes.json").delete()
+                    return@mapNotNull null
+                }
 
-                // Try to find a title from a Label or Frame, otherwise default
-                val titleNode = elements.filterIsInstance<CanvasElement.LabelNode>().firstOrNull()
-                val title = titleNode?.text ?: "Untitled Canvas"
+                val title = if (metaFile.exists()) {
+                    try { JSONObject(metaFile.readText()).getString("title") } catch(e: Exception) { "Untitled Canvas" }
+                } else {
+                    val titleNode = elements.filterIsInstance<CanvasElement.LabelNode>().firstOrNull()
+                    titleNode?.text ?: "Untitled Canvas"
+                }
 
                 Project(
                     id = projectId,
@@ -42,20 +57,120 @@ class NoteRepository(context: Context) {
             }.sortedByDescending { it.lastModifiedMs } // Newest first
     }
 
-    fun createNewProject(): String {
+    fun createNewProject(title: String): String {
         val newId = java.util.UUID.randomUUID().toString()
-        saveElements(newId, emptyList()) // Create empty file
+        android.util.Log.d("DraftDataSync", "Created new project ID: $newId")
+        val metaFile = File(projectsDir, "${newId}_meta.json")
+        val json = JSONObject().apply { put("title", title) }
+        metaFile.writeText(json.toString())
         return newId
     }
 
+    fun renameProject(projectId: String, newName: String) {
+        val metaFile = File(projectsDir, "${projectId}_meta.json")
+        val json = JSONObject().apply { put("title", newName) }
+        metaFile.writeText(json.toString())
+        
+        // Remove any hacked LabelNode that might have been saved as title 
+        // to avoid legacy junk if they rename it again
+        val elements = loadElements(projectId).toMutableList()
+        val titleNodeIndex = elements.indexOfFirst { it is CanvasElement.LabelNode && it.text == newName && it.position.y == -100f }
+        if (titleNodeIndex != -1) {
+            elements.removeAt(titleNodeIndex)
+            saveElements(projectId, elements)
+        }
+    }
+
     fun deleteProject(projectId: String) {
-        val file = File(projectsDir, "$projectId.json")
-        if (file.exists()) file.delete()
+        File(projectsDir, "$projectId.json").takeIf { it.exists() }?.delete()
+        File(projectsDir, "${projectId}_scenes.json").takeIf { it.exists() }?.delete()
+        File(projectsDir, "${projectId}_meta.json").takeIf { it.exists() }?.delete()
+    }
+
+    fun duplicateProject(projectId: String): String {
+        val newId = java.util.UUID.randomUUID().toString()
+        val elements = loadElements(projectId)
+        val scenes = loadScenes(projectId)
+        
+        android.util.Log.d("DraftDataSync", "Duplicating project $projectId -> $newId")
+        saveElements(newId, elements)
+        saveScenes(newId, scenes)
+        
+        val metaFile = File(projectsDir, "${projectId}_meta.json")
+        if (metaFile.exists()) {
+            try {
+                val oldTitle = JSONObject(metaFile.readText()).getString("title")
+                val newMetaFile = File(projectsDir, "${newId}_meta.json")
+                newMetaFile.writeText(JSONObject().apply { put("title", "$oldTitle Copy") }.toString())
+            } catch(e: Exception) {}
+        }
+        return newId
+    }
+
+    // --- .DRAFTIT ZIP EXPORT / IMPORT ---
+
+    fun exportProject(context: Context, projectId: String, outputStream: java.io.OutputStream) {
+        val projectJson = getRawJson(projectId) ?: "[]"
+        val scenesJson = try {
+            File(projectsDir, "${projectId}_scenes.json").readText()
+        } catch (e: Exception) { null }
+        val metaJson = try {
+            File(projectsDir, "${projectId}_meta.json").readText()
+        } catch (e: Exception) { null }
+        
+        com.flash.draft.utils.ProjectArchiveHelper.exportToZip(
+            context, projectId, projectJson, scenesJson, metaJson, outputStream
+        )
+    }
+
+    fun importProjectArchive(context: Context, inputStream: java.io.InputStream): String? {
+        return try {
+            val bytes = inputStream.readBytes()
+            var projectJson: String? = null
+            var scenesJson: String? = null
+            var metaJson: String? = null
+            
+            try {
+                // Try to parse as ZIP
+                val zipResult = com.flash.draft.utils.ProjectArchiveHelper.importFromZip(context, bytes.inputStream())
+                projectJson = zipResult.first
+                scenesJson = zipResult.second
+                metaJson = zipResult.third
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            
+            if (projectJson == null) {
+                // Fallback: try parsing the whole thing as a raw JSON array
+                val rawContent = String(bytes)
+                if (rawContent.trim().startsWith("[")) {
+                    projectJson = rawContent
+                }
+            }
+
+            if (projectJson != null) {
+                val newId = java.util.UUID.randomUUID().toString()
+                File(projectsDir, "$newId.json").writeText(projectJson)
+                if (scenesJson != null) {
+                    File(projectsDir, "${newId}_scenes.json").writeText(scenesJson)
+                }
+                if (metaJson != null) {
+                    File(projectsDir, "${newId}_meta.json").writeText(metaJson)
+                }
+                newId
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     // --- UPGRADED: ELEMENT SAVING/LOADING ---
 
     fun saveElements(projectId: String, elements: List<CanvasElement>) {
+        val start = System.nanoTime()
         val file = File(projectsDir, "$projectId.json")
         val jsonArray = JSONArray()
         elements.forEach { element ->
@@ -201,7 +316,19 @@ class NoteRepository(context: Context) {
             }
             jsonArray.put(jsonObject)
         }
-        file.writeText(jsonArray.toString())
+        val atomicFile = AtomicFile(file)
+        var stream: FileOutputStream? = null
+        try {
+            stream = atomicFile.startWrite()
+            stream.write(jsonArray.toString().toByteArray())
+            atomicFile.finishWrite(stream)
+            val elapsed = (System.nanoTime() - start) / 1_000_000f
+            android.util.Log.d("DraftDataSync", "saveElements: Saved ${elements.size} elements to $projectId.json in ${String.format("%.2f", elapsed)}ms")
+        } catch (e: Exception) {
+            if (stream != null) atomicFile.failWrite(stream)
+            android.util.Log.e("DraftDataSync", "saveElements FAILED for $projectId", e)
+            e.printStackTrace()
+        }
     }
 
     fun loadElements(projectId: String): List<CanvasElement> {
@@ -320,7 +447,16 @@ class NoteRepository(context: Context) {
             obj.put("scale", scene.scale.toDouble())
             jsonArray.put(obj)
         }
-        file.writeText(jsonArray.toString())
+        val atomicFile = AtomicFile(file)
+        var stream: FileOutputStream? = null
+        try {
+            stream = atomicFile.startWrite()
+            stream.write(jsonArray.toString().toByteArray())
+            atomicFile.finishWrite(stream)
+        } catch (e: Exception) {
+            if (stream != null) atomicFile.failWrite(stream)
+            e.printStackTrace()
+        }
     }
 
     fun loadScenes(projectId: String): List<com.flash.draft.model.Scene> {

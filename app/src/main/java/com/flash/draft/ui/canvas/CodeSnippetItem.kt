@@ -30,7 +30,7 @@ import com.flash.draft.model.CanvasElement
 fun CodeSnippetItem(
     codeBlock: CanvasElement.CodeBlock, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.CodeBlock) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     val clipboardManager = LocalClipboardManager.current
 
@@ -40,7 +40,7 @@ fun CodeSnippetItem(
         isLocked = codeBlock.isLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
         isFullyDraggable = false, // Critical so TextField works normally
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Icon(Icons.Default.ContentCopy, "Copy Code", modifier = Modifier.size(24.dp).clickable {
                 clipboardManager.setText(AnnotatedString(codeBlock.code))

@@ -33,18 +33,29 @@ import androidx.compose.ui.unit.sp
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 import io.github.fletchmckee.liquid.liquid
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
+import com.flash.draft.ui.canvas.tools.InsertToolStack
+
 @Composable
 fun BottomNavBar(
     activeTool: String,
     onToolSelect: (String) -> Unit,
+    isInsertMenuOpen: Boolean,
     onAddClick: () -> Unit,
     showDynamicLeft: Boolean,
     onDynamicLeftClick: () -> Unit,
-    dynamicLeftContent: @Composable () -> Unit
+    dynamicLeftContent: @Composable () -> Unit,
+    onPdfClick: () -> Unit,
+    onMediaClick: () -> Unit,
+    onCodeClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onTaskClick: () -> Unit,
+    onNoteClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
-    val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
+    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
+    val glassBorder = if (isDark) Color(0x4DFFFFFF) else Color(0x66FFFFFF)
 
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
@@ -99,61 +110,101 @@ fun BottomNavBar(
         // ----------------------------------------------------
         // 2. MAIN DOCK (Center - Dynamically Shrinking)
         // ----------------------------------------------------
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = startPadding, end = 84.dp) // 84dp avoids the + button on the right
-                .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
-                .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
-                .height(dockHeight)
-                .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
-                .then(
-                    if (liquidState != null) Modifier.liquid(liquidState) {
-                        refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
-                    } else Modifier
-                )
-                .background(glassBg, pillShape)
-                .border(1.dp, glassBorder, pillShape)
-                .clip(pillShape)
+        AnimatedVisibility(
+            visible = !isInsertMenuOpen,
+            enter = scaleIn(spring(stiffness = 400f)) + fadeIn(),
+            exit = scaleOut(spring(stiffness = 400f)) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Row(
-                // Padding ensures the first and last icons don't touch the pill edge
-                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .padding(start = startPadding, end = 84.dp) // 84dp avoids the + button on the right
+                    .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
+                    .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
+                    .height(dockHeight)
+                    .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                    .then(
+                        if (liquidState != null) Modifier.liquid(liquidState) {
+                            refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
+                        } else Modifier
+                    )
+                    .background(glassBg, pillShape)
+                    .border(1.dp, glassBorder, pillShape)
+                    .clip(pillShape)
             ) {
-                // weight(1f) ensures absolute perfect symmetry. They share the space equally.
-                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_hand), "Pan", activeTool == "Pan") { onToolSelect("Pan") }
-                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_pen), "Draw", activeTool == "Draw") { onToolSelect("Draw") }
-                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_type), "Text", activeTool == "Text") { onToolSelect("Text") }
-                DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_sticky_note), "Note", activeTool == "Note") { onToolSelect("Note") }
+                Row(
+                    // Padding ensures the first and last icons don't touch the pill edge
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // weight(1f) ensures absolute perfect symmetry. They share the space equally.
+                    DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_hand), "Pan", activeTool == "Pan") { onToolSelect("Pan") }
+                    DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_pen), "Draw", activeTool == "Draw") { onToolSelect("Draw") }
+                    DockItem(Modifier.weight(1f), painterResource(id = LucideR.drawable.lucide_ic_type), "Text", activeTool == "Text") { onToolSelect("Text") }
+                }
             }
         }
 
         // ----------------------------------------------------
         // 3. SEPARATE '+' PILL (Bottom Right)
         // ----------------------------------------------------
+        val popoverShape = RoundedCornerShape(24.dp)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .size(dockHeight)
-                .shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.2f))
+                .shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f))
                 .then(
                     if (liquidState != null) Modifier.liquid(liquidState) {
-                        refraction = liquidRefraction; curve = liquidCurve; shape = CircleShape
+                        refraction = liquidRefraction; curve = liquidCurve; shape = popoverShape
                     } else Modifier
                 )
-                .background(glassBg, CircleShape)
-                .border(1.dp, glassBorder, CircleShape)
-                .clip(CircleShape)
-                .clickable { onAddClick() },
+                .background(glassBg, popoverShape)
+                .border(1.dp, glassBorder, popoverShape)
+                .clip(popoverShape)
+                .animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 800f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(id = LucideR.drawable.lucide_ic_plus),
-                contentDescription = "Insert Menu",
-                tint = if (isDark) Color.White else Color.Black,
-                modifier = Modifier.size(28.dp)
-            )
+            if (!isInsertMenuOpen) {
+                Box(
+                    modifier = Modifier
+                        .size(dockHeight)
+                        .clickable { onAddClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = LucideR.drawable.lucide_ic_plus),
+                        contentDescription = "Insert Menu",
+                        tint = if (isDark) Color.White else Color.Black,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    InsertToolStack(
+                        onPdfClick = onPdfClick,
+                        onMediaClick = onMediaClick,
+                        onCodeClick = onCodeClick,
+                        onAudioClick = onAudioClick,
+                        onTaskClick = onTaskClick,
+                        onNoteClick = onNoteClick
+                    )
+                    // The collapse button at the bottom right corner (where the + button was)
+                    Box(
+                        modifier = Modifier
+                            .size(dockHeight)
+                            .clip(CircleShape)
+                            .clickable { onAddClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = LucideR.drawable.lucide_ic_x),
+                            contentDescription = "Close Menu",
+                            tint = if (isDark) Color.White else Color.Black,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

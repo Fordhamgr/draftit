@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+data class CanvasState(
+    val elements: List<CanvasElement>,
+    val scenes: List<Scene>
+)
+
 class CanvasViewModel(
     private val repository: NoteRepository,
     val projectId: String // <--- NEW: The Brain now knows WHICH board it is managing!
@@ -25,9 +30,9 @@ class CanvasViewModel(
     private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
     val scenes = _scenes.asStateFlow()
 
-    private val undoStack = ArrayDeque<List<CanvasElement>>()
-    private val redoStack = ArrayDeque<List<CanvasElement>>()
-    private val maxHistorySize = 50
+    private val undoStack = ArrayDeque<CanvasState>()
+    private val redoStack = ArrayDeque<CanvasState>()
+    private val maxHistorySize = 20
 
     private var saveJob: Job? = null
 
@@ -41,30 +46,36 @@ class CanvasViewModel(
         }
     }
 
-    fun updateElements(newElements: List<CanvasElement>) {
-        if (_elements.value.isNotEmpty()) {
-            undoStack.addLast(_elements.value.toList())
-            if (undoStack.size > maxHistorySize) undoStack.removeFirst()
-        }
-
+    private fun pushToUndoStack() {
+        undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+        if (undoStack.size > maxHistorySize) undoStack.removeFirst()
         redoStack.clear()
-        _elements.value = newElements
+    }
 
+    fun updateElements(newElements: List<CanvasElement>) {
+        if (_elements.value.isNotEmpty() || _scenes.value.isNotEmpty()) {
+            pushToUndoStack()
+        }
+        _elements.value = newElements
         triggerAutoSave()
     }
 
     fun undo() {
         if (undoStack.isNotEmpty()) {
-            redoStack.addLast(_elements.value.toList())
-            _elements.value = undoStack.removeLast()
+            redoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+            val prevState = undoStack.removeLast()
+            _elements.value = prevState.elements
+            _scenes.value = prevState.scenes
             triggerAutoSave()
         }
     }
 
     fun redo() {
         if (redoStack.isNotEmpty()) {
-            undoStack.addLast(_elements.value.toList())
-            _elements.value = redoStack.removeLast()
+            undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+            val nextState = redoStack.removeLast()
+            _elements.value = nextState.elements
+            _scenes.value = nextState.scenes
             triggerAutoSave()
         }
     }
@@ -72,14 +83,20 @@ class CanvasViewModel(
     private fun triggerAutoSave() {
         saveJob?.cancel()
         saveJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(1000)
-            // Background Auto-Save specifically to THIS project's file
-            repository.saveElements(projectId, _elements.value) // <--- Updated
-            repository.saveScenes(projectId, _scenes.value)
+            // Immediate temp save for crash recovery
+            val elementsSnapshot = _elements.value
+            val scenesSnapshot = _scenes.value
+            
+            // Fast debounce for the actual file
+            delay(500)
+            android.util.Log.d("DraftDataSync", "triggerAutoSave: Committing to disk for $projectId")
+            repository.saveElements(projectId, elementsSnapshot)
+            repository.saveScenes(projectId, scenesSnapshot)
         }
     }
 
     fun addScene(name: String, offsetX: Float, offsetY: Float, scale: Float): String {
+        pushToUndoStack()
         val newScene = Scene(name = name, offsetX = offsetX, offsetY = offsetY, scale = scale)
         _scenes.value = _scenes.value + newScene
         triggerAutoSave()
@@ -87,18 +104,22 @@ class CanvasViewModel(
     }
 
     fun removeScene(id: String) {
+        pushToUndoStack()
         _scenes.value = _scenes.value.filterNot { it.id == id }
         triggerAutoSave()
     }
 
     fun renameScene(id: String, newName: String) {
+        pushToUndoStack()
         _scenes.value = _scenes.value.map { if (it.id == id) it.copy(name = newName) else it }
         triggerAutoSave()
     }
 
     fun triggerImmediateSave() {
         saveJob?.cancel()
-        viewModelScope.launch(Dispatchers.IO) {
+        // Fire-and-forget save in an independent scope so it survives ViewModel death (e.g. popping backstack)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            android.util.Log.d("DraftDataSync", "triggerImmediateSave: Forced commit to disk for $projectId")
             repository.saveElements(projectId, _elements.value)
             repository.saveScenes(projectId, _scenes.value)
         }

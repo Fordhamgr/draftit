@@ -36,37 +36,104 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.blur
+import kotlinx.coroutines.delay
+import com.flash.draft.ui.canvas.LiquidGlassPill
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.platform.LocalConfiguration
+import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(
     repository: NoteRepository,
     onProjectClick: (String) -> Unit,
-    onCreateNewProject: () -> Unit
+    onCreateNewProject: (String) -> Unit,
+    onNavigateToAbout: () -> Unit
 ) {
-    // We use a mutable state list so the UI updates if we delete a project
     var projects by remember { mutableStateOf(repository.getAllProjects()) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                projects = repository.getAllProjects()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val isDark = false // You can tie this to system theme later
 
-    val bgColor = if (isDark) Color(0xFF121212) else Color(0xFFF5F5F7)
+    val bgColor = if (isDark) Color(0xFF121212) else Color(0xFFF4F5F9)
     val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
+    val menuBg = if (isDark) Color(0xFF2A2A2A) else Color(0xFFFFFFFF)
     val context = LocalContext.current
+    var projectToExport by remember { mutableStateOf<Project?>(null) }
+    
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var projectToRename by remember { mutableStateOf<Project?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                val jsonContent = reader.use { it.readText() }
-                val newProjectId = repository.importProject(jsonContent)
-                if (newProjectId != null) {
-                    projects = repository.getAllProjects()
-                    Toast.makeText(context, "Project imported successfully!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Invalid project file format.", Toast.LENGTH_SHORT).show()
+                if (inputStream != null) {
+                    val newProjectId = repository.importProjectArchive(context, inputStream)
+                    if (newProjectId != null) {
+                        projects = repository.getAllProjects()
+                        Toast.makeText(context, "Project imported successfully!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Invalid project file format.", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Error reading file.", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    var contextMenuProject by remember { mutableStateOf<Project?>(null) }
+    var contextMenuOffset by remember { mutableStateOf(Offset.Zero) }
+    var contextMenuSize by remember { mutableStateOf(IntSize.Zero) }
+    
+    // Use */* to prevent Android from forcing a .zip extension when saving
+    val exportArchiveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+        if (uri != null && projectToExport != null) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    repository.exportProject(context, projectToExport!!.id, stream)
+                }
+                Toast.makeText(context, "Project exported successfully!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error exporting project.", Toast.LENGTH_SHORT).show()
+            }
+            projectToExport = null
         }
     }
 
@@ -86,19 +153,19 @@ fun DashboardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "All canvas",
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = "All Canvas",
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.Black,
                     color = textColor
                 )
                 
                 IconButton(
-                    onClick = { /* TODO Help */ },
+                    onClick = onNavigateToAbout,
                     modifier = Modifier
                         .size(48.dp)
                         .background(Color.White.copy(alpha = if (isDark) 0.1f else 0.8f), RoundedCornerShape(24.dp))
@@ -109,9 +176,34 @@ fun DashboardScreen(
                 }
             }
 
-            if (projects.isEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search canvas...", color = textColor.copy(alpha = 0.4f)) },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = textColor.copy(alpha = 0.3f),
+                    unfocusedBorderColor = textColor.copy(alpha = 0.1f),
+                    focusedContainerColor = menuBg,
+                    unfocusedContainerColor = menuBg
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            val filteredProjects = remember(projects, searchQuery) {
+                if (searchQuery.isBlank()) projects else projects.filter { it.title.contains(searchQuery, ignoreCase = true) }
+            }
+
+            if (filteredProjects.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No boards yet. Create one to get started.", color = Color.Gray)
+                    if (searchQuery.isNotBlank()) {
+                        Text("No results for '$searchQuery'", color = Color.Gray)
+                    } else {
+                        Text("No boards yet. Create one to get started.", color = Color.Gray)
+                    }
                 }
             } else {
                 LazyVerticalGrid(
@@ -120,7 +212,7 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 100.dp)
                 ) {
-                    items(projects, key = { it.id }) { project ->
+                    items(filteredProjects, key = { it.id }) { project ->
                         ProjectCard(
                             project = project,
                             isDark = isDark,
@@ -128,8 +220,158 @@ fun DashboardScreen(
                             onDelete = {
                                 repository.deleteProject(project.id)
                                 projects = repository.getAllProjects() // Refresh list
+                            },
+                            onDuplicate = {
+                                repository.duplicateProject(project.id)
+                                projects = repository.getAllProjects()
+                            },
+                            onExport = {
+                                projectToExport = project
+                                exportArchiveLauncher.launch("${project.title}.draftit")
+                            },
+                            onRename = {
+                                projectToRename = project
+                            },
+                            onLongPress = { offset, size ->
+                                contextMenuOffset = offset
+                                contextMenuSize = size
+                                contextMenuProject = project
                             }
                         )
+                    }
+                }
+            }
+        }
+
+        if (showCreateDialog) {
+            var projectName by remember { mutableStateOf("") }
+            Dialog(onDismissRequest = { showCreateDialog = false }) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = menuBg.copy(alpha = 0.95f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.5f), RoundedCornerShape(20.dp)),
+                    shadowElevation = 32.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        OutlinedTextField(
+                            value = projectName,
+                            onValueChange = { projectName = it },
+                            placeholder = { Text("Project Name", color = textColor.copy(alpha = 0.4f), fontWeight = FontWeight.Medium) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = textColor,
+                                unfocusedBorderColor = textColor.copy(alpha = 0.1f),
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                cursorColor = textColor,
+                                focusedContainerColor = textColor.copy(alpha = 0.03f),
+                                unfocusedContainerColor = textColor.copy(alpha = 0.03f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            TextButton(
+                                onClick = { showCreateDialog = false },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Cancel", color = textColor.copy(alpha = 0.7f), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            }
+                            Button(
+                                onClick = {
+                                    val finalName = if (projectName.isNotBlank()) projectName else "Untitled Canvas"
+                                    showCreateDialog = false
+                                    onCreateNewProject(finalName)
+                                },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = textColor, contentColor = bgColor),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                            ) {
+                                Text("Create", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (projectToRename != null) {
+            var newName by remember { mutableStateOf(projectToRename!!.title) }
+            Dialog(onDismissRequest = { projectToRename = null }) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = menuBg.copy(alpha = 0.95f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.5f), RoundedCornerShape(20.dp)),
+                    shadowElevation = 32.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        OutlinedTextField(
+                            value = newName,
+                            onValueChange = { newName = it },
+                            placeholder = { Text("New Name", color = textColor.copy(alpha = 0.4f), fontWeight = FontWeight.Medium) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = textColor,
+                                unfocusedBorderColor = textColor.copy(alpha = 0.1f),
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                cursorColor = textColor,
+                                focusedContainerColor = textColor.copy(alpha = 0.03f),
+                                unfocusedContainerColor = textColor.copy(alpha = 0.03f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            TextButton(
+                                onClick = { projectToRename = null },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Cancel", color = textColor.copy(alpha = 0.7f), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            }
+                            Button(
+                                onClick = {
+                                    if (newName.isNotBlank()) {
+                                        repository.renameProject(projectToRename!!.id, newName)
+                                        projects = repository.getAllProjects()
+                                    }
+                                    projectToRename = null
+                                },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = textColor, contentColor = bgColor),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                            ) {
+                                Text("Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -139,33 +381,58 @@ fun DashboardScreen(
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
-                .shadow(16.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-                .background(Color.White.copy(alpha = if (isDark) 0.15f else 0.85f), RoundedCornerShape(32.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(32.dp))
+                .padding(bottom = 48.dp)
+                .shadow(16.dp, RoundedCornerShape(40.dp), spotColor = Color.Black.copy(alpha = 0.1f))
+                .background(Color.White, RoundedCornerShape(40.dp))
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(
                 onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
             ) {
                 Icon(Icons.Filled.FileDownload, contentDescription = "Import", modifier = Modifier.size(20.dp), tint = textColor)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Import", fontWeight = FontWeight.Medium, color = textColor)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Import", fontWeight = FontWeight.Medium, color = textColor, fontSize = 16.sp)
             }
 
             Button(
-                onClick = onCreateNewProject,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1), contentColor = Color.White),
-                shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                onClick = { showCreateDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = bgColor, contentColor = textColor),
+                shape = RoundedCornerShape(32.dp),
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
             ) {
                 Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = "New Project", modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("New Project", fontWeight = FontWeight.Medium)
+                Text("New Project", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
+        }
+
+        // Context Menu Overlay
+        if (contextMenuProject != null) {
+            ProjectContextMenuOverlay(
+                project = contextMenuProject!!,
+                isDark = isDark,
+                cardOffset = contextMenuOffset,
+                cardSize = contextMenuSize,
+                onDismiss = { contextMenuProject = null },
+                onRename = { 
+                    contextMenuProject = null
+                    projectToRename = it
+                },
+                onDuplicate = { 
+                    repository.duplicateProject(it.id)
+                    projects = repository.getAllProjects()
+                    contextMenuProject = null
+                },
+                onDelete = { 
+                    repository.deleteProject(it.id)
+                    projects = repository.getAllProjects()
+                    contextMenuProject = null
+                }
+            )
         }
     }
 }
@@ -175,61 +442,267 @@ fun ProjectCard(
     project: Project,
     isDark: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onExport: () -> Unit,
+    onRename: () -> Unit,
+    onLongPress: (Offset, IntSize) -> Unit = { _, _ -> }
 ) {
     val cardBg = Color.White.copy(alpha = if (isDark) 0.1f else 0.7f)
     val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
     val dateColor = if (isDark) Color.Gray else Color(0xFF86868B)
+    val menuBg = if (isDark) Color(0xFF2A2A2A) else Color(0xFFFFFFFF)
 
     val formatter = SimpleDateFormat("MMM d, yyyy", LocalLocale.current.platformLocale)
     val dateString = formatter.format(Date(project.lastModifiedMs))
+    
+    val context = LocalContext.current
+    var currentPosition by remember { mutableStateOf(Offset.Zero) }
+    var currentSize by remember { mutableStateOf(IntSize.Zero) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.1f))
-            .background(cardBg, RoundedCornerShape(24.dp))
-            .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.6f), RoundedCornerShape(24.dp))
-            .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .onGloballyPositioned { layoutCoordinates ->
+                currentPosition = layoutCoordinates.positionInRoot()
+                currentSize = layoutCoordinates.size
+            }
+            .shadow(16.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.05f))
+            .background(Color.White, RoundedCornerShape(32.dp))
+            .clip(RoundedCornerShape(32.dp))
+            .pointerInput(project.id) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongPress(currentPosition, currentSize) }
+                )
+            }
     ) {
-        // Thumbnail Area (Mocking a preview)
+        // Thumbnail Area
+        val thumbDir = java.io.File(context.filesDir, "projects")
+        val thumbFile = remember(project.id) {
+            thumbDir.listFiles { _, name -> name.startsWith("${project.id}_scene_") && name.endsWith("_thumb.png") }?.firstOrNull()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
-                .background(Color.White.copy(alpha = if (isDark) 0.05f else 0.4f)),
+                .aspectRatio(1f), // Perfectly square thumbnail area
             contentAlignment = Alignment.Center
         ) {
-            // Future feature: Actually draw miniaturized elements here based on project.previewElements
-            Text("${project.previewElements.size} items", color = dateColor, fontSize = 12.sp)
+            if (thumbFile != null && thumbFile.exists()) {
+                AsyncImage(
+                    model = thumbFile,
+                    contentDescription = "Project Thumbnail",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         // Card Footer
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(20.dp),
+            verticalArrangement = Arrangement.Top
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = project.title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = textColor,
-                    maxLines = 1
-                )
+            Text(
+                text = project.title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = dateString,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
+                    color = dateColor
+                )
+                Text(
+                    text = "${project.previewElements.size} items",
+                    fontSize = 14.sp,
                     color = dateColor
                 )
             }
+        }
+    }
+}
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f))
+@Composable
+fun ProjectContextMenuOverlay(
+    project: Project,
+    isDark: Boolean,
+    cardOffset: Offset,
+    cardSize: IntSize,
+    onDismiss: () -> Unit,
+    onRename: (Project) -> Unit,
+    onDuplicate: (Project) -> Unit,
+    onDelete: (Project) -> Unit
+) {
+    var isVisible by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    
+    val xDp = with(density) { cardOffset.x.toDp() }
+    val yDp = with(density) { cardOffset.y.toDp() }
+    val widthDp = with(density) { cardSize.width.toDp() }
+    
+    val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isVisible) 0.6f else 0f,
+        animationSpec = tween(300)
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = scrimAlpha))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = {
+                    if (isVisible) {
+                        isVisible = false
+                        coroutineScope.launch {
+                            delay(300)
+                            onDismiss()
+                        }
+                    }
+                }
+            )
+    ) {
+        // Floating Card Replica
+        AnimatedVisibility(
+            visible = isVisible,
+            enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0.95f),
+            exit = fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 0.95f),
+            modifier = Modifier
+                .offset(x = xDp, y = yDp)
+                .width(widthDp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(32.dp, RoundedCornerShape(32.dp), spotColor = Color.White.copy(alpha = 0.5f))
+                    .clip(RoundedCornerShape(32.dp))
+            ) {
+                // We use a non-interactive clone of the card
+                ProjectCard(
+                    project = project,
+                    isDark = isDark,
+                    onClick = {},
+                    onDelete = {},
+                    onDuplicate = {},
+                    onExport = {},
+                    onRename = {},
+                    onLongPress = { _, _ -> }
+                )
+            }
+        }
+
+        // Side Pills
+        val pillSpacing = 12.dp
+        val pillContainerWidth = 160.dp
+        
+        // Ensure pills do not go off-screen on the right side
+        val pillsXOffset = if (xDp + widthDp + pillContainerWidth + 32.dp > screenWidth) {
+            xDp - pillContainerWidth - 16.dp
+        } else {
+            xDp + widthDp + 16.dp
+        }
+        
+        Column(
+            modifier = Modifier
+                .offset(x = pillsXOffset, y = yDp + 32.dp)
+                .width(pillContainerWidth),
+            verticalArrangement = Arrangement.spacedBy(pillSpacing)
+        ) {
+            ContextMenuItem(
+                text = "Rename",
+                icon = androidx.compose.material.icons.Icons.Filled.Edit,
+                color = Color.Black,
+                delayMs = 50,
+                isVisible = isVisible,
+                onClick = { 
+                    isVisible = false
+                    coroutineScope.launch { delay(300); onRename(project) }
+                }
+            )
+            ContextMenuItem(
+                text = "Duplicate",
+                icon = androidx.compose.material.icons.Icons.Filled.FileCopy,
+                color = Color.Black,
+                delayMs = 100,
+                isVisible = isVisible,
+                onClick = { 
+                    isVisible = false
+                    coroutineScope.launch { delay(300); onDuplicate(project) }
+                }
+            )
+            ContextMenuItem(
+                text = "Delete",
+                icon = androidx.compose.material.icons.Icons.Filled.Delete,
+                color = Color.Black,
+                delayMs = 150,
+                isVisible = isVisible,
+                onClick = { 
+                    isVisible = false
+                    coroutineScope.launch { delay(300); onDelete(project) }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ContextMenuItem(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    color: Color,
+    delayMs: Int,
+    isVisible: Boolean,
+    onClick: () -> Unit
+) {
+    var show by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            delay(delayMs.toLong())
+            show = true
+        } else {
+            show = false
+        }
+    }
+
+    AnimatedVisibility(
+        visible = show,
+        enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0f),
+        exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0f)
+    ) {
+        LiquidGlassPill(
+            shape = RoundedCornerShape(24.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.clickable { onClick() }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (icon != null) {
+                    Icon(icon, contentDescription = text, modifier = Modifier.size(20.dp), tint = color)
+                }
+                Text(text, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = color)
             }
         }
     }

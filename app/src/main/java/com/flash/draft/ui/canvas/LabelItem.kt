@@ -40,7 +40,7 @@ import com.flash.draft.ui.canvas.item.getAdaptiveColor
 fun LabelItem(
     labelNode: CanvasElement.LabelNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.LabelNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = labelNode.position, width = labelNode.width, height = labelNode.height,
@@ -49,7 +49,7 @@ fun LabelItem(
         hasDefaultBackground = false, // <-- Makes it transparent!
         isFullyDraggable = false, // Critical for text editing
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Row 1: Typography tools & Alignment

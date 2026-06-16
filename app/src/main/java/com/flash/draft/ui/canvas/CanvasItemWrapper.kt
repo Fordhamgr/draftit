@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -62,8 +63,19 @@ fun CanvasItemWrapper(
     hyperlinkTarget: String? = null, onLinkUpdate: (String?) -> Unit = {},
     onSelect: () -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDelete: () -> Unit, onSaveRequest: () -> Unit,
+    onDuplicate: (() -> Unit)? = null,
     customMenuContent: (@Composable () -> Unit)? = null, content: @Composable (isLocked: Boolean) -> Unit
 ) {
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnPositionDelta by rememberUpdatedState(onPositionDelta)
+    val currentOnSizeDelta by rememberUpdatedState(onSizeDelta)
+    val currentOnSaveRequest by rememberUpdatedState(onSaveRequest)
+    val currentOnDelete by rememberUpdatedState(onDelete)
+    val currentOnDuplicate by rememberUpdatedState(onDuplicate)
+    val currentOnConnectRequest by rememberUpdatedState(onConnectRequest)
+    val currentOnLinkUpdate by rememberUpdatedState(onLinkUpdate)
+    val currentOnLockedChange by rememberUpdatedState(onLockedChange)
+
     val screenPos = ViewportMath.worldToScreen(position, canvasOffset, scale)
     var isMultiTouch by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
@@ -116,18 +128,18 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(Unit) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) onSelect() }) }
+                .pointerInput(Unit) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) currentOnSelect() }) }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; onSelect() } },
-                                onDragEnd = { isDragging = false; onSaveRequest() },
-                                onDragCancel = { isDragging = false; onSaveRequest() },
+                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect() } },
+                                onDragEnd = { isDragging = false; currentOnSaveRequest() },
+                                onDragCancel = { isDragging = false; currentOnSaveRequest() },
                                 onDrag = { change, dragAmount ->
                                     if (!isLocked && !isMultiTouch && !isZooming) {
                                         change.consume()
-                                        onPositionDelta(dragAmount)
+                                        currentOnPositionDelta(dragAmount)
                                     }
                                 }
                             )
@@ -185,16 +197,16 @@ fun CanvasItemWrapper(
                             .size(64.dp)
                             .pointerInput(isLocked) {
                                 detectDragGestures(
-                                    onDragEnd = { onSaveRequest() },
+                                    onDragEnd = { currentOnSaveRequest() },
                                     onDrag = { change, dragAmount ->
                                         if (!isLocked && !isMultiTouch && !isZooming) {
                                             change.consume()
-                                            onSizeDelta((dragAmount / density) / scale)
+                                            currentOnSizeDelta((dragAmount / density) / scale)
                                         }
                                     }
                                 )
                             }
-                            .pointerInput(Unit) { detectTapGestures(onTap = { onSelect() }) },
+                            .pointerInput(Unit) { detectTapGestures(onTap = { currentOnSelect() }) },
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
@@ -238,7 +250,7 @@ fun CanvasItemWrapper(
                         // Utility Items Grid (2x3 or flow)
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { onConnectRequest() })
+                                Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { currentOnConnectRequest() })
                                 
                                 val hasHyperlink = hyperlinkTarget != null
                                 Icon(Icons.Default.Link, contentDescription = "Link", tint = if (hasHyperlink) Color(0xFF4CAF50) else Color.Gray, modifier = Modifier.size(22.dp).clickable { isEditingLink = !isEditingLink })
@@ -248,12 +260,15 @@ fun CanvasItemWrapper(
                                     (hyperlinkTarget.startsWith("board:") && hyperlinkTarget.length > "board:".length)
                                 )
                                 if (isTeleportable) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Teleport", tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp).clickable { onLinkUpdate("TELEPORT") })
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Teleport", tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp).clickable { currentOnLinkUpdate("TELEPORT") })
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { onLockedChange(!isLocked) })
-                                Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { onDelete() })
+                                Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { currentOnLockedChange(!isLocked) })
+                                if (currentOnDuplicate != null) {
+                                    Icon(androidx.compose.material.icons.Icons.Default.ContentCopy, contentDescription = "Duplicate", tint = Color.Gray, modifier = Modifier.size(22.dp).clickable { currentOnDuplicate?.invoke() })
+                                }
+                                Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { currentOnDelete() })
                             }
                         }
                     }
@@ -279,7 +294,7 @@ fun CanvasItemWrapper(
                                         }
                                     )
                                     Icon(Icons.Default.Check, "Save Link", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp).clickable {
-                                        onLinkUpdate(linkTargetInput.takeIf { it.isNotBlank() })
+                                        currentOnLinkUpdate(linkTargetInput.takeIf { it.isNotBlank() })
                                         isEditingLink = false
                                     })
                                 }

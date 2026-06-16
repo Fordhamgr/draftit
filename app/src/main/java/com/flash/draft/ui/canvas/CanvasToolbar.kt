@@ -44,7 +44,7 @@ fun CanvasToolbar(
     val offsetY by animateDpAsState(if (isExpanded) 0.dp else 16.dp, tween(250, easing = FastOutSlowInEasing), label = "offset")
     val fabRotation by animateFloatAsState(if (isExpanded) 45f else 0f, tween(250, easing = FastOutSlowInEasing), label = "rotation")
 
-    val glassBg = if (isDarkTheme) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
+    val glassBg = if (isDarkTheme) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
     val glassBorder = if (isDarkTheme) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
     val iconTint = if (isDarkTheme) Color.White else Color(0xFF1D1D1F)
     val activeTint = if (isDarkTheme) Color.White else Color.Black

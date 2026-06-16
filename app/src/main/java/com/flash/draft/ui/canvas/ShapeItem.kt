@@ -28,7 +28,7 @@ import com.flash.draft.model.CanvasElement
 fun ShapeItem(
     shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.ShapeNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = shapeNode.position, width = shapeNode.width, height = shapeNode.height,
@@ -36,7 +36,7 @@ fun ShapeItem(
         isLocked = shapeNode.isLocked, onLockedChange = { onUpdate(shapeNode.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         hasDefaultBackground = false,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = shapeNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(shapeNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = shapeNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(shapeNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

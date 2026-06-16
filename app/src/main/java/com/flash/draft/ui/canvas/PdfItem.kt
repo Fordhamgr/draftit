@@ -27,7 +27,7 @@ import com.flash.draft.model.CanvasElement
 fun PdfItem(
     pdfCard: CanvasElement.PdfCard, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.PdfCard) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -37,7 +37,7 @@ fun PdfItem(
         isLocked = pdfCard.isLocked, onLockedChange = { onUpdate(pdfCard.copy(isLocked = it)) },
         backgroundAlpha = 1f,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = pdfCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(pdfCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = pdfCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(pdfCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 // Context menu toggle to view full PDF

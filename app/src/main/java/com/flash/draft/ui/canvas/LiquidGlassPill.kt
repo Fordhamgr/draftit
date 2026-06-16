@@ -1,4 +1,4 @@
-package com.flash.draft.ui.canvas
+    package com.flash.draft.ui.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +17,9 @@ import io.github.fletchmckee.liquid.liquid
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+
 @Composable
 fun LiquidGlassPill(
     modifier: Modifier = Modifier,
@@ -30,7 +33,7 @@ fun LiquidGlassPill(
     val liquidCurve = LocalLiquidCurve.current
 
     // Premium iOS-style Frosted Glass colors
-    val glassBg = if (isDark) Color(0x991A1A1A) else Color(0x99FFFFFF)
+    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
 
     // The universal liquid lens
@@ -49,6 +52,7 @@ fun LiquidGlassPill(
             .background(glassBg, shape)
             .border(1.dp, glassBorder, shape)
             .clip(shape)
+            .pointerInput(Unit) { detectTapGestures { } } // <--- Consume taps here
             .padding(contentPadding),
         content = content
     )

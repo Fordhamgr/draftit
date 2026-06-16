@@ -11,7 +11,7 @@ object ViewportMath {
         pan: Offset,
         zoom: Float
     ): Pair<Float, Offset> {
-        val newScale = (currentScale * zoom).coerceIn(0.1f, 5f)
+        val newScale = (currentScale * zoom).coerceIn(0.01f, 5f)
         val zoomFactor = newScale / currentScale
         val newOffset = centroid + (currentOffset + pan - centroid) * zoomFactor
         return Pair(newScale, newOffset)

@@ -35,16 +35,16 @@ import com.flash.draft.ui.canvas.item.getAdaptiveColor
 fun TaskListItem(
     taskNode: CanvasElement.TaskListNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.TaskListNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = taskNode.position, width = taskNode.width, height = taskNode.height,
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
         isLocked = taskNode.isLocked, onLockedChange = { onUpdate(taskNode.copy(isLocked = it)) },
         isFullyDraggable = true, // Critical so we can scroll the list and tap checkboxes
-        hasDefaultBackground = true,
+        hasDefaultBackground = true, backgroundAlpha = 1f,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = taskNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(taskNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = taskNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(taskNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // TASK COLOR CUSTOMIZATION
@@ -67,7 +67,7 @@ fun TaskListItem(
             }
         }
     ) { isLocked ->
-        Column(modifier = Modifier.fillMaxSize().background(taskNode.color.copy(alpha = 0.65f)).padding(12.dp)) {
+        Column(modifier = Modifier.fillMaxSize().background(taskNode.color).padding(12.dp)) {
             // Title
             BasicTextField(
                 value = taskNode.title,

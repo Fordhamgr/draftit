@@ -34,7 +34,7 @@ import com.flash.draft.model.CanvasElement
 fun StickyNoteItem(
     note: CanvasElement.StickyNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.StickyNote) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     val currentFont = when (note.fontFamily) {
         "Serif" -> AppFonts.Serif
@@ -49,7 +49,7 @@ fun StickyNoteItem(
         isLocked = note.isLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
         isFullyDraggable = false, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = note.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(note.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = note.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(note.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Row 1: Font Family

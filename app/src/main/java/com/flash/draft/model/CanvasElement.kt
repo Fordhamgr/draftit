@@ -3,6 +3,7 @@ package com.flash.draft.model
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import java.util.UUID
+import androidx.compose.runtime.Immutable
 
 data class InkPoint(
     val x: Float,
@@ -11,6 +12,7 @@ data class InkPoint(
     val timeMillis: Long = 0L
 )
 
+@Immutable
 sealed class CanvasElement {
     abstract val id: String
     abstract val hyperlinkTarget: String?  // null = no link, "scene:<id>" or "board:<id>"

@@ -25,7 +25,7 @@ import com.flash.draft.model.CanvasElement
 fun FrameItem(
     frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.FrameNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = frameNode.position, width = frameNode.width, height = frameNode.height,
@@ -34,7 +34,7 @@ fun FrameItem(
         hasDefaultBackground = false, // Transparent center!
         isFullyDraggable = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
-        onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = frameNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(frameNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
+        onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = frameNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(frameNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 val lockIcon = if (frameNode.isMagnetic) Icons.Default.Lock else Icons.Default.LockOpen

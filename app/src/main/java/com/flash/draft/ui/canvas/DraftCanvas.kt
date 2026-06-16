@@ -35,6 +35,14 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
@@ -53,6 +61,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.painterResource
+import com.composables.icons.lucide.R as LucideR
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -78,8 +88,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
-import com.flash.draft.R as LucideR
+import androidx.compose.ui.zIndex
 
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -124,6 +133,8 @@ fun DraftCanvas(
     onNavigateToBoard: (String) -> Unit = {}
 ) {
     var scale by remember { mutableStateOf(0.7f) }
+    var lastZoomTime by remember { mutableLongStateOf(0L) }
+    var isZooming by remember { mutableStateOf(false) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var centerX by remember { mutableStateOf(0f) }
     var centerY by remember { mutableStateOf(0f) }
@@ -170,35 +181,59 @@ fun DraftCanvas(
     // PERF LOGGING: Measure entire canvas recomposition
     val recomposeStart = System.nanoTime()
     DisposableEffect(Unit) {
-        onDispose { }
+        onDispose { 
+            viewModel.triggerImmediateSave()
+        }
     }
     SideEffect {
         val elapsed = (System.nanoTime() - recomposeStart) / 1_000_000f
-        Log.d("DraftCanvasPerf", "DraftCanvas recomposed in ${elapsed}ms")
+        com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount++
     }
     
     // PERF LOGGING: Monitor actual frame rate and detect stutters
     var frameCount by remember { mutableStateOf(0) }
     var lastFpsTime by remember { mutableStateOf(System.nanoTime()) }
+    var maxFrameDelta by remember { mutableStateOf(0f) }
     LaunchedEffect(Unit) {
         var lastFrameTime = System.nanoTime()
         while (isActive) {
             withFrameNanos { time ->
                 frameCount++
                 val dtMs = (time - lastFrameTime) / 1_000_000f
+                if (dtMs > maxFrameDelta) maxFrameDelta = dtMs
                 if (dtMs > 18f && lastFrameTime != 0L) { // Stutter detected
                     Log.w("DraftCanvasPerf", "Frame Drop: ${dtMs}ms")
                 }
                 lastFrameTime = time
                 
                 if (time - lastFpsTime > 1_000_000_000L) {
-                    Log.d("DraftCanvasPerf", "FPS: $frameCount")
+                    val avgBg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount else 0f
+                    val avgFg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount else 0f
+                    val totalCpu = avgBg + avgFg
+                    val totalCalls = com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount + com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount
+                    
+                    Log.i("DraftCanvasPerf", "[PERF] FPS: $frameCount | MaxFrame: ${String.format("%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format("%.2f", totalCpu)}ms (BG: ${String.format("%.2f", avgBg)}, FG: ${String.format("%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
+                    
                     frameCount = 0
+                    maxFrameDelta = 0f
                     lastFpsTime = time
+                    com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum = 0f
+                    com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount = 0
+                    com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum = 0f
+                    com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount = 0
+                    com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount = 0
                 }
             }
         }
     }
+
+
+    val elementsState by viewModel.elements.collectAsStateWithLifecycle()
+    val elements = remember { mutableStateListOf<CanvasElement>() }
+
+    var isUiVisible by remember { mutableStateOf(true) }
+    val view = LocalView.current
+    val graphicsLayer = rememberGraphicsLayer()
 
     fun navigateToScene(scene: com.flash.draft.model.Scene) {
         panJob?.cancel()
@@ -218,12 +253,44 @@ fun DraftCanvas(
         }
     }
 
-    val elementsState by viewModel.elements.collectAsStateWithLifecycle()
-    val elements = remember { mutableStateListOf<CanvasElement>() }
+    fun zoomToFit() {
+        panJob?.cancel()
+        if (elements.isEmpty()) return
+        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
+        var maxX = Float.MIN_VALUE; var maxY = Float.MIN_VALUE
+        elements.forEach { el ->
+            if (el is CanvasElement.Connector) return@forEach
+            val center = getCenterPoint(el.id, elements) ?: return@forEach
+            val dim = getElementDimensions(el.id, elements)
+            val halfW = dim.first / 2f; val halfH = dim.second / 2f
+            if (center.x - halfW < minX) minX = center.x - halfW
+            if (center.y - halfH < minY) minY = center.y - halfH
+            if (center.x + halfW > maxX) maxX = center.x + halfW
+            if (center.y + halfH > maxY) maxY = center.y + halfH
+        }
+        if (minX == Float.MAX_VALUE) return // Only connectors
+        val padding = 100f
+        val contentW = maxX - minX + (padding * 2)
+        val contentH = maxY - minY + (padding * 2)
+        val sw = view.width.toFloat(); val sh = view.height.toFloat()
+        if (sw == 0f || sh == 0f) return
+        val targetScale = minOf(sw / contentW, sh / contentH).coerceIn(0.01f, 3f)
+        val contentCenter = Offset(minX + (maxX - minX) / 2f, minY + (maxY - minY) / 2f)
+        val targetOffset = Offset(sw / 2f, sh / 2f) - (contentCenter * targetScale)
 
-    var isUiVisible by remember { mutableStateOf(true) }
-    val view = LocalView.current
-    val graphicsLayer = rememberGraphicsLayer()
+        coroutineScope.launch {
+            val startScale = scale
+            val startOffset = offset
+            androidx.compose.animation.core.animate(
+                initialValue = 0f, 
+                targetValue = 1f, 
+                animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+            ) { progress, _ ->
+                scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
+                offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
+            }
+        }
+    }
 
     LaunchedEffect(elementsState) {
         if (elements.toList() != elementsState) {
@@ -285,18 +352,31 @@ fun DraftCanvas(
         }
     }
 
-    val exportProjectLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP || event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                // Ensure immediate save when app goes to background
+                viewModel.triggerImmediateSave()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.triggerImmediateSave()
+        }
+    }
+
+    val exportProjectLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         if (uri != null) {
-            val json = viewModel.getRawProjectJson()
-            if (json != null) {
-                try {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        stream.write(json.toByteArray())
-                    }
-                    Toast.makeText(context, "Project exported successfully!", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Error exporting project.", Toast.LENGTH_SHORT).show()
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    val repo = com.flash.draft.data.NoteRepository(context)
+                    repo.exportProject(context, viewModel.projectId, stream)
                 }
+                Toast.makeText(context, "Project exported successfully!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error exporting project.", Toast.LENGTH_SHORT).show()
             }
             isExportMenuOpen = false
         }
@@ -427,22 +507,22 @@ fun DraftCanvas(
             val idx = elements.indexOfFirst { it.id == id }
             if (idx != -1) {
                 val el = elements[idx]
-                if (el is CanvasElement.StickyNote) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.ImageCard) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.PdfCard) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.Sketch) {
+                if (el is CanvasElement.StickyNote && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.ImageCard && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.PdfCard && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.Sketch && !el.isLocked) {
                     val newX = FloatArray(el.xCoords.size) { i -> el.xCoords[i] + delta.x }
                     val newY = FloatArray(el.yCoords.size) { i -> el.yCoords[i] + delta.y }
                     val newEl = el.copy(xCoords = newX, yCoords = newY)
                     newEl.cachedStroke = null
                     elements[idx] = newEl
                 }
-                if (el is CanvasElement.CodeBlock) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.AudioNote) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.ShapeNode) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.LabelNode) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.FrameNode) elements[idx] = el.copy(position = el.position + delta)
-                if (el is CanvasElement.TaskListNode) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.CodeBlock && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.AudioNote && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.ShapeNode && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.LabelNode && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.FrameNode && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
+                if (el is CanvasElement.TaskListNode && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
             }
         }
     }
@@ -735,131 +815,211 @@ fun DraftCanvas(
 
             if (isUiVisible) {
 
-                // --- TOP LEFT ACTION BAR (BACK) ---
+                // --- TOP LEFT ACTION BAR (BACK + UNDO/REDO + ZOOM) ---
                 Box(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
-                    LiquidGlassPill(
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                            LiquidGlassPill(
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                            
+                            // HORIZONTAL UNDO / REDO PILL
+                            LiquidGlassPill(
+                                shape = RoundedCornerShape(24.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.height(48.dp)
+                                ) {
+                                    IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
+                                        Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                    }
+                                    IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
+                                        Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                // CLICK OUTSIDE OVERLAY FOR EXPORT & SCENES MENUS
-                if (isExportMenuOpen || isScenesMenuOpen) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(
-                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                indication = null
-                            ) { 
-                                isExportMenuOpen = false
-                                isScenesMenuOpen = false
+                
+                // EPHEMERAL ZOOM INDICATOR
+                LaunchedEffect(lastZoomTime) {
+                    if (lastZoomTime > 0) {
+                        isZooming = true
+                        kotlinx.coroutines.delay(1500)
+                        isZooming = false
+                    }
+                }
+                
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isZooming,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it },
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it },
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
+                ) {
+                    LiquidGlassPill(shape = CircleShape, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text("${(scale * 100).toInt()}%", color = if (isDarkTheme) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                // CLICK OUTSIDE OVERLAY FOR ALL MENUS
+                if (isExportMenuOpen || isScenesMenuOpen || isInsertMenuOpen || (isDrawingMode && isDrawMenuOpen)) {
+                    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                        detectTapGestures {
+                            isExportMenuOpen = false
+                            isScenesMenuOpen = false
+                            isInsertMenuOpen = false
+                            isDrawMenuOpen = false
+                            if (activeSubMenu == "CustomColor" || activeSubMenu == "Color" || activeSubMenu == "Thickness") {
+                                activeSubMenu = null
                             }
-                    )
+                        }
+                    })
                 }
 
-                // --- TOP RIGHT MENU (EXPORT + UNDO/REDO) ---
-                Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        
-                        // EXPORT BUTTON / MENU
-                        LiquidGlassPill(
-                            shape = RoundedCornerShape(24.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
-                                if (!isExportMenuOpen) {
-                                    IconButton(
-                                        onClick = { isExportMenuOpen = true },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(Icons.Default.Share, "Export", tint = Color.Black, modifier = Modifier.size(24.dp))
-                                    }
-                                } else {
-                                    Column(
-                                        modifier = Modifier.width(160.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        Text("As a Project", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Board.json") }.padding(vertical = 14.dp, horizontal = 12.dp))
-                                        Text("As PDF", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 12.dp))
-                                        Text("As Picture", fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 12.dp))
-                                    }
-                                }
+                // --- TOP RIGHT MENU (3 DOTS + EXPORT + SCENES) ---
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = 24.dp)) {
+                    
+                    // LEFT COLUMN: MORE OPTIONS (3 DOTS)
+                    val threeDotsAlpha by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    val threeDotsScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen) 1f else 0.8f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 64.dp) // 48dp (column pill) + 16dp (spacing)
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                alpha = threeDotsAlpha
+                                scaleX = threeDotsScale
+                                scaleY = threeDotsScale
                             }
-                        }
-
-                        // UNDO / REDO PILL
+                    ) {
                         LiquidGlassPill(
                             shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 12.dp)
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.width(48.dp)
-                            ) {
-                                IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black)
-                                }
-                                Box(modifier = Modifier.width(20.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                                IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black)
-                                }
+                            IconButton(onClick = { if (!isExportMenuOpen && !isScenesMenuOpen) { /* TODO: Open settings menu */ } }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = "More Options", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
                             }
                         }
+                    }
 
-                        // SCENES MENU (Morphing)
+                    // EXPORT BUTTON / MENU
+                    val exportAlpha by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isScenesMenuOpen) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    val exportScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isScenesMenuOpen) 1f else 0.8f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                alpha = exportAlpha
+                                scaleX = exportScale
+                                scaleY = exportScale
+                            }
+                    ) {
                         LiquidGlassPill(
                             shape = RoundedCornerShape(24.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
-                                if (!isScenesMenuOpen) {
-                                    IconButton(onClick = { isScenesMenuOpen = true }, modifier = Modifier.size(48.dp)) {
-                                        Icon(Icons.Default.Layers, contentDescription = "Scenes", tint = if (isDarkTheme) Color.White else Color.Black)
+                        Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                            if (!isExportMenuOpen) {
+                                IconButton(
+                                    onClick = { if (!isScenesMenuOpen) isExportMenuOpen = true },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(Icons.Default.IosShare, "Export", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier.width(180.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Project.draftit") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("As a Project", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                        Icon(Icons.Default.Folder, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
                                     }
-                                } else {
-                                    val scenes by viewModel.scenes.collectAsStateWithLifecycle()
-                                    ScenesMenu(
-                                        scenes = scenes,
-                                        projectId = viewModel.projectId,
-                                        onClose = { isScenesMenuOpen = false },
-                                        onCaptureScene = {
-                                            coroutineScope.launch {
-                                                try {
-                                                    val sceneId = viewModel.addScene("Scene ${scenes.size + 1}", offset.x, offset.y, scale)
-                                                    val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-                                                    val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                                                    
-                                                    // Scale to thumbnail (max 480px width)
-                                                    val ratio = swBitmap.height.toFloat() / swBitmap.width.toFloat()
-                                                    val thumbWidth = 480
-                                                    val thumbHeight = (thumbWidth * ratio).toInt()
-                                                    val thumbBitmap = android.graphics.Bitmap.createScaledBitmap(swBitmap, thumbWidth, thumbHeight, true)
-                                                    
-                                                    val file = java.io.File(context.filesDir, "projects/${viewModel.projectId}_scene_${sceneId}_thumb.png")
-                                                    file.outputStream().use { 
-                                                        thumbBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) 
-                                                    }
-                                                } catch (e: Exception) {
-                                                    // Ignore thumbnail failure
-                                                }
-                                            }
-                                        },
-                                        onNavigateToScene = { navigateToScene(it) },
-                                        onRenameScene = { id, newName -> viewModel.renameScene(id, newName) },
-                                        onDeleteScene = { viewModel.removeScene(it) },
-                                        onExportScene = { 
-                                            sceneToExport = it
-                                            exportScenePdfLauncher.launch("${it.name}.pdf") 
-                                        }
-                                    )
+                                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("As PDF", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                    }
+                                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("As Picture", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                        Icon(Icons.Default.Image, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                    }
                                 }
                             }
+                        }
+                        }
+                    }
+                    
+                    // SCENES MENU (Morphing)
+                    val scenesAlpha by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    val scenesScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen) 1f else 0.8f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 64.dp) // 48dp (Export pill height) + 16dp gap
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                alpha = scenesAlpha
+                                scaleX = scenesScale
+                                scaleY = scenesScale
+                            }
+                    ) {
+                        LiquidGlassPill(
+                            shape = RoundedCornerShape(24.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                        Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                            if (!isScenesMenuOpen) {
+                                IconButton(onClick = { if (!isExportMenuOpen) isScenesMenuOpen = true }, modifier = Modifier.size(48.dp)) {
+                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_aperture), contentDescription = "Scenes", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                }
+                            } else {
+                                val scenes by viewModel.scenes.collectAsStateWithLifecycle()
+                                ScenesMenu(
+                                    scenes = scenes,
+                                    projectId = viewModel.projectId,
+                                    onClose = { isScenesMenuOpen = false },
+                                    onCaptureScene = {
+                                        coroutineScope.launch {
+                                            try {
+                                                viewModel.addScene("Scene ${scenes.size + 1}", offset.x, offset.y, scale)
+                                            } catch (e: Exception) {
+                                                // Ignore thumbnail failure
+                                            }
+                                        }
+                                    },
+                                    onNavigateToScene = { navigateToScene(it) },
+                                    onRenameScene = { id, newName -> viewModel.renameScene(id, newName) },
+                                    onDeleteScene = { viewModel.removeScene(it) }
+                                )
+                            }
+                        }
                         }
                     }
                 }
@@ -923,7 +1083,7 @@ fun DraftCanvas(
                     val deselectAll = { isDrawingMode = false; isConnectingMode = false; isLassoMode = false; connectingStartNodeId = null; selectedGroupIds = emptySet(); isInsertMenuOpen = false }
 
                     // --- NEW: THE VERTICAL DRAW TOOL STACK & POPOUTS ---
-                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 108.dp)) {
+                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 108.dp).zIndex(2f)) {
                         com.flash.draft.ui.canvas.tools.DrawToolStack(
                             isOpen = isDrawingMode && isDrawMenuOpen,
                             activeColor = activeDrawColor,
@@ -937,26 +1097,8 @@ fun DraftCanvas(
                             onThicknessClick = { activeSubMenu = if (activeSubMenu == "Thickness") null else "Thickness" },
                             activeStrokeWidth = activeStrokeWidth,
                             onStrokeWidthChange = { activeStrokeWidth = it },
-                            onColorSelect = { activeDrawColor = it }
-                        )
-                    }
-
-                    // --- NEW: THE VERTICAL INSERT TOOL STACK ---
-                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 108.dp)) {
-                        com.flash.draft.ui.canvas.tools.InsertToolStack(
-                            isOpen = isInsertMenuOpen,
-                            onPdfClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")); isInsertMenuOpen = false },
-                            onMediaClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)); isInsertMenuOpen = false },
-                            onCodeClick = {
-                                elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
-                                viewModel.updateElements(elements.toList())
-                                isInsertMenuOpen = false
-                            },
-                            onAudioClick = {
-                                elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
-                                viewModel.updateElements(elements.toList())
-                                isInsertMenuOpen = false
-                            }
+                            onColorSelect = { activeDrawColor = it },
+                            onRainbowClick = { activeSubMenu = "CustomColor" }
                         )
                     }
 
@@ -1002,7 +1144,7 @@ fun DraftCanvas(
                         }
                     }
 
-                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                    Box(modifier = Modifier.align(Alignment.BottomCenter).zIndex(2f)) {
                         BottomNavBar(
                             activeTool = activeMainTool,
                             onToolSelect = { tool ->
@@ -1012,32 +1154,72 @@ fun DraftCanvas(
                                     "Draw" -> isDrawingMode = true
                                     "Pan" -> { /* Defaults to panning */ }
                                     "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) }
-                                    "Note" -> { elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) }
                                 }
                             },
+                            isInsertMenuOpen = isInsertMenuOpen,
                             onAddClick = {
                                 isInsertMenuOpen = !isInsertMenuOpen
                                 isDrawMenuOpen = false
+                                if (isInsertMenuOpen && isDrawingMode) {
+                                    isDrawingMode = false
+                                }
                             },
                             showDynamicLeft = isDrawingMode,
                             onDynamicLeftClick = {
                                 isDrawMenuOpen = !isDrawMenuOpen // Toggles the vertical stack!
                             },
+                            onPdfClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")); isInsertMenuOpen = false },
+                            onMediaClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)); isInsertMenuOpen = false },
+                            onCodeClick = {
+                                elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                viewModel.updateElements(elements.toList())
+                                isInsertMenuOpen = false
+                            },
+                            onAudioClick = {
+                                elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                viewModel.updateElements(elements.toList())
+                                isInsertMenuOpen = false
+                            },
+                            onTaskClick = {
+                                elements.add(CanvasElement.TaskListNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                viewModel.updateElements(elements.toList())
+                                isInsertMenuOpen = false
+                            },
+                            onNoteClick = {
+                                elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                viewModel.updateElements(elements.toList())
+                                isInsertMenuOpen = false
+                            },
                             dynamicLeftContent = {
                                 AnimatedContent(
-                                    targetState = isDrawMenuOpen,
+                                    targetState = isDrawMenuOpen to activeSubMenu,
                                     transitionSpec = {
-                                        (androidx.compose.animation.scaleIn(tween(250)) + fadeIn(tween(250)))
-                                            .togetherWith(androidx.compose.animation.scaleOut(tween(250)) + fadeOut(tween(250)))
+                                        (androidx.compose.animation.scaleIn(tween(200)) + fadeIn(tween(200)))
+                                            .togetherWith(androidx.compose.animation.scaleOut(tween(200)) + fadeOut(tween(200)))
                                     },
                                     label = "iconMorph"
-                                ) { isOpen ->
-                                    Icon(
-                                        imageVector = if (isOpen) Icons.Default.Close else Icons.Default.Brush,
-                                        contentDescription = "Draw Menu",
-                                        tint = if (isDarkTheme) Color.White else Color.Black,
-                                        modifier = Modifier.size(28.dp)
-                                    )
+                                ) { (isOpen, subMenu) ->
+                                    if (isOpen && (subMenu == "Color" || subMenu == "CustomColor")) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .background(activeDrawColor, CircleShape)
+                                                .border(2.dp, if (isDarkTheme) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f), CircleShape)
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = if (isOpen) Icons.Default.Close else when (activeToolType) {
+                                                "Eraser" -> Icons.Default.CleaningServices
+                                                "Pen" -> Icons.Default.Create
+                                                "Brush" -> Icons.Default.Brush
+                                                "Highlighter" -> Icons.Default.AutoFixHigh
+                                                else -> Icons.Default.Brush
+                                            },
+                                            contentDescription = "Draw Menu",
+                                            tint = if (isOpen) (if (isDarkTheme) Color.White else Color.Black) else activeDrawColor,
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
                                 }
                             }
                         )

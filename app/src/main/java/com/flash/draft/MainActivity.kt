@@ -1,5 +1,6 @@
 package com.flash.draft
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,7 +24,8 @@ import androidx.navigation.navArgument
 import com.flash.draft.data.NoteRepository
 import com.flash.draft.ui.canvas.CanvasViewModel
 import com.flash.draft.ui.canvas.DraftCanvas
-import com.flash.draft.ui.home.DashboardScreen // We are about to build this!
+import com.flash.draft.ui.home. DashboardScreen // We are about to build this!
+import com.flash.draft.ui.home.AboutScreen
 
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +55,7 @@ fun AdaptiveLayout(content: @Composable () -> Unit) {
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
@@ -82,11 +85,19 @@ class MainActivity : ComponentActivity() {
                             onProjectClick = { projectId ->
                                 navController.navigate("canvas/$projectId")
                             },
-                            onCreateNewProject = {
-                                val newProjectId = repo.createNewProject()
+                            onCreateNewProject = { title ->
+                                val newProjectId = repo.createNewProject(title)
                                 navController.navigate("canvas/$newProjectId")
+                            },
+                            onNavigateToAbout = {
+                                navController.navigate("about")
                             }
                         )
+                    }
+
+                    // ROUTE: About Screen
+                    composable("about") {
+                        AboutScreen(onBack = { navController.popBackStack() })
                     }
 
                     // ROUTE 2: The Infinite Canvas

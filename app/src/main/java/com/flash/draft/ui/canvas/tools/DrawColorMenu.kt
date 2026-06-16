@@ -32,7 +32,7 @@ fun DrawColorMenu(
     onColorSelect: (Color) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
+    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
 
     val liquidState = LocalLiquidState.current

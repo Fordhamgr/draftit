@@ -26,6 +26,13 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
+object CanvasProfiler {
+    var bgDrawTimeSum = 0f
+    var bgDrawCount = 0
+    var fgDrawTimeSum = 0f
+    var fgDrawCount = 0
+    var recomposeCount = 0
+}
 @Composable
 fun CanvasBackgroundDrawPipeline(
     elements: List<CanvasElement>,
@@ -41,9 +48,10 @@ fun CanvasBackgroundDrawPipeline(
     Canvas(modifier = Modifier.fillMaxSize()) {
         val drawStart = System.nanoTime()
 
-        // 1. ALLOCATE ALL HEAVY OBJECTS OUTSIDE THE DRAW LOOP
-        val shadowOffset = Offset(8f, 16f)
-        val shadowColor = Color.Black.copy(alpha = 0.15f)
+        // HW-Accelerated Fake Blur Configuration
+        val shadowOffset = Offset(4f, 8f)
+        val shadowColor = Color.Black
+
         val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f)
         val dottedEffect = PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f)
 
@@ -77,10 +85,12 @@ fun CanvasBackgroundDrawPipeline(
                             else -> null
                         }
 
-                        // Draw Line Shadow (Native Compose is hardware accelerated, much faster than BlurMaskFilter)
-                        drawLine(color = shadowColor, start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
+                        // Native Hardware Accelerated "Fake Blur" (Multi-pass stroke)
+                        // Far faster than setShadowLayer because it entirely bypasses the GPU's Gaussian rasterization pass.
+                        drawLine(color = shadowColor.copy(alpha = 0.03f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 12f, pathEffect = effect, cap = StrokeCap.Round)
+                        drawLine(color = shadowColor.copy(alpha = 0.06f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 5f, pathEffect = effect, cap = StrokeCap.Round)
                         
-                        // Draw Line Main
+                        // Main Line
                         drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
 
                         fun drawArrow(tip: Offset, base: Offset, isShadow: Boolean = false) {
@@ -99,7 +109,12 @@ fun CanvasBackgroundDrawPipeline(
                                     sharedPath.lineTo(tX, tY)
                                     sharedPath.lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
                                     
-                                    drawPath(sharedPath, colorToDraw, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                    if (isShadow) {
+                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.03f), style = Stroke(width = drawStroke + 12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Stroke(width = drawStroke + 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                    } else {
+                                        drawPath(sharedPath, colorToDraw, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                    }
                                 }
                                 "Filled", "Diamond" -> {
                                     sharedPath.rewind()
@@ -119,11 +134,23 @@ fun CanvasBackgroundDrawPipeline(
                                         sharedPath.lineTo(midX + (arrowLen / 2) * sin(angle).toFloat(), midY - (arrowLen / 2) * cos(angle).toFloat())
                                         sharedPath.close()
                                     }
-                                    drawPath(sharedPath, colorToDraw, style = Fill)
+                                    
+                                    if (isShadow) {
+                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Fill)
+                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.03f), style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Stroke(width = 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                    } else {
+                                        drawPath(sharedPath, colorToDraw, style = Fill)
+                                    }
                                 }
                                 "Circle" -> {
                                     val center = Offset(tX - (arrowLen / 2) * cos(angle).toFloat(), tY - (arrowLen / 2) * sin(angle).toFloat())
-                                    drawCircle(color = colorToDraw, radius = arrowLen / 2, center = center)
+                                    if (isShadow) {
+                                        drawCircle(color = shadowColor.copy(alpha = 0.06f), radius = (arrowLen / 2) + 6f, center = center)
+                                        drawCircle(color = shadowColor.copy(alpha = 0.03f), radius = (arrowLen / 2) + 2.5f, center = center)
+                                    } else {
+                                        drawCircle(color = colorToDraw, radius = arrowLen / 2, center = center)
+                                    }
                                 }
                             }
                         }
@@ -140,9 +167,8 @@ fun CanvasBackgroundDrawPipeline(
             }
         }
         val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-        if (elapsed > 2f) {
-            android.util.Log.d("DraftCanvasPerf", "CanvasBackgroundDrawPipeline took ${elapsed}ms")
-        }
+        CanvasProfiler.bgDrawTimeSum += elapsed
+        CanvasProfiler.bgDrawCount++
     }
 }
 
@@ -268,8 +294,7 @@ fun CanvasForegroundDrawPipeline(
             drawPath(path, color = Color.Blue, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f / cameraScale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / cameraScale, 15f / cameraScale))))
         }
         val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-        if (elapsed > 2f) {
-            android.util.Log.d("DraftCanvasPerf", "CanvasForegroundDrawPipeline took ${elapsed}ms")
-        }
+        CanvasProfiler.fgDrawTimeSum += elapsed
+        CanvasProfiler.fgDrawCount++
     }
 }

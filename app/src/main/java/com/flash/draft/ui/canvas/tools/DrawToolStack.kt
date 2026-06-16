@@ -6,6 +6,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,8 +24,9 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.LineWeight
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -60,195 +63,212 @@ fun DrawToolStack(
     onToolChange: (String) -> Unit,
     onColorClick: () -> Unit,
     onThicknessClick: () -> Unit,
+    onRainbowClick: () -> Unit,
     activeStrokeWidth: Float,
     onStrokeWidthChange: (Float) -> Unit,
     onColorSelect: (Color) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
+    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
     val iconTint = if (isDark) Color.White else Color.Black
+    val activeBg = if (isDark) Color.White else Color.Black
+    val activeIconTint = if (isDark) Color.Black else Color.White
 
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
 
-    val dockHeight = 68.dp // Exact same scale as the parent dock
+    val dockHeight = 56.dp
 
-    Column(
-        modifier = Modifier.pointerInput(Unit) { detectDragGestures { _, _ -> } },
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.Start
+    AnimatedVisibility(
+        visible = isOpen,
+        enter = slideInHorizontally(initialOffsetX = { -it - 50 }) + fadeIn(tween(300)),
+        exit = slideOutHorizontally(targetOffsetX = { -it - 50 }) + fadeOut(tween(200))
     ) {
-
-        @Composable
-        fun ExpandingToolPill(
-            index: Int,
-            isExpanded: Boolean,
-            expandedWidth: androidx.compose.ui.unit.Dp,
-            collapsedContent: @Composable () -> Unit,
-            expandedContent: @Composable RowScope.() -> Unit
+        Box(
+            modifier = Modifier
+                .height(dockHeight)
+                .shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                .then(
+                    if (liquidState != null) Modifier.liquid(liquidState) {
+                        refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(percent = 50)
+                    } else Modifier
+                )
+                .background(glassBg, CircleShape)
+                .border(1.dp, glassBorder, CircleShape)
+                .clip(CircleShape)
+                .animateContentSize(animationSpec = androidx.compose.animation.core.spring(stiffness = 800f, dampingRatio = 0.8f))
+                .pointerInput(Unit) { detectDragGestures { _, _ -> } }
         ) {
-            val width by animateDpAsState(
-                targetValue = if (isExpanded) expandedWidth else dockHeight,
-                animationSpec = tween(300)
-            )
-
-            AnimatedVisibility(
-                visible = isOpen,
-                enter = slideInHorizontally(
-                    initialOffsetX = { -it - 50 },
-                    animationSpec = tween(400, delayMillis = index * 50)
-                ) + fadeIn(tween(400, delayMillis = index * 50)),
-                exit = slideOutHorizontally(
-                    targetOffsetX = { -it - 50 },
-                    animationSpec = tween(300)
-                ) + fadeOut()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .height(dockHeight)
-                        .width(width)
-                        .shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f))
-                        .then(
-                            if (liquidState != null) Modifier.liquid(liquidState) {
-                                refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(percent = 50)
-                            } else Modifier
-                        )
-                        .background(glassBg, CircleShape)
-                        .border(1.dp, glassBorder, CircleShape)
-                        .clip(CircleShape)
+            androidx.compose.animation.AnimatedContent(
+                targetState = activeSubMenu,
+                transitionSpec = {
+                    (fadeIn(tween(200)) togetherWith fadeOut(tween(200)))
+                },
+                label = "dockContent"
+            ) { subMenu ->
+                Row(
+                    modifier = Modifier.fillMaxHeight().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Crossfade(targetState = isExpanded, animationSpec = tween(300), label = "pillCrossfade") { expanded ->
-                        if (!expanded) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                collapsedContent()
+                    when (subMenu) {
+                        "Color" -> {
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onColorClick() }, contentAlignment = Alignment.Center) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Back", tint = iconTint, modifier = Modifier.size(20.dp))
                             }
-                        } else {
-                            Row(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                                expandedContent()
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(1.dp).height(24.dp).background(glassBorder))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val colors = listOf(Color.Black, Color.Red, Color(0xFF34C759))
+                            colors.forEach { color ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 2.dp)
+                                        .size(32.dp)
+                                        .background(color, CircleShape)
+                                        .border(
+                                            width = if (activeColor == color) 3.dp else 1.dp,
+                                            color = if (activeColor == color) Color(0xFF2196F3) else Color.LightGray.copy(alpha = 0.5f),
+                                            shape = CircleShape
+                                        )
+                                        .clickable { onColorSelect(color); onColorClick() }
+                                )
+                            }
+                            // Rainbow Button
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 2.dp)
+                                    .size(32.dp)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                                            listOf(Color.Red, Color.Magenta, Color.Blue, Color.Cyan, Color.Green, Color.Yellow, Color.Red)
+                                        ),
+                                        shape = CircleShape
+                                    )
+                                    .border(1.dp, glassBorder, CircleShape)
+                                    .clickable { onRainbowClick() }
+                            )
+                        }
+                        "CustomColor" -> {
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onColorClick() }, contentAlignment = Alignment.Center) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Back", tint = iconTint, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(1.dp).height(24.dp).background(glassBorder))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // Active Color Indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(activeColor, CircleShape)
+                                    .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            androidx.compose.foundation.Canvas(
+                                modifier = Modifier
+                                    .width(180.dp)
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { offset ->
+                                            val ratio = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                            val angle = ratio * 360f
+                                            onColorSelect(Color.hsv(angle, 1f, 1f))
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectDragGestures { change, _ ->
+                                            change.consume()
+                                            val ratio = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                            val angle = ratio * 360f
+                                            onColorSelect(Color.hsv(angle, 1f, 1f))
+                                        }
+                                    }
+                            ) {
+                                drawRect(
+                                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                        listOf(Color.Red, Color.Magenta, Color.Blue, Color.Cyan, Color.Green, Color.Yellow, Color.Red)
+                                    )
+                                )
+                            }
+                        }
+                        "Thickness" -> {
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).clickable { onThicknessClick() }, contentAlignment = Alignment.Center) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Back", tint = iconTint, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(1.dp).height(24.dp).background(glassBorder))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Size", color = iconTint, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 8.dp))
+                            IosThicknessSlider(
+                                value = activeStrokeWidth,
+                                onValueChange = onStrokeWidthChange,
+                                valueRange = 2f..100f,
+                                modifier = Modifier.width(180.dp).height(40.dp).padding(horizontal = 8.dp),
+                                trackColor = if (isDark) Color.White else Color.Black,
+                                thumbColor = if (isDark) Color.White else Color.Black
+                            )
+                        }
+                        else -> {
+                            // Main Dock
+                            val tools = listOf(
+                                "Eraser" to androidx.compose.material.icons.Icons.Default.CleaningServices,
+                                "Pen" to androidx.compose.material.icons.Icons.Default.Create,
+                                "Brush" to androidx.compose.material.icons.Icons.Default.Brush,
+                                "Highlighter" to androidx.compose.material.icons.Icons.Default.AutoFixHigh
+                            )
+                            tools.forEach { (name, icon) ->
+                                val isActive = activeToolType == name
+                                val toolBg by animateColorAsState(if (isActive) activeBg else Color.Transparent)
+                                val toolIconTint by animateColorAsState(if (isActive) activeIconTint else iconTint)
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(toolBg, CircleShape)
+                                        .clip(CircleShape)
+                                        .clickable { onToolChange(name) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(icon, contentDescription = name, tint = toolIconTint, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(1.dp).height(24.dp).background(glassBorder))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            
+                            // Color Indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(activeColor, CircleShape)
+                                    .border(1.dp, glassBorder, CircleShape)
+                                    .clickable { onColorClick() }
+                            )
+                            
+                            Spacer(modifier = Modifier.width(4.dp))
+                            
+                            // Size Indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onThicknessClick() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Tune, contentDescription = "Thickness", tint = iconTint, modifier = Modifier.size(22.dp))
                             }
                         }
                     }
                 }
             }
         }
-
-        // Pill 4: Thickness
-        ExpandingToolPill(
-            index = 0,
-            isExpanded = activeSubMenu == "Thickness" && isOpen,
-            expandedWidth = 240.dp,
-            collapsedContent = {
-                Box(modifier = Modifier.fillMaxSize().clickable { onThicknessClick() }, contentAlignment = Alignment.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Default.LineWeight, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
-                }
-            },
-            expandedContent = {
-                val textColor = if (isDark) Color.LightGray else Color.DarkGray
-                Text("Size", color = textColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Spacer(modifier = Modifier.width(16.dp))
-                RulerSlider(
-                    value = activeStrokeWidth,
-                    onValueChange = onStrokeWidthChange,
-                    valueRange = 2f..40f,
-                    modifier = Modifier.weight(1f).height(48.dp)
-                )
-            }
-        )
-
-        // Pill 3: Color Palette
-        val colors = listOf(Color.Black, Color.Red, Color.Blue, Color(0xFF34C759), Color(0xFFFF9500), Color.White)
-        ExpandingToolPill(
-            index = 1,
-            isExpanded = activeSubMenu == "Color" && isOpen,
-            expandedWidth = 280.dp,
-            collapsedContent = {
-                Box(modifier = Modifier.fillMaxSize().clickable { onColorClick() }, contentAlignment = Alignment.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Default.Palette, contentDescription = null, tint = activeColor, modifier = Modifier.size(28.dp))
-                }
-            },
-            expandedContent = {
-                colors.forEach { color ->
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .background(color, CircleShape)
-                            .border(
-                                width = if (activeColor == color) 3.dp else 1.dp,
-                                color = if (activeColor == color) Color(0xFF2196F3) else Color.LightGray.copy(alpha = 0.5f),
-                                shape = CircleShape
-                            )
-                            .clickable { onColorSelect(color); onColorClick() /* auto close */ }
-                    )
-                }
-            }
-        )
-
-        // Pill 2 & 1: Split Eraser / Pencil Pill
-        val isDark = LocalDarkTheme.current
-        val activeBg = if (isDark) Color.White else Color.Black
-        ExpandingToolPill(
-            index = 2,
-            isExpanded = activeSubMenu == "Brush" && isOpen,
-            expandedWidth = 200.dp,
-            collapsedContent = {
-                val isEraserActive = activeToolType == "Eraser"
-                val eraserBg by animateColorAsState(if (isEraserActive) activeBg else Color.Transparent)
-                val penBg by animateColorAsState(if (!isEraserActive) activeBg else Color.Transparent)
-                
-                val activeIconTint = if (isDark) Color.Black else Color.White
-                val iconEraserTint by animateColorAsState(if (isEraserActive) activeIconTint else iconTint)
-                val iconPenTint by animateColorAsState(if (!isEraserActive) activeIconTint else iconTint)
-
-                // Circle mode with 45-degree split
-                Canvas(modifier = Modifier.fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures { 
-                            onToolChange("Pen") // Clicking anywhere on circle switches to Pen!
-                        }
-                    }
-                ) {
-                    val pathLeft = Path().apply { moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(0f, size.height); close() }
-                    drawPath(pathLeft, eraserBg)
-                    
-                    val pathRight = Path().apply { moveTo(size.width, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
-                    drawPath(pathRight, penBg)
-                    drawLine(color = glassBorder, start = Offset(size.width, 0f), end = Offset(0f, size.height), strokeWidth = 1.dp.toPx())
-                }
-                
-                Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onToolChange("Pen") } }) {
-                    Icon(androidx.compose.material.icons.Icons.Default.CleaningServices, contentDescription = "Eraser", tint = iconEraserTint, modifier = Modifier.size(20.dp).align(Alignment.TopStart).offset(x = 16.dp, y = 16.dp))
-                    Icon(androidx.compose.material.icons.Icons.Default.Brush, contentDescription = "Pen", tint = iconPenTint, modifier = Modifier.size(20.dp).align(Alignment.BottomEnd).offset(x = (-16).dp, y = (-16).dp))
-                }
-            },
-            expandedContent = {
-                // Eraser Collapser
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { onToolChange("Eraser") }, contentAlignment = Alignment.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Default.CleaningServices, contentDescription = "Eraser", tint = iconTint, modifier = Modifier.size(24.dp))
-                }
-                
-                Box(modifier = Modifier.width(1.dp).height(40.dp).background(glassBorder))
-                
-                val subTools = listOf("Pen" to androidx.compose.material.icons.Icons.Default.Create, "Brush" to androidx.compose.material.icons.Icons.Default.Brush, "Highlighter" to androidx.compose.material.icons.Icons.Default.AutoFixHigh)
-                subTools.forEach { (name, icon) ->
-                    val isActive = activeToolType == name
-                    val toolBg by animateColorAsState(if (isActive) activeBg else Color.Transparent)
-                    val activeIconTint = if (isDark) Color.Black else Color.White
-                    val toolIconTint by animateColorAsState(if (isActive) activeIconTint else iconTint)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .background(toolBg)
-                            .clickable { onToolChange(name) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(icon, contentDescription = name, tint = toolIconTint, modifier = Modifier.size(24.dp))
-                    }
-                }
-            }
-        )
     }
 }
 
