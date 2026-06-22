@@ -60,6 +60,7 @@ fun BottomNavBar(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val isPerformance = com.flash.draft.ui.canvas.item.LocalPerformanceMode.current
 
     // PERFECT SCALE: Lock everything to 68dp
     val dockHeight = 68.dp
@@ -91,9 +92,9 @@ fun BottomNavBar(
             Box(
                 modifier = Modifier
                     .size(dockHeight)
-                    .shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                    .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
-                        if (liquidState != null) Modifier.liquid(liquidState) {
+                        if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; shape = CircleShape
                         } else Modifier
                     )
@@ -122,9 +123,9 @@ fun BottomNavBar(
                     .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
                     .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
                     .height(dockHeight)
-                    .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                    .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
-                        if (liquidState != null) Modifier.liquid(liquidState) {
+                        if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
                         } else Modifier
                     )
@@ -152,9 +153,9 @@ fun BottomNavBar(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f))
+                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
-                    if (liquidState != null) Modifier.liquid(liquidState) {
+                    if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = popoverShape
                     } else Modifier
                 )

@@ -44,6 +44,7 @@ fun CanvasBackgroundDrawPipeline(
     // DO NOT use remember here. We need the latest elements map every time it recomposes.
     // Building the map takes < 1ms for hundreds of elements.
     val elementMap = elements.associateBy { it.id }
+    val isPerformanceMode = LocalPerformanceMode.current
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val drawStart = System.nanoTime()
@@ -87,8 +88,10 @@ fun CanvasBackgroundDrawPipeline(
 
                         // Native Hardware Accelerated "Fake Blur" (Multi-pass stroke)
                         // Far faster than setShadowLayer because it entirely bypasses the GPU's Gaussian rasterization pass.
-                        drawLine(color = shadowColor.copy(alpha = 0.03f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 12f, pathEffect = effect, cap = StrokeCap.Round)
-                        drawLine(color = shadowColor.copy(alpha = 0.06f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 5f, pathEffect = effect, cap = StrokeCap.Round)
+                        if (!isPerformanceMode) {
+                            drawLine(color = shadowColor.copy(alpha = 0.03f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 12f, pathEffect = effect, cap = StrokeCap.Round)
+                            drawLine(color = shadowColor.copy(alpha = 0.06f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 5f, pathEffect = effect, cap = StrokeCap.Round)
+                        }
                         
                         // Main Line
                         drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
@@ -156,8 +159,10 @@ fun CanvasBackgroundDrawPipeline(
                         }
                         
                         // Draw Arrow Shadows
-                        if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = true)
-                        if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = true)
+                        if (!isPerformanceMode) {
+                            if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = true)
+                            if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = true)
+                        }
                         
                         // Draw Arrow Main
                         if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = false)
@@ -187,6 +192,7 @@ fun CanvasForegroundDrawPipeline(
     lassoPath: List<Offset>
 ) {
     val renderer = remember { CanvasStrokeRenderer.create() }
+    val isPerformanceMode = LocalPerformanceMode.current
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val drawStart = System.nanoTime()
@@ -213,11 +219,12 @@ fun CanvasForegroundDrawPipeline(
                             "Pencil" -> StockBrushes.markerV1
                             else -> StockBrushes.markerV1
                         }
+                        val brushEpsilon = if (isPerformanceMode) 2.0f else 0.1f
                         val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
                             family,
                             baseColor.copy(alpha = sketch.alpha).toArgb(),
                             sketch.strokeWidth,
-                            0.1f
+                            brushEpsilon
                         )
                         sketch.cachedStroke = Stroke(brush, batch)
                     }
@@ -238,11 +245,12 @@ fun CanvasForegroundDrawPipeline(
                             "Pencil" -> StockBrushes.markerV1
                             else -> StockBrushes.markerV1
                         }
+                        val brushEpsilon = if (isPerformanceMode) 2.0f else 0.1f
                         val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
                             family,
                             baseColor.copy(alpha = 0.5f).toArgb(),
                             sketch.strokeWidth,
-                            0.1f
+                            brushEpsilon
                         )
                         strokeToDraw = Stroke(brush, batch)
                     }
@@ -268,11 +276,12 @@ fun CanvasForegroundDrawPipeline(
                     "Pencil" -> StockBrushes.markerV1
                     else -> StockBrushes.markerV1
                 }
+                val brushEpsilon = if (isPerformanceMode) 2.0f else 0.1f
                 val brush = androidx.ink.brush.Brush.createWithColorIntArgb(
                     family,
                     baseColor.copy(alpha = activeAlpha).toArgb(),
                     activeStrokeWidth,
-                    0.1f
+                    brushEpsilon
                 )
 
                 val stroke = Stroke(brush, batch)

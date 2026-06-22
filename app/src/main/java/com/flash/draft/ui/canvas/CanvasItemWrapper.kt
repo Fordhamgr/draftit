@@ -51,7 +51,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 import com.flash.draft.ui.canvas.item.LocalPerformanceMode
-import com.flash.draft.ui.canvas.item.LocalHapticFeedbackEnabled
+
 import com.flash.draft.utils.ViewportMath
 import io.github.fletchmckee.liquid.liquid
 import kotlinx.coroutines.Job
@@ -63,6 +63,7 @@ import kotlin.math.roundToInt
 fun CanvasItemWrapper(
     position: Offset, width: Float, height: Float, scale: Float, canvasOffset: Offset,
     isSelected: Boolean, isConnecting: Boolean, isLocked: Boolean = false, onLockedChange: (Boolean) -> Unit = {}, isFullyDraggable: Boolean = true,
+    isChildDragging: Boolean = false,
     isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     hasDefaultBackground: Boolean = true, backgroundAlpha: Float = 0.65f,
     hyperlinkTarget: String? = null, onLinkUpdate: (String?) -> Unit = {},
@@ -89,11 +90,10 @@ fun CanvasItemWrapper(
     var zoomCooldownJob by remember { mutableStateOf<Job?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    val animatedShadow by animateDpAsState(targetValue = if (isDragging) 24.dp else 4.dp, animationSpec = tween(150), label = "shadow")
-    val animatedScale by animateFloatAsState(targetValue = if (isDragging) 1.02f else 1f, animationSpec = tween(150), label = "scale")
+    val animatedShadow by animateDpAsState(targetValue = if (isDragging || isChildDragging) 24.dp else 4.dp, animationSpec = tween(150), label = "shadow")
+    val animatedScale by animateFloatAsState(targetValue = if (isDragging || isChildDragging) 1.02f else 1f, animationSpec = tween(150), label = "scale")
     val isDark = LocalDarkTheme.current
     val isPerformance = LocalPerformanceMode.current
-    val isHaptic = LocalHapticFeedbackEnabled.current
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current.density
     
@@ -136,14 +136,14 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(Unit) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) currentOnSelect() }) }
+                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isLocked && !isMultiTouch && !isZooming) currentOnSelect() }) }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) } },
-                                onDragEnd = { isDragging = false; currentOnSaveRequest(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
-                                onDragCancel = { isDragging = false; currentOnSaveRequest(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) } },
+                                onDragEnd = { isDragging = false; currentOnSaveRequest(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                onDragCancel = { isDragging = false; currentOnSaveRequest(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                                 onDrag = { change, dragAmount ->
                                     if (!isLocked && !isMultiTouch && !isZooming) {
                                         change.consume()
@@ -157,7 +157,7 @@ fun CanvasItemWrapper(
 
                 // ---- THE CORRECT LENS MODIFIER ----
                 .then(
-                    if (LocalLiquidState.current != null) {
+                    if (LocalLiquidState.current != null && !isPerformance) {
                         val currentRefraction = LocalLiquidRefraction.current
                         val currentCurve = LocalLiquidCurve.current
                         // This turns the card into a glass lens!
@@ -234,7 +234,7 @@ fun CanvasItemWrapper(
                             .wrapContentSize()
                             .then(if (!isPerformance) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
                             .then(
-                                if (LocalLiquidState.current != null) {
+                                if (LocalLiquidState.current != null && !isPerformance) {
                                     val currentRefraction = LocalLiquidRefraction.current
                                     val currentCurve = LocalLiquidCurve.current
                                     Modifier.liquid(LocalLiquidState.current!!) {

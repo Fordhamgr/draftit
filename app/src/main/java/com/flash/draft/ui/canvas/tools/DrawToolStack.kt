@@ -78,6 +78,7 @@ fun DrawToolStack(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val isPerformance = com.flash.draft.ui.canvas.item.LocalPerformanceMode.current
 
     val dockHeight = 56.dp
 
@@ -89,9 +90,9 @@ fun DrawToolStack(
         Box(
             modifier = Modifier
                 .height(dockHeight)
-                .shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                 .then(
-                    if (liquidState != null) Modifier.liquid(liquidState) {
+                    if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(percent = 50)
                     } else Modifier
                 )

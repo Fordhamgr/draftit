@@ -73,7 +73,7 @@ fun TaskListItem(
                 value = taskNode.title,
                 onValueChange = { onUpdate(taskNode.copy(title = it)) },
                 enabled = isSelected,
-                textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             )
 
@@ -109,9 +109,7 @@ fun TaskListItem(
                             enabled = isSelected,
                             textStyle = TextStyle(
                                 fontSize = 14.sp,
-                                color = if (task.isCompleted) Color.Gray else getAdaptiveColor(Color.Black,
-                                    LocalDarkTheme.current
-                                ),
+                                color = if (task.isCompleted) Color.Gray else Color.Black,
                                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                             ),
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp)

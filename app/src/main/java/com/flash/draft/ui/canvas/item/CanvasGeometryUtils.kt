@@ -9,13 +9,27 @@ import kotlin.math.min
 val LocalDarkTheme = compositionLocalOf { false }
 val LocalPerformanceMode = compositionLocalOf { false }
 val LocalCameraScaleProvider = compositionLocalOf<() -> Float> { { 1f } }
-val LocalHapticFeedbackEnabled = compositionLocalOf { true }
 
 fun getAdaptiveColor(originalColor: Color, isDark: Boolean): Color {
-    return when {
-        originalColor == Color.Black && isDark -> Color.White
-        originalColor == Color.White && isDark -> Color(0xFF1E1E1E)
-        originalColor == Color.White && !isDark -> Color.Black
+    if (!isDark) {
+        if (originalColor == Color.White) return Color.Black
+        return originalColor
+    }
+    
+    // In Dark Mode:
+    return when (originalColor) {
+        Color.Black -> Color.White
+        Color.White -> Color(0xFF1E1E1E)
+        Color.DarkGray -> Color.LightGray
+        // Map bright pastels to darker pastel shades
+        Color(0xFFFFF9C4) -> Color(0xFF4A4835) // Dark Yellow
+        Color(0xFFFFCDD2) -> Color(0xFF4A3739) // Dark Pink
+        Color(0xFFBBDEFB) -> Color(0xFF2E3B46) // Dark Blue
+        Color(0xFFC8E6C9) -> Color(0xFF354136) // Dark Green
+        Color(0xFFE1BEE7) -> Color(0xFF413244) // Dark Purple
+        Color(0xFFE3F2FD) -> Color(0xFF253440) // Another Blue from TaskList
+        Color(0xFFE8F5E9) -> Color(0xFF2C3B2E) // Another Green from TaskList
+        Color(0xFFFCE4EC) -> Color(0xFF4A353E) // Another Pink from TaskList
         else -> originalColor
     }
 }

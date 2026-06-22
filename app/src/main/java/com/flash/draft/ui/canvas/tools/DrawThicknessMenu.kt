@@ -42,6 +42,7 @@ fun DrawThicknessMenu(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val isPerformance = com.flash.draft.ui.canvas.item.LocalPerformanceMode.current
     val pillShape = RoundedCornerShape(50)
 
     AnimatedVisibility(
@@ -52,9 +53,9 @@ fun DrawThicknessMenu(
         Box(
             modifier = Modifier
                 .height(68.dp) // Perfect match to parent
-                .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
+                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                 .then(
-                    if (liquidState != null) Modifier.liquid(liquidState) {
+                    if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
                     } else Modifier
                 )

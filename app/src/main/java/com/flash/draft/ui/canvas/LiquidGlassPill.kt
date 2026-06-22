@@ -36,8 +36,8 @@ fun LiquidGlassPill(
     val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
 
-    // The universal liquid lens
-    val liquidModifier = if (liquidState != null) {
+    val isPerformanceMode = com.flash.draft.ui.canvas.item.LocalPerformanceMode.current
+    val liquidModifier = if (liquidState != null && !isPerformanceMode) {
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
@@ -47,7 +47,7 @@ fun LiquidGlassPill(
 
     Box(
         modifier = modifier
-            .shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f))
+            .then(if (isPerformanceMode) Modifier else Modifier.shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f)))
             .then(liquidModifier)
             .background(glassBg, shape)
             .border(1.dp, glassBorder, shape)

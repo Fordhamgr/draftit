@@ -16,6 +16,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.flash.draft.AppFonts
 import com.flash.draft.model.CanvasElement
+import com.flash.draft.ui.canvas.item.LocalDarkTheme
+import com.flash.draft.ui.canvas.item.getAdaptiveColor
 
 @Composable
 fun StickyNoteItem(
@@ -42,12 +46,13 @@ fun StickyNoteItem(
         "Cursive" -> AppFonts.Handwriting
         else -> AppFonts.Sans
     }
+    var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     CanvasItemWrapper(
         position = note.position, width = note.width, height = note.height,
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
         isLocked = note.isLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
-        isFullyDraggable = false, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
+        isFullyDraggable = false, isChildDragging = isDragging, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = note.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(note.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
@@ -87,12 +92,14 @@ fun StickyNoteItem(
             }
         }
     ) { isLocked ->
-        Column(modifier = Modifier.fillMaxSize().background(note.color)) {
+        Column(modifier = Modifier.fillMaxSize().background(getAdaptiveColor(note.color, LocalDarkTheme.current))) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(32.dp).background(Color.Black.copy(alpha = 0.1f))
                     .pointerInput(isLocked) {
                         detectDragGestures(
-                            onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                            onDragStart = { if (!isLocked) { onSelect(); isDragging = true } }, 
+                            onDragEnd = { if (!isLocked) { onSaveRequest(); isDragging = false } },
+                            onDragCancel = { if (!isLocked) { onSaveRequest(); isDragging = false } },
                             onDrag = { change, dragAmount -> 
                                 if (!isLocked) {
                                     change.consume()
@@ -109,7 +116,7 @@ fun StickyNoteItem(
                 enabled = isSelected,
                 onValueChange = { onUpdate(note.copy(text = it)); onSaveRequest() },
                 modifier = Modifier.fillMaxSize().padding(8.dp).onFocusChanged { if (it.isFocused) onSelect() },
-                textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = note.fontSize.sp, fontFamily = currentFont, color = Color.Black))
+                textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = note.fontSize.sp, fontFamily = currentFont, color = getAdaptiveColor(Color.Black, LocalDarkTheme.current)))
             )
         }
     }

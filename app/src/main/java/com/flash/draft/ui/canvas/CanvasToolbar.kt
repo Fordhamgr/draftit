@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 import androidx.compose.ui.unit.sp
-import com.flash.draft.ui.canvas.item.LocalHapticFeedbackEnabled
+
 import io.github.fletchmckee.liquid.liquid
 
 @Composable
@@ -42,7 +42,6 @@ fun CanvasToolbar(
     onThemeToggle: () -> Unit, onShareClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val isHaptic = LocalHapticFeedbackEnabled.current
     var isExpanded by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(if (isExpanded) 1f else 0.8f, tween(250, easing = FastOutSlowInEasing), label = "scale")
@@ -102,7 +101,7 @@ fun CanvasToolbar(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick(); isExpanded = false }
+                            .clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick(); isExpanded = false }
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -141,7 +140,7 @@ fun CanvasToolbar(
                 .background(if (isExpanded) activeTint else glassBg, CircleShape)
                 .border(1.dp, if (isExpanded) Color.Transparent else glassBorder, CircleShape)
                 .clip(CircleShape)
-                .clickable { if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress); isExpanded = !isExpanded },
+                .clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); isExpanded = !isExpanded },
             contentAlignment = Alignment.Center
         ) {
             Icon(

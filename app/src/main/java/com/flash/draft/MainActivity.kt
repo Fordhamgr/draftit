@@ -40,6 +40,9 @@ import androidx.compose.runtime.Composable
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 @Composable
 fun AdaptiveLayout(content: @Composable () -> Unit) {
@@ -85,11 +88,9 @@ class MainActivity : ComponentActivity() {
             
             val isPerformanceMode by settingsRepo.getPerformanceModeFlow().collectAsStateWithLifecycle(initialValue = false)
             val framerate by settingsRepo.getFramerateFlow().collectAsStateWithLifecycle(initialValue = 60)
-            val isMotionBlurEnabled by settingsRepo.getMotionBlurFlow().collectAsStateWithLifecycle(initialValue = true)
-            val motionBlurAmount by settingsRepo.getMotionBlurAmountFlow().collectAsStateWithLifecycle(initialValue = 0.5f)
             val isHapticFeedbackEnabled by settingsRepo.getHapticFeedbackFlow().collectAsStateWithLifecycle(initialValue = true)
             
-            androidx.compose.runtime.LaunchedEffect(framerate) {
+            androidx.compose.runtime.LaunchedEffect(framerate, isPerformanceMode) {
                 val params = window.attributes
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                     val currentDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -99,12 +100,14 @@ class MainActivity : ComponentActivity() {
                         windowManager.defaultDisplay
                     }
                     if (currentDisplay != null) {
-                        if (framerate > 0) {
+                        if (framerate > 0 && !isPerformanceMode) {
                             val modes = currentDisplay.supportedModes
                             val mode = modes.minByOrNull { kotlin.math.abs(it.refreshRate - framerate.toFloat()) }
                             params.preferredDisplayModeId = mode?.modeId ?: 0
                         } else {
-                            params.preferredDisplayModeId = 0
+                            val modes = currentDisplay.supportedModes
+                            val maxMode = modes.maxByOrNull { it.refreshRate }
+                            params.preferredDisplayModeId = maxMode?.modeId ?: 0
                         }
                         window.attributes = params
                     }
@@ -114,7 +117,19 @@ class MainActivity : ComponentActivity() {
             // Override the MaterialTheme color scheme based on user setting
             val colorScheme = if (isDarkMode) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme()
 
-            MaterialTheme(colorScheme = colorScheme) {
+            val nativeHaptic = LocalHapticFeedback.current
+            val customHaptic = remember(isHapticFeedbackEnabled, nativeHaptic) {
+                object : HapticFeedback {
+                    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
+                        if (isHapticFeedbackEnabled) {
+                            nativeHaptic.performHapticFeedback(hapticFeedbackType)
+                        }
+                    }
+                }
+            }
+
+            CompositionLocalProvider(LocalHapticFeedback provides customHaptic) {
+                MaterialTheme(colorScheme = colorScheme) {
                 AdaptiveLayout {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -182,11 +197,6 @@ class MainActivity : ComponentActivity() {
 
                                 DraftCanvas(
                                     viewModel = canvasViewModel,
-                                    isDarkTheme = isDarkMode,
-                                    isPerformanceMode = isPerformanceMode,
-                                    isMotionBlurEnabled = isMotionBlurEnabled,
-                                    motionBlurAmount = motionBlurAmount,
-                                    isHapticFeedbackEnabled = isHapticFeedbackEnabled,
                                     onBack = { navController.popBackStack() },
                                     onNavigateToBoard = { boardId -> navController.navigate("canvas/$boardId") }
                                 )
@@ -194,6 +204,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
             }
         }
     }

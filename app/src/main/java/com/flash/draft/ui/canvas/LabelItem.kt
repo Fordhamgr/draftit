@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,12 +44,13 @@ fun LabelItem(
     onUpdate: (CanvasElement.LabelNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
+    var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     CanvasItemWrapper(
         position = labelNode.position, width = labelNode.width, height = labelNode.height,
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
         isLocked = labelNode.isLocked, onLockedChange = { onUpdate(labelNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // <-- Makes it transparent!
-        isFullyDraggable = false, // Critical for text editing
+        isFullyDraggable = false, isChildDragging = isDragging, // Critical for text editing
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
@@ -118,12 +121,13 @@ fun LabelItem(
         // Wrap in a box to capture drag gestures when not selected
         Box(
             modifier = Modifier.fillMaxSize()
-                .background(labelNode.backgroundColor, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .background(getAdaptiveColor(labelNode.backgroundColor, LocalDarkTheme.current), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                 .pointerInput(isSelected, isLocked) {
                     if (!isSelected) {
                         detectDragGestures(
-                            onDragStart = { /* Do not select on drag to prevent gesture cancellation! */ },
-                            onDragEnd = { if (!isLocked) onSaveRequest() },
+                            onDragStart = { isDragging = true },
+                            onDragEnd = { if (!isLocked) onSaveRequest(); isDragging = false },
+                            onDragCancel = { if (!isLocked) onSaveRequest(); isDragging = false },
                             onDrag = { change, dragAmount -> 
                                 if (!isLocked) {
                                     change.consume()

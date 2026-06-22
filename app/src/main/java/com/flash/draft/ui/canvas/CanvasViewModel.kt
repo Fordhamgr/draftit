@@ -10,8 +10,11 @@ import com.flash.draft.model.Scene
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class CanvasState(
@@ -27,6 +30,16 @@ class CanvasViewModel(
 
     private val _elements = MutableStateFlow<List<CanvasElement>>(emptyList())
     val elements = _elements.asStateFlow()
+
+    val isDarkMode: StateFlow<Boolean> = settingsRepo.getDarkModeFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+
+    val isPerformanceMode: StateFlow<Boolean> = settingsRepo.getPerformanceModeFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+
+    val isHapticFeedbackEnabled: StateFlow<Boolean> = settingsRepo.getHapticFeedbackFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), true)
+
 
     private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
     val scenes = _scenes.asStateFlow()
@@ -116,6 +129,12 @@ class CanvasViewModel(
             repository.saveElements(projectId, _elements.value)
             repository.saveScenes(projectId, _scenes.value)
         }
+    }
+
+    fun clearCanvas() {
+        pushToUndoStack()
+        _elements.value = emptyList()
+        triggerAutoSave()
     }
     // --- LIQUID PHYSICS STATE ---
     private val _liquidRefraction = kotlinx.coroutines.flow.MutableStateFlow(0.5f)

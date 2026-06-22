@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -33,12 +35,13 @@ fun CodeSnippetItem(
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     val clipboardManager = LocalClipboardManager.current
+    var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     CanvasItemWrapper(
         position = codeBlock.position, width = codeBlock.width, height = codeBlock.height,
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
         isLocked = codeBlock.isLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
-        isFullyDraggable = false, // Critical so TextField works normally
+        isFullyDraggable = false, isChildDragging = isDragging, // Critical so TextField works normally
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
@@ -53,7 +56,9 @@ fun CodeSnippetItem(
                 modifier = Modifier.fillMaxWidth().height(28.dp).background(Color(0xFF2D2D2D))
                     .pointerInput(isLocked) {
                         detectDragGestures(
-                            onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                            onDragStart = { if (!isLocked) { onSelect(); isDragging = true } }, 
+                            onDragEnd = { if (!isLocked) { onSaveRequest(); isDragging = false } },
+                            onDragCancel = { if (!isLocked) { onSaveRequest(); isDragging = false } },
                             onDrag = { change, dragAmount -> 
                                 if (!isLocked) {
                                     change.consume()

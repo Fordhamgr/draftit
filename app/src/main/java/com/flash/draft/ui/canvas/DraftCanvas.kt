@@ -44,6 +44,10 @@ import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.SaveAlt
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -142,9 +146,12 @@ fun DraftCanvas(
     var selectedConnectorId by remember { mutableStateOf<String?>(null) }
     var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "")) }
 
-    var isDarkTheme by remember { mutableStateOf(false) }
+    val isDarkTheme by viewModel.isDarkMode.collectAsStateWithLifecycle(initialValue = false)
+    val isPerformanceMode by viewModel.isPerformanceMode.collectAsStateWithLifecycle(initialValue = false)
 
     var isScenesMenuOpen by remember { mutableStateOf(false) }
+    var isThreeDotsMenuOpen by remember { mutableStateOf(false) }
+    var isCanvasLocked by remember { mutableStateOf(false) }
     var sceneToExport by remember { mutableStateOf<com.flash.draft.model.Scene?>(null) }
 
     var isDrawMenuOpen by remember { mutableStateOf(false) }
@@ -172,6 +179,9 @@ fun DraftCanvas(
     val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle(initialValue = 0.5f)
     var isExportMenuOpen by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
+
+    val resScale = if (isPerformanceMode && !isExporting) 0.7f else 1f
+    val inverseScale = 1f / resScale
 
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -410,6 +420,42 @@ fun DraftCanvas(
         }
     }
 
+    val quickSave = {
+        coroutineScope.launch {
+            try {
+                isExporting = true
+                delay(100)
+                val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                isExporting = false
+                
+                val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(finalBitmap)
+                canvas.drawColor(android.graphics.Color.WHITE)
+                canvas.drawBitmap(swBitmap, 0f, 0f, null)
+
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "Draft_${System.currentTimeMillis()}.png")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/DraftIt")
+                }
+                
+                val uri = context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    }
+                    Toast.makeText(context, "Quick Saved to Gallery!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to create gallery entry.", Toast.LENGTH_SHORT).show()
+                }
+            } catch(e: Exception) {
+                isExporting = false
+                Toast.makeText(context, "Error saving picture.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val exportPdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) {
             coroutineScope.launch {
@@ -536,6 +582,7 @@ fun DraftCanvas(
 
     CompositionLocalProvider(
         LocalDarkTheme provides isDarkTheme,
+        com.flash.draft.ui.canvas.item.LocalPerformanceMode provides isPerformanceMode,
         LocalLiquidState provides liquidState,
         LocalLiquidRefraction provides liquidRefraction,
         LocalLiquidCurve provides liquidCurve
@@ -591,8 +638,8 @@ fun DraftCanvas(
                         }
                     }
                 }
-                .pointerInput(isDrawingMode, isLassoMode) {
-                    if (isDrawingMode || isLassoMode) {
+                .pointerInput(isDrawingMode, isLassoMode, isCanvasLocked) {
+                    if (!isCanvasLocked && (isDrawingMode || isLassoMode)) {
                         detectDragGestures(
                             onDragStart = { startPos ->
                                 if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, offset, scale)) }
@@ -745,16 +792,35 @@ fun DraftCanvas(
                         }
                     }
                 ) {
+                // Outer Box: Scales up the inner content
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = inverseScale
+                        scaleY = inverseScale
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    }
+                ) {
+                    // Inner Box: Render at lower resolution
                     Box(modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = offset.x
-                            translationY = offset.y
-                            scaleX = scale
-                            scaleY = scale
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                        }
+                        .fillMaxWidth(resScale)
+                        .fillMaxHeight(resScale)
+                        .then(
+                            if (isPerformanceMode && !isExporting) Modifier.graphicsLayer {
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                            } else Modifier
+                        )
                     ) {
+                        Box(modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = offset.x * resScale
+                                translationY = offset.y * resScale
+                                scaleX = scale * resScale
+                                scaleY = scale * resScale
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                            }
+                        ) {
                         CanvasBackgroundDrawPipeline(
                             elements = elements, scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
                             isDarkTheme = isDarkTheme
@@ -811,8 +877,11 @@ fun DraftCanvas(
                             lassoPath = lassoPath
                         )
                     }
-                }
+                    } // End inner resScale Box
+                } // End outer inverseScale Box
+            } // End RECORDING BACKGROUND drawWithContent Box
 
+            // --- 3. UI OVERLAYS (Outside the recording layer so UI doesn't get captured!) ---
             if (isUiVisible) {
 
                 // --- TOP LEFT ACTION BAR (BACK + UNDO/REDO + ZOOM) ---
@@ -828,21 +897,27 @@ fun DraftCanvas(
                                 }
                             }
                             
-                            // HORIZONTAL UNDO / REDO PILL
-                            LiquidGlassPill(
-                                shape = RoundedCornerShape(24.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = !isCanvasLocked,
+                                enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
+                                exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut()
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.height(48.dp)
+                                // HORIZONTAL UNDO / REDO PILL
+                                LiquidGlassPill(
+                                    shape = RoundedCornerShape(24.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                                 ) {
-                                    IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
-                                        Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
-                                    }
-                                    IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
-                                        Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.height(48.dp)
+                                    ) {
+                                        IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
+                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        }
+                                        IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
+                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        }
                                     }
                                 }
                             }
@@ -860,7 +935,7 @@ fun DraftCanvas(
                 }
                 
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = isZooming,
+                    visible = isZooming && !isCanvasLocked,
                     enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it },
                     exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it },
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
@@ -871,11 +946,12 @@ fun DraftCanvas(
                 }
                 
                 // CLICK OUTSIDE OVERLAY FOR ALL MENUS
-                if (isExportMenuOpen || isScenesMenuOpen || isInsertMenuOpen || (isDrawingMode && isDrawMenuOpen)) {
+                if (isExportMenuOpen || isScenesMenuOpen || isThreeDotsMenuOpen || isInsertMenuOpen || (isDrawingMode && isDrawMenuOpen)) {
                     Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                         detectTapGestures {
                             isExportMenuOpen = false
                             isScenesMenuOpen = false
+                            isThreeDotsMenuOpen = false
                             isInsertMenuOpen = false
                             isDrawMenuOpen = false
                             if (activeSubMenu == "CustomColor" || activeSubMenu == "Color" || activeSubMenu == "Thickness") {
@@ -890,11 +966,11 @@ fun DraftCanvas(
                     
                     // LEFT COLUMN: MORE OPTIONS (3 DOTS)
                     val threeDotsAlpha by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen) 1f else 0f,
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) 1f else 0f,
                         animationSpec = androidx.compose.animation.core.tween(200)
                     )
                     val threeDotsScale by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen) 1f else 0.8f,
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) 1f else 0.8f,
                         animationSpec = androidx.compose.animation.core.tween(200)
                     )
                     Box(
@@ -908,11 +984,37 @@ fun DraftCanvas(
                             }
                     ) {
                         LiquidGlassPill(
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(24.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            IconButton(onClick = { if (!isExportMenuOpen && !isScenesMenuOpen) { /* TODO: Open settings menu */ } }, modifier = Modifier.size(48.dp)) {
-                                Icon(Icons.Default.MoreHoriz, contentDescription = "More Options", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                                if (!isThreeDotsMenuOpen) {
+                                    IconButton(
+                                        onClick = { if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) isThreeDotsMenuOpen = true },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(Icons.Default.MoreHoriz, contentDescription = "More Options", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier.width(180.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { isCanvasLocked = true; isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Lock Canvas", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                            Icon(Icons.Default.Lock, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        }
+                                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { quickSave(); isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Quick Save", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                            Icon(Icons.Default.SaveAlt, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        }
+                                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { viewModel.clearCanvas(); isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Reset Canvas", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE53935))
+                                            Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -940,9 +1042,16 @@ fun DraftCanvas(
                             contentPadding = PaddingValues(0.dp)
                         ) {
                         Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
-                            if (!isExportMenuOpen) {
+                            if (isCanvasLocked) {
                                 IconButton(
-                                    onClick = { if (!isScenesMenuOpen) isExportMenuOpen = true },
+                                    onClick = { isCanvasLocked = false },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(Icons.Default.LockOpen, "Unlock", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                }
+                            } else if (!isExportMenuOpen) {
+                                IconButton(
+                                    onClick = { if (!isScenesMenuOpen && !isThreeDotsMenuOpen) isExportMenuOpen = true },
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(Icons.Default.IosShare, "Export", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
@@ -973,11 +1082,11 @@ fun DraftCanvas(
                     
                     // SCENES MENU (Morphing)
                     val scenesAlpha by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (!isExportMenuOpen) 1f else 0f,
+                        targetValue = if (!isExportMenuOpen && !isCanvasLocked) 1f else 0f,
                         animationSpec = androidx.compose.animation.core.tween(200)
                     )
                     val scenesScale by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (!isExportMenuOpen) 1f else 0.8f,
+                        targetValue = if (!isExportMenuOpen && !isCanvasLocked) 1f else 0.8f,
                         animationSpec = androidx.compose.animation.core.tween(200)
                     )
                     Box(
@@ -1035,7 +1144,7 @@ fun DraftCanvas(
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = showConnectorMenu && activeConnector != null,
+                    visible = showConnectorMenu && activeConnector != null && !isCanvasLocked,
                     enter = androidx.compose.animation.slideInVertically(
                         initialOffsetY = { 68 }, // Starts inside the main bottom nav bar
                         animationSpec = androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1075,6 +1184,11 @@ fun DraftCanvas(
                 }
 
                 // --- PREMIUM BOTTOM WORKSPACE BAR ---
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isCanvasLocked,
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut()
+                ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val activeMainTool = when {
                         isDrawingMode -> "Draw"
@@ -1225,6 +1339,7 @@ fun DraftCanvas(
                         )
                     }
                 }
+                } // END OF BOTTOM WORKSPACE BAR VISIBILITY
             } // END OF UI VISIBILITY BLOCK
         }
     }
