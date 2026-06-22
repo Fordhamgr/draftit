@@ -22,10 +22,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.ui.unit.sp
+import com.flash.draft.ui.canvas.item.LocalHapticFeedbackEnabled
 import io.github.fletchmckee.liquid.liquid
 
 @Composable
@@ -37,6 +41,8 @@ fun CanvasToolbar(
     onTaskListClick: () -> Unit, onAutoLayoutClick: () -> Unit, onUndoClick: () -> Unit, onRedoClick: () -> Unit,
     onThemeToggle: () -> Unit, onShareClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    val isHaptic = LocalHapticFeedbackEnabled.current
     var isExpanded by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(if (isExpanded) 1f else 0.8f, tween(250, easing = FastOutSlowInEasing), label = "scale")
@@ -96,7 +102,7 @@ fun CanvasToolbar(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { onClick(); isExpanded = false }
+                            .clickable { if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress); onClick(); isExpanded = false }
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -135,7 +141,7 @@ fun CanvasToolbar(
                 .background(if (isExpanded) activeTint else glassBg, CircleShape)
                 .border(1.dp, if (isExpanded) Color.Transparent else glassBorder, CircleShape)
                 .clip(CircleShape)
-                .clickable { isExpanded = !isExpanded },
+                .clickable { if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress); isExpanded = !isExpanded },
             contentAlignment = Alignment.Center
         ) {
             Icon(

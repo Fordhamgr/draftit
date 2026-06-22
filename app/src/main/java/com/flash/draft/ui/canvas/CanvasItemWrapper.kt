@@ -40,13 +40,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
+import com.flash.draft.ui.canvas.item.LocalPerformanceMode
+import com.flash.draft.ui.canvas.item.LocalHapticFeedbackEnabled
 import com.flash.draft.utils.ViewportMath
 import io.github.fletchmckee.liquid.liquid
 import kotlinx.coroutines.Job
@@ -87,6 +92,9 @@ fun CanvasItemWrapper(
     val animatedShadow by animateDpAsState(targetValue = if (isDragging) 24.dp else 4.dp, animationSpec = tween(150), label = "shadow")
     val animatedScale by animateFloatAsState(targetValue = if (isDragging) 1.02f else 1f, animationSpec = tween(150), label = "scale")
     val isDark = LocalDarkTheme.current
+    val isPerformance = LocalPerformanceMode.current
+    val isHaptic = LocalHapticFeedbackEnabled.current
+    val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current.density
     
     var isEditingLink by remember { mutableStateOf(false) }
@@ -133,9 +141,9 @@ fun CanvasItemWrapper(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect() } },
-                                onDragEnd = { isDragging = false; currentOnSaveRequest() },
-                                onDragCancel = { isDragging = false; currentOnSaveRequest() },
+                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) } },
+                                onDragEnd = { isDragging = false; currentOnSaveRequest(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                onDragCancel = { isDragging = false; currentOnSaveRequest(); if (isHaptic) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                                 onDrag = { change, dragAmount ->
                                     if (!isLocked && !isMultiTouch && !isZooming) {
                                         change.consume()
@@ -162,7 +170,7 @@ fun CanvasItemWrapper(
                 )
                 // -----------------------------------
 
-                .then(if (hasDefaultBackground) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
+                .then(if (hasDefaultBackground && !isPerformance) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
 
                 // IMPORTANT: The alpha is backgroundAlpha here so you can optionally see the liquid distortion through the card's background color!
                 .then(if (hasDefaultBackground) Modifier.background(if (isDark) Color(0xFF1E1E1E).copy(alpha = backgroundAlpha) else Color.White.copy(alpha = backgroundAlpha), RoundedCornerShape(12.dp)) else Modifier)
@@ -224,7 +232,7 @@ fun CanvasItemWrapper(
                     Row(
                         modifier = Modifier
                             .wrapContentSize()
-                            .shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                            .then(if (!isPerformance) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
                             .then(
                                 if (LocalLiquidState.current != null) {
                                     val currentRefraction = LocalLiquidRefraction.current
@@ -277,7 +285,7 @@ fun CanvasItemWrapper(
                         androidx.compose.animation.AnimatedVisibility(visible = isEditingLink) {
                             Box(
                                 modifier = Modifier
-                                    .shadow(16.dp, RoundedCornerShape(12.dp))
+                                    .then(if (!isPerformance) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier)
                                     .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(12.dp))
                                     .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(12.dp))
                                     .padding(8.dp)

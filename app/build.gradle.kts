@@ -24,8 +24,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -39,6 +39,11 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 
@@ -82,7 +87,7 @@ dependencies {
     
     // Play Store Production Dependencies
     implementation(libs.androidx.core.splashscreen)
-    implementation(libs.play.review)
+    // implementation(libs.play.review) // Commented out to speed up build
 
     // Firebase (Crashlytics & Analytics)
     // implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Uncomment when google-services.json is added

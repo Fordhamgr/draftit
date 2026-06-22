@@ -30,8 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.flash.draft.model.CanvasElement
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
+import com.flash.draft.ui.canvas.item.LocalPerformanceMode
 
 @Composable
 fun ImageItem(
@@ -105,9 +108,22 @@ fun ImageItem(
             }
         }
     ) { isLocked ->
+        val context = LocalContext.current
+        val isPerformance = LocalPerformanceMode.current
+        val imageRequest = androidx.compose.runtime.remember(imageCard.uriString, isPerformance) {
+            ImageRequest.Builder(context)
+                .data(imageCard.uriString)
+                .apply {
+                    if (isPerformance) {
+                        size(800) // Lower resolution for preview
+                    }
+                }
+                .build()
+        }
+
         // --- APPLY THE TRANSFORMS TO THE IMAGE ---
         AsyncImage(
-            model = imageCard.uriString,
+            model = imageRequest,
             contentDescription = "Canvas Image",
             contentScale = ContentScale.Fit, // Or Crop if they prefer the card filled
             modifier = Modifier

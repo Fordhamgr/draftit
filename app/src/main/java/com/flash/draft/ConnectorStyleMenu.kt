@@ -38,6 +38,9 @@ import com.flash.draft.ui.canvas.LocalLiquidRefraction
 import com.flash.draft.ui.canvas.LocalLiquidCurve
 import io.github.fletchmckee.liquid.liquid
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 
 @Composable
 fun PremiumSegmentedControl(options: List<String>, selectedOption: String, onOptionSelected: (String) -> Unit, isDark: Boolean) {
@@ -116,7 +119,7 @@ fun ConnectorStyleMenu(
     connector: CanvasElement.Connector,
     onUpdate: (CanvasElement.Connector) -> Unit,
     onDelete: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit = {}
 ) {
     val isDark = LocalDarkTheme.current
     val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
@@ -132,8 +135,12 @@ fun ConnectorStyleMenu(
     
     var isColorPickerExpanded by remember { mutableStateOf(false) }
 
+    val configuration = LocalConfiguration.current
+    val maxDockWidth = configuration.screenWidthDp.dp - 32.dp
+
     Box(
         modifier = Modifier
+            .widthIn(max = maxDockWidth)
             .height(dockHeight)
             .shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f))
             .then(
@@ -148,7 +155,11 @@ fun ConnectorStyleMenu(
             .clip(pillShape)
     ) {
         Row(
-            modifier = Modifier.fillMaxHeight().padding(horizontal = 8.dp).animateContentSize(animationSpec = tween(300)),
+            modifier = Modifier
+                .fillMaxHeight()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .animateContentSize(animationSpec = tween(300)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -193,6 +204,9 @@ fun ConnectorStyleMenu(
             // Vertical Divider
             Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
 
+            val dashedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f) }
+            val dottedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 10f), 0f) }
+
             // Line Style Options
             val lineStyleOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
                 "Solid" to { color ->
@@ -204,13 +218,13 @@ fun ConnectorStyleMenu(
                 "Dashed" to { color ->
                     androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
                         val stroke = 2.dp.toPx()
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f))
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = dashedEffect)
                     }
                 },
                 "Dotted" to { color ->
                     androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
                         val stroke = 2.dp.toPx()
-                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 10f), 0f))
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(2.dp.toPx(), size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 2.dp.toPx(), size.height/2), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = dottedEffect)
                     }
                 }
             )
@@ -248,17 +262,6 @@ fun ConnectorStyleMenu(
                     .clip(CircleShape)
             ) {
                 Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(20.dp))
-            }
-
-            // Close
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(if (isDark) Color(0x33000000) else Color(0x0D000000), CircleShape)
-                    .clip(CircleShape)
-            ) {
-                Icon(painterResource(id = LucideR.drawable.lucide_ic_x), "Close", tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(20.dp))
             }
         }
     }

@@ -12,6 +12,9 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
+// Synchronization lock to prevent AtomicFile concurrent writes
+private val saveLock = Any()
+
 class NoteRepository(context: Context) {
     // We now save to a dedicated "projects" folder inside filesDir
     private val projectsDir = File(context.filesDir, "projects")
@@ -172,9 +175,15 @@ class NoteRepository(context: Context) {
     fun saveElements(projectId: String, elements: List<CanvasElement>) {
         val start = System.nanoTime()
         val file = File(projectsDir, "$projectId.json")
-        val jsonArray = JSONArray()
-        elements.forEach { element ->
-            val jsonObject = JSONObject()
+        synchronized(saveLock) {
+            val atomicFile = AtomicFile(file)
+            var stream: FileOutputStream? = null
+            try {
+                stream = atomicFile.startWrite()
+                val writer = java.io.OutputStreamWriter(stream, "UTF-8").buffered()
+                writer.write("[")
+                elements.forEachIndexed { index, element ->
+                    val jsonObject = JSONObject()
             jsonObject.put("id", element.id)
             element.hyperlinkTarget?.let { jsonObject.put("hyperlinkTarget", it) }
 
@@ -313,22 +322,21 @@ class NoteRepository(context: Context) {
                     }
                     jsonObject.put("tasks", tasksArray)
                 }
-            }
-            jsonArray.put(jsonObject)
-        }
-        val atomicFile = AtomicFile(file)
-        var stream: FileOutputStream? = null
-        try {
-            stream = atomicFile.startWrite()
-            stream.write(jsonArray.toString().toByteArray())
+                } // end when
+                writer.write(jsonObject.toString())
+                if (index < elements.size - 1) writer.write(",")
+            } // end forEachIndexed
+            writer.write("]")
+            writer.flush()
             atomicFile.finishWrite(stream)
             val elapsed = (System.nanoTime() - start) / 1_000_000f
-            android.util.Log.d("DraftDataSync", "saveElements: Saved ${elements.size} elements to $projectId.json in ${String.format("%.2f", elapsed)}ms")
+            android.util.Log.d("DraftDataSync", "saveElements: Streamed ${elements.size} elements to $projectId.json in ${String.format("%.2f", elapsed)}ms")
         } catch (e: Exception) {
             if (stream != null) atomicFile.failWrite(stream)
             android.util.Log.e("DraftDataSync", "saveElements FAILED for $projectId", e)
             e.printStackTrace()
         }
+        } // end synchronized
     }
 
     fun loadElements(projectId: String): List<CanvasElement> {

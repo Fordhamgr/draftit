@@ -21,6 +21,7 @@ data class CanvasState(
 
 class CanvasViewModel(
     private val repository: NoteRepository,
+    private val settingsRepo: com.flash.draft.data.SettingsRepository,
     val projectId: String // <--- NEW: The Brain now knows WHICH board it is managing!
 ) : ViewModel() {
 
@@ -32,23 +33,15 @@ class CanvasViewModel(
 
     private val undoStack = ArrayDeque<CanvasState>()
     private val redoStack = ArrayDeque<CanvasState>()
-    private val maxHistorySize = 20
+    private var maxHistorySize = 50 // Will be updated by settings
 
     private var saveJob: Job? = null
 
-    init {
-        // Crash Recovery: Instantly load THIS specific project when the Canvas boots
-        viewModelScope.launch(Dispatchers.IO) {
-            val savedData = repository.loadElements(projectId) // <--- Updated
-            _elements.value = savedData
-            val savedScenes = repository.loadScenes(projectId)
-            _scenes.value = savedScenes
-        }
-    }
+
 
     private fun pushToUndoStack() {
         undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
-        if (undoStack.size > maxHistorySize) undoStack.removeFirst()
+        while (undoStack.size > maxHistorySize) undoStack.removeFirst()
         redoStack.clear()
     }
 
@@ -145,6 +138,35 @@ class CanvasViewModel(
 
     fun getRawProjectJson(): String? {
         return repository.getRawJson(projectId)
+    }
+
+    init {
+        // Crash Recovery: Instantly load THIS specific project when the Canvas boots
+        viewModelScope.launch(Dispatchers.IO) {
+            val savedData = repository.loadElements(projectId) // <--- Updated
+            _elements.value = savedData
+            val savedScenes = repository.loadScenes(projectId)
+            _scenes.value = savedScenes
+        }
+
+        // Observe Settings
+        viewModelScope.launch {
+            settingsRepo.getUndoHistoryLimitFlow().collect { limit ->
+                maxHistorySize = limit
+                while (undoStack.size > maxHistorySize) undoStack.removeFirst()
+                while (redoStack.size > maxHistorySize) redoStack.removeFirst()
+            }
+        }
+        viewModelScope.launch {
+            settingsRepo.getLiquidCurveFlow().collect { level ->
+                setLiquidCurve(level)
+            }
+        }
+        viewModelScope.launch {
+            settingsRepo.getLiquidRefractionFlow().collect { level ->
+                setLiquidRefraction(level)
+            }
+        }
     }
 
     // Removed exportPaginatedPdf

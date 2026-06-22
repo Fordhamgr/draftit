@@ -7,6 +7,9 @@ import kotlin.math.abs
 import kotlin.math.min
 
 val LocalDarkTheme = compositionLocalOf { false }
+val LocalPerformanceMode = compositionLocalOf { false }
+val LocalCameraScaleProvider = compositionLocalOf<() -> Float> { { 1f } }
+val LocalHapticFeedbackEnabled = compositionLocalOf { true }
 
 fun getAdaptiveColor(originalColor: Color, isDark: Boolean): Color {
     return when {
