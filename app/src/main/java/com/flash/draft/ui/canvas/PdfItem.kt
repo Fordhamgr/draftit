@@ -63,7 +63,7 @@ fun PdfItem(
         }
     ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color.White.copy(alpha = 0.65f)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(Color.White), contentAlignment = Alignment.Center) {
                 Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = "PDF", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(48.dp))
             }
             Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1B3D34).copy(alpha = 0.8f)).padding(horizontal = 12.dp, vertical = 8.dp)) {

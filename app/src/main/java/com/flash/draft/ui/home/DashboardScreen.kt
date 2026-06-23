@@ -175,7 +175,7 @@ fun DashboardScreen(
                 .fillMaxWidth(0.9f)
                 .align(Alignment.TopCenter)
         ) {
-            Spacer(modifier = Modifier.fillMaxWidth().aspectRatio(10f)) // dynamic spacer roughly 10% of width
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Premium Header
             Row(
@@ -230,7 +230,7 @@ fun DashboardScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.fillMaxWidth().aspectRatio(20f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             val screenWidth = LocalConfiguration.current.screenWidthDp
             val dynamicColumns = if (screenWidth >= 600) 4 else 2

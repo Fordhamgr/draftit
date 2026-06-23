@@ -1180,7 +1180,7 @@ fun DraftCanvas(
                         targetOffsetY = { 68 },
                         animationSpec = androidx.compose.animation.core.tween(250, easing = androidx.compose.animation.core.FastOutSlowInEasing)
                     ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)),
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp)
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
                 ) {
                     if (activeConnector != null) {
                         val isEditingExisting = selectedConnectorId != null
@@ -1286,8 +1286,13 @@ fun DraftCanvas(
                     }
 
                     Box(modifier = Modifier.align(Alignment.BottomCenter).zIndex(2f)) {
-                        BottomNavBar(
-                            activeTool = activeMainTool,
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = !(showConnectorMenu && activeConnector != null && !isCanvasLocked),
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { 50 }),
+                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(targetOffsetY = { 50 })
+                        ) {
+                            BottomNavBar(
+                                activeTool = activeMainTool,
                             onToolSelect = { tool ->
                                 deselectAll()
                                 isDrawMenuOpen = false // Close menu when switching tools
@@ -1331,6 +1336,7 @@ fun DraftCanvas(
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },
+                            forceCenter = showConnectorMenu && activeConnector != null && !isCanvasLocked,
                             dynamicLeftContent = {
                                 AnimatedContent(
                                     targetState = isDrawMenuOpen to activeSubMenu,
@@ -1344,7 +1350,7 @@ fun DraftCanvas(
                                         Box(
                                             modifier = Modifier
                                                 .size(24.dp)
-                                                .background(activeDrawColor, CircleShape)
+                                                .background(com.flash.draft.ui.canvas.item.getAdaptiveColor(activeDrawColor, isDarkTheme), CircleShape)
                                                 .border(2.dp, if (isDarkTheme) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f), CircleShape)
                                         )
                                     } else {
@@ -1357,13 +1363,14 @@ fun DraftCanvas(
                                                 else -> Icons.Default.Brush
                                             },
                                             contentDescription = "Draw Menu",
-                                            tint = if (isOpen) (if (isDarkTheme) Color.White else Color.Black) else activeDrawColor,
+                                            tint = if (isOpen) (if (isDarkTheme) Color.White else Color.Black) else com.flash.draft.ui.canvas.item.getAdaptiveColor(activeDrawColor, isDarkTheme),
                                             modifier = Modifier.size(28.dp)
                                         )
                                     }
                                 }
                             }
                         )
+                        }
                     }
                 }
                 } // END OF BOTTOM WORKSPACE BAR VISIBILITY

@@ -80,7 +80,10 @@ fun CanvasBackgroundDrawPipeline(
                         val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
                         val drawStroke = connector.strokeWidth
 
-                        if (isSelected) drawLine(color = Color.Blue.copy(alpha = 0.2f), start = start, end = end, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
+                        if (isSelected) {
+                            val highlightColor = if (isDarkTheme) Color(0xFF64B5F6).copy(alpha = 0.5f) else Color.Blue.copy(alpha = 0.2f)
+                            drawLine(color = highlightColor, start = start, end = end, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
+                        }
                         
                         val effect = when (connector.lineStyle) {
                             "Dashed" -> dashedEffect

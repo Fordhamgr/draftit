@@ -135,7 +135,7 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isLocked && !isMultiTouch && !isZooming) currentOnSelect() }) }
+                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) currentOnSelect() }) }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {

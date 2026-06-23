@@ -74,10 +74,9 @@ fun SettingsScreen(
                     .fillMaxHeight()
                     .widthIn(max = 600.dp)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp)
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
             ) {
-                item { Spacer(modifier = Modifier.height(16.dp)) }
-
                 item {
                     SettingsGroup(title = "APPEARANCE", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
                         ToggleRow(

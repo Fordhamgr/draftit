@@ -51,7 +51,8 @@ fun BottomNavBar(
     onCodeClick: () -> Unit,
     onAudioClick: () -> Unit,
     onTaskClick: () -> Unit,
-    onNoteClick: () -> Unit
+    onNoteClick: () -> Unit,
+    forceCenter: Boolean = false
 ) {
     val isDark = LocalDarkTheme.current
     val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
@@ -66,9 +67,9 @@ fun BottomNavBar(
     val dockHeight = 68.dp
     val pillShape = RoundedCornerShape(percent = 50)
 
-    // Smoothly pushes the main dock right when the dynamic pill appears
+    // Smoothly pushes the main dock right when the dynamic pill appears or if forced to center
     val startPadding by animateDpAsState(
-        targetValue = if (showDynamicLeft) 84.dp else 0.dp,
+        targetValue = if (showDynamicLeft || forceCenter) 84.dp else 0.dp,
         animationSpec = tween(300),
         label = "dockSlide"
     )

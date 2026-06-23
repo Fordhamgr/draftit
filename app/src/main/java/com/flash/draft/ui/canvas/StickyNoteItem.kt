@@ -92,7 +92,7 @@ fun StickyNoteItem(
             }
         }
     ) { isLocked ->
-        Column(modifier = Modifier.fillMaxSize().background(getAdaptiveColor(note.color, LocalDarkTheme.current))) {
+        Column(modifier = Modifier.fillMaxSize().background(note.color)) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(32.dp).background(Color.Black.copy(alpha = 0.1f))
                     .pointerInput(isLocked) {
@@ -116,7 +116,7 @@ fun StickyNoteItem(
                 enabled = isSelected,
                 onValueChange = { onUpdate(note.copy(text = it)); onSaveRequest() },
                 modifier = Modifier.fillMaxSize().padding(8.dp).onFocusChanged { if (it.isFocused) onSelect() },
-                textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = note.fontSize.sp, fontFamily = currentFont, color = getAdaptiveColor(Color.Black, LocalDarkTheme.current)))
+                textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = note.fontSize.sp, fontFamily = currentFont, color = Color.Black))
             )
         }
     }

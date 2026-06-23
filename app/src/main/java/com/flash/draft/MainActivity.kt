@@ -134,17 +134,17 @@ class MainActivity : ComponentActivity() {
                                     repository = repo,
                                     isDarkTheme = isDarkMode,
                                     onProjectClick = { projectId ->
-                                        navController.navigate("canvas/$projectId")
+                                        navController.navigate("canvas/$projectId") { launchSingleTop = true }
                                     },
                                     onCreateNewProject = { title ->
                                         val newProjectId = repo.createNewProject(title)
-                                        navController.navigate("canvas/$newProjectId")
+                                        navController.navigate("canvas/$newProjectId") { launchSingleTop = true }
                                     },
                                     onNavigateToAbout = {
-                                        navController.navigate("about")
+                                        navController.navigate("about") { launchSingleTop = true }
                                     },
                                     onNavigateToSettings = {
-                                        navController.navigate("settings")
+                                        navController.navigate("settings") { launchSingleTop = true }
                                     }
                                 )
                             }
@@ -156,13 +156,13 @@ class MainActivity : ComponentActivity() {
                                 )
                                 com.flash.draft.ui.settings.SettingsScreen(
                                     viewModel = settingsViewModel,
-                                    onBack = { navController.popBackStack() }
+                                    onBack = { navController.navigateUp() }
                                 )
                             }
 
                             // ROUTE: About Screen
                             composable("about") {
-                                AboutScreen(isDarkTheme = isDarkMode, onBack = { navController.popBackStack() })
+                                AboutScreen(isDarkTheme = isDarkMode, onBack = { navController.navigateUp() })
                             }
 
                             // ROUTE 2: The Infinite Canvas
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
 
                                 DraftCanvas(
                                     viewModel = canvasViewModel,
-                                    onBack = { navController.popBackStack() },
+                                    onBack = { navController.navigateUp() },
                                     onNavigateToBoard = { boardId -> navController.navigate("canvas/$boardId") }
                                 )
                             }
