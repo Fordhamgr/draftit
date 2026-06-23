@@ -105,6 +105,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 // Global Composition Locals
 val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
@@ -127,17 +128,17 @@ fun DraftCanvas(
     var renderOffset by remember { mutableStateOf(Offset.Zero) }
     val framerate by viewModel.framerate.collectAsStateWithLifecycle(initialValue = 60)
 
-    androidx.compose.runtime.LaunchedEffect(framerate) {
+    LaunchedEffect(framerate) {
         if (framerate in 1..119) {
             val delayMillis = 1000L / framerate
             while (true) {
                 renderScale = scale
                 renderOffset = offset
-                kotlinx.coroutines.delay(delayMillis)
+                delay(delayMillis.milliseconds)
             }
         } else {
             // Unlocked (0) or 120Hz native - just continuous sync via snapshotFlow
-            androidx.compose.runtime.snapshotFlow { Pair(scale, offset) }.collect { (s, o) ->
+            snapshotFlow { Pair(scale, offset) }.collect { (s, o) ->
                 renderScale = s
                 renderOffset = o
             }
@@ -200,7 +201,6 @@ fun DraftCanvas(
         }
     }
     SideEffect {
-        val elapsed = (System.nanoTime() - recomposeStart) / 1_000_000f
         com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount++
     }
     
@@ -226,7 +226,7 @@ fun DraftCanvas(
                     val totalCpu = avgBg + avgFg
                     val totalCalls = com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount + com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount
                     
-                    com.flash.draft.utils.DraftLogger.logUi("CanvasProfiler", "FPS: $frameCount | MaxFrame: ${String.format("%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format("%.2f", totalCpu)}ms (BG: ${String.format("%.2f", avgBg)}, FG: ${String.format("%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
+                    com.flash.draft.utils.DraftLogger.logUi("CanvasProfiler", "FPS: $frameCount | MaxFrame: ${String.format(java.util.Locale.US, "%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format(java.util.Locale.US, "%.2f", totalCpu)}ms (BG: ${String.format(java.util.Locale.US, "%.2f", avgBg)}, FG: ${String.format(java.util.Locale.US, "%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
                     
                     frameCount = 0
                     maxFrameDelta = 0f
@@ -259,7 +259,7 @@ fun DraftCanvas(
             androidx.compose.animation.core.animate(
                 initialValue = 0f, 
                 targetValue = 1f, 
-                animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
             ) { progress, _ ->
                 scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
                 offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
@@ -267,6 +267,7 @@ fun DraftCanvas(
         }
     }
 
+    @Suppress("unused")
     fun zoomToFit() {
         panJob?.cancel()
         if (elements.isEmpty()) return
@@ -299,7 +300,7 @@ fun DraftCanvas(
             androidx.compose.animation.core.animate(
                 initialValue = 0f, 
                 targetValue = 1f, 
-                animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
             ) { progress, _ ->
                 scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
                 offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
@@ -389,7 +390,7 @@ fun DraftCanvas(
                     repo.exportProject(context, viewModel.projectId, stream)
                 }
                 Toast.makeText(context, "Project exported successfully!", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(context, "Error exporting project.", Toast.LENGTH_SHORT).show()
             }
             isExportMenuOpen = false
@@ -401,12 +402,12 @@ fun DraftCanvas(
             coroutineScope.launch {
                 try {
                     isExporting = true
-                    delay(100) // Allow recomposition and drawWithContent to record the layer
+                    delay(100.milliseconds) // Allow recomposition and drawWithContent to record the layer
                     val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
                     isExporting = false
                     
                     val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                    val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val finalBitmap = androidx.core.graphics.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
                     val canvas = android.graphics.Canvas(finalBitmap)
                     canvas.drawColor(android.graphics.Color.WHITE)
                     canvas.drawBitmap(swBitmap, 0f, 0f, null)
@@ -415,7 +416,7 @@ fun DraftCanvas(
                         finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
                     }
                     Toast.makeText(context, "Picture exported successfully!", Toast.LENGTH_SHORT).show()
-                } catch(e: Exception) {
+                } catch(_: Exception) {
                     isExporting = false
                     Toast.makeText(context, "Error exporting picture.", Toast.LENGTH_SHORT).show()
                 }
@@ -426,7 +427,7 @@ fun DraftCanvas(
 
     // Take a background snapshot when the user is idle for 2 seconds
     LaunchedEffect(elementsState, renderScale, renderOffset) {
-        kotlinx.coroutines.delay(2000)
+        delay(2000.milliseconds)
         try {
             val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
             val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
@@ -451,12 +452,12 @@ fun DraftCanvas(
         coroutineScope.launch {
             try {
                 isExporting = true
-                delay(100)
+                delay(100.milliseconds)
                 val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
                 isExporting = false
                 
                 val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+                val finalBitmap = androidx.core.graphics.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(finalBitmap)
                 canvas.drawColor(android.graphics.Color.WHITE)
                 canvas.drawBitmap(swBitmap, 0f, 0f, null)
@@ -476,7 +477,7 @@ fun DraftCanvas(
                 } else {
                     Toast.makeText(context, "Failed to create gallery entry.", Toast.LENGTH_SHORT).show()
                 }
-            } catch(e: Exception) {
+            } catch(_: Exception) {
                 isExporting = false
                 Toast.makeText(context, "Error saving picture.", Toast.LENGTH_SHORT).show()
             }

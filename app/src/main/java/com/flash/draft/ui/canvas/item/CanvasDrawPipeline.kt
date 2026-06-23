@@ -93,7 +93,7 @@ fun CanvasBackgroundDrawPipeline(
 
                         // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
                         // Far faster than setShadowLayer because it entirely bypasses the GPU's Gaussian rasterization pass.
-                        if (!isPerformanceMode) {
+                        if (!isPerformanceMode && !isDarkTheme) {
                             drawLine(color = shadowColor.copy(alpha = 0.08f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
                         }
                         
@@ -120,7 +120,7 @@ fun CanvasBackgroundDrawPipeline(
                                     sharedPath.lineTo(tip.x, tip.y)
                                     sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
                                     
-                                    if (!isPerformanceMode) {
+                                    if (!isPerformanceMode && !isDarkTheme) {
                                         withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
                                             drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Stroke(width = drawStroke + 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                                         }
@@ -146,7 +146,7 @@ fun CanvasBackgroundDrawPipeline(
                                         sharedPath.close()
                                     }
                                     
-                                    if (!isPerformanceMode) {
+                                    if (!isPerformanceMode && !isDarkTheme) {
                                         withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
                                             drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Fill)
                                         }
@@ -155,7 +155,7 @@ fun CanvasBackgroundDrawPipeline(
                                 }
                                 "Circle" -> {
                                     val center = Offset(tip.x - (arrowLen / 2) * cosAng, tip.y - (arrowLen / 2) * sinAng)
-                                    if (!isPerformanceMode) {
+                                    if (!isPerformanceMode && !isDarkTheme) {
                                         drawCircle(color = shadowColor.copy(alpha = 0.08f), radius = (arrowLen / 2) + 4f, center = center + shadowOffset)
                                     }
                                     drawCircle(color = drawColor, radius = arrowLen / 2, center = center)

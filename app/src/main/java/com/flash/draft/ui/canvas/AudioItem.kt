@@ -73,7 +73,12 @@ fun AudioItem(
         val file = File(context.cacheDir, "audio_${UUID.randomUUID()}.m4a")
 
         // 2. Initialize the recorder with high-res settings
-        val newRecorder = android.media.MediaRecorder().apply {
+        recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.media.MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            android.media.MediaRecorder()
+        }.apply {
             setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
 
             setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
@@ -86,7 +91,7 @@ fun AudioItem(
             start()
         }
 
-        recorder = newRecorder
+
         onUpdate(audioNote.copy(audioPath = file.absolutePath, isRecording = true))
 
         recordingSeconds = 0

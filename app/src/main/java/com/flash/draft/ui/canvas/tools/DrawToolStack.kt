@@ -90,7 +90,7 @@ fun DrawToolStack(
         Box(
             modifier = Modifier
                 .height(dockHeight)
-                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = RoundedCornerShape(percent = 50)

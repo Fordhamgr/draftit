@@ -51,7 +51,7 @@ fun DrawColorMenu(
         Box(
             modifier = Modifier
                 .height(68.dp) // Perfect match to parent
-                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = pillShape

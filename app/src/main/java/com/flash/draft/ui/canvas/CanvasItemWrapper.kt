@@ -169,7 +169,7 @@ fun CanvasItemWrapper(
                 )
                 // -----------------------------------
 
-                .then(if (hasDefaultBackground && !isPerformance) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
+                .then(if (hasDefaultBackground && !isPerformance && !isDark) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
 
                 // IMPORTANT: The alpha is backgroundAlpha here so you can optionally see the liquid distortion through the card's background color!
                 .then(if (hasDefaultBackground) Modifier.background(if (isDark) Color(0xFF1E1E1E).copy(alpha = backgroundAlpha) else Color.White.copy(alpha = backgroundAlpha), RoundedCornerShape(12.dp)) else Modifier)
@@ -231,7 +231,7 @@ fun CanvasItemWrapper(
                     Row(
                         modifier = Modifier
                             .wrapContentSize()
-                            .then(if (!isPerformance) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
+                            .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
                             .then(
                                 if (LocalLiquidState.current != null && !isPerformance) {
                                     val currentRefraction = LocalLiquidRefraction.current
@@ -284,7 +284,7 @@ fun CanvasItemWrapper(
                         androidx.compose.animation.AnimatedVisibility(visible = isEditingLink) {
                             Box(
                                 modifier = Modifier
-                                    .then(if (!isPerformance) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier)
+                                    .then(if (!isPerformance && !isDark) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier)
                                     .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(12.dp))
                                     .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(12.dp))
                                     .padding(8.dp)

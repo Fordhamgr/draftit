@@ -93,7 +93,7 @@ fun BottomNavBar(
             Box(
                 modifier = Modifier
                     .size(dockHeight)
-                    .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; shape = CircleShape
@@ -124,7 +124,7 @@ fun BottomNavBar(
                     .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
                     .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
                     .height(dockHeight)
-                    .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
@@ -154,7 +154,7 @@ fun BottomNavBar(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .then(if (isPerformance) Modifier else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
+                .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; shape = popoverShape

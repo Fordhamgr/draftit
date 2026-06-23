@@ -47,7 +47,7 @@ fun LiquidGlassPill(
 
     Box(
         modifier = modifier
-            .then(if (isPerformanceMode) Modifier else Modifier.shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f)))
+            .then(if (isPerformanceMode || isDark) Modifier else Modifier.shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f)))
             .then(liquidModifier)
             .background(glassBg, shape)
             .border(1.dp, glassBorder, shape)
