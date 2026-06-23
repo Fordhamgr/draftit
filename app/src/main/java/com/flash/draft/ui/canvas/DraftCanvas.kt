@@ -121,6 +121,29 @@ fun DraftCanvas(
     var lastZoomTime by remember { mutableLongStateOf(0L) }
     var isZooming by remember { mutableStateOf(false) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    
+    // Decoupled Rendering State (for custom FPS limiter that preserves touch sampling)
+    var renderScale by remember { mutableFloatStateOf(0.7f) }
+    var renderOffset by remember { mutableStateOf(Offset.Zero) }
+    val framerate by viewModel.framerate.collectAsStateWithLifecycle(initialValue = 60)
+
+    androidx.compose.runtime.LaunchedEffect(framerate) {
+        if (framerate in 1..119) {
+            val delayMillis = 1000L / framerate
+            while (true) {
+                renderScale = scale
+                renderOffset = offset
+                kotlinx.coroutines.delay(delayMillis)
+            }
+        } else {
+            // Unlocked (0) or 120Hz native - just continuous sync via snapshotFlow
+            androidx.compose.runtime.snapshotFlow { Pair(scale, offset) }.collect { (s, o) ->
+                renderScale = s
+                renderOffset = o
+            }
+        }
+    }
+
     var centerX by remember { mutableFloatStateOf(0f) }
     var centerY by remember { mutableFloatStateOf(0f) }
     var selectedNoteId by remember { mutableStateOf<String?>(null) }
@@ -564,7 +587,7 @@ fun DraftCanvas(
 
     CompositionLocalProvider(
         LocalDarkTheme provides isDarkTheme,
-        com.flash.draft.ui.canvas.item.LocalPerformanceMode provides isPerformanceMode,
+        com.flash.draft.ui.canvas.item.LocalPerformanceMode provides (isPerformanceMode && !isExporting),
         LocalLiquidState provides liquidState,
         LocalLiquidRefraction provides liquidRefraction,
         LocalLiquidCurve provides liquidCurve
@@ -798,10 +821,10 @@ fun DraftCanvas(
                         Box(modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                translationX = offset.x * resScale
-                                translationY = offset.y * resScale
-                                scaleX = scale * resScale
-                                scaleY = scale * resScale
+                                translationX = renderOffset.x * resScale
+                                translationY = renderOffset.y * resScale
+                                scaleX = renderScale * resScale
+                                scaleY = renderScale * resScale
                                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                             }
                         ) {
@@ -849,8 +872,8 @@ fun DraftCanvas(
 
                         CanvasForegroundDrawPipeline(
                             elements = elements,
-                            cameraScaleProvider = { scale },
-                            cameraOffsetProvider = { offset },
+                            cameraOffsetProvider = { renderOffset },
+                            cameraScaleProvider = { renderScale },
                             isDarkTheme = isDarkTheme,
                             selectedGroupIds = selectedGroupIds,
                             currentDrawingPath = currentDrawingPath,

@@ -90,29 +90,7 @@ class MainActivity : ComponentActivity() {
             val framerate by settingsRepo.getFramerateFlow().collectAsStateWithLifecycle(initialValue = 60)
             val isHapticFeedbackEnabled by settingsRepo.getHapticFeedbackFlow().collectAsStateWithLifecycle(initialValue = true)
             
-            androidx.compose.runtime.LaunchedEffect(framerate, isPerformanceMode) {
-                val params = window.attributes
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    val currentDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        display
-                    } else {
-                        @Suppress("DEPRECATION")
-                        windowManager.defaultDisplay
-                    }
-                    if (currentDisplay != null) {
-                        if (framerate > 0 && !isPerformanceMode) {
-                            val modes = currentDisplay.supportedModes
-                            val mode = modes.minByOrNull { kotlin.math.abs(it.refreshRate - framerate.toFloat()) }
-                            params.preferredDisplayModeId = mode?.modeId ?: 0
-                        } else {
-                            val modes = currentDisplay.supportedModes
-                            val maxMode = modes.maxByOrNull { it.refreshRate }
-                            params.preferredDisplayModeId = maxMode?.modeId ?: 0
-                        }
-                        window.attributes = params
-                    }
-                }
-            }
+
 
             // Override the MaterialTheme color scheme based on user setting
             val colorScheme = if (isDarkMode) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme()

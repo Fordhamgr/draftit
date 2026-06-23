@@ -169,7 +169,10 @@ fun BottomNavBar(
                 Box(
                     modifier = Modifier
                         .size(dockHeight)
-                        .clickable { onAddClick() },
+                        .clickable(
+                            interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onAddClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -194,7 +197,10 @@ fun BottomNavBar(
                         modifier = Modifier
                             .size(dockHeight)
                             .clip(CircleShape)
-                            .clickable { onAddClick() },
+                            .clickable(
+                                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { onAddClick() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -230,7 +236,10 @@ private fun DockItem(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(percent = 50))
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
     ) {
         Box(
             modifier = Modifier

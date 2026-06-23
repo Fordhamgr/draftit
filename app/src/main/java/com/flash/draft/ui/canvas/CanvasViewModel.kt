@@ -54,7 +54,9 @@ class CanvasViewModel(
 
     private fun pushToUndoStack() {
         undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
-        while (undoStack.size > maxHistorySize) undoStack.removeFirst()
+        if (maxHistorySize > 0) {
+            while (undoStack.size > maxHistorySize) undoStack.removeFirst()
+        }
         redoStack.clear()
     }
 
@@ -161,6 +163,12 @@ class CanvasViewModel(
     fun setLiquidFrost(value: Float) { _liquidFrost.value = value }
     fun setLiquidDispersion(value: Float) { _liquidDispersion.value = value }
 
+    val framerate: kotlinx.coroutines.flow.StateFlow<Int> = settingsRepo.getFramerateFlow().stateIn(
+        scope = viewModelScope,
+        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initialValue = 60
+    )
+
     fun getRawProjectJson(): String? {
         return repository.getRawJson(projectId)
     }
@@ -178,8 +186,10 @@ class CanvasViewModel(
         viewModelScope.launch {
             settingsRepo.getUndoHistoryLimitFlow().collect { limit ->
                 maxHistorySize = limit
-                while (undoStack.size > maxHistorySize) undoStack.removeFirst()
-                while (redoStack.size > maxHistorySize) redoStack.removeFirst()
+                if (maxHistorySize > 0) {
+                    while (undoStack.size > maxHistorySize) undoStack.removeFirst()
+                    while (redoStack.size > maxHistorySize) redoStack.removeFirst()
+                }
             }
         }
         viewModelScope.launch {

@@ -147,8 +147,8 @@ fun SettingsScreen(
                         SegmentedControlRow(
                             label = "Undo Limit",
                             icon = Icons.Default.History,
-                            options = listOf(20, 50, 100),
-                            optionLabels = listOf("20", "50", "100"),
+                            options = listOf(20, 50, 100, 0),
+                            optionLabels = listOf("20", "50", "100", "No Limit"),
                             selectedOption = undoHistoryLimit,
                             onOptionSelected = { viewModel.setUndoHistoryLimit(it) },
                             textColor = textColor,

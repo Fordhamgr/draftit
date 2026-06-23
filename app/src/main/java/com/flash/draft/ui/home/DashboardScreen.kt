@@ -445,8 +445,8 @@ fun DashboardScreen(
                 .fillMaxWidth(0.9f)
                 .wrapContentHeight()
                 .padding(bottom = 24.dp)
-                .shadow(16.dp, RoundedCornerShape(50), spotColor = Color.Black.copy(alpha = 0.1f))
-                .background(Color.White, RoundedCornerShape(50))
+                .shadow(16.dp, RoundedCornerShape(50), spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.1f))
+                .background(if (isDark) Color(0xFF1E1E1E) else Color.White, RoundedCornerShape(50))
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -555,12 +555,23 @@ fun ProjectCard(
             contentAlignment = Alignment.Center
         ) {
             if (thumbFile != null && thumbFile.exists()) {
-                AsyncImage(
-                    model = thumbFile,
+                androidx.compose.foundation.Image(
+                    painter = coil.compose.rememberAsyncImagePainter(thumbFile),
                     contentDescription = "Project Thumbnail",
-                    contentScale = ContentScale.Crop,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+            } else {
+                // Fallback: Mock preview with item count
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFE5E5EA).copy(alpha = if (isDark) 0.1f else 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val dateColor = if (isDark) Color.Gray else Color(0xFF86868B)
+                    Text("${project.previewElements.size} items", color = dateColor, fontSize = 12.sp)
+                }
             }
         }
 
