@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -353,6 +355,7 @@ fun SliderRow(
                 modifier = Modifier.width(140.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
+                @OptIn(ExperimentalMaterial3Api::class)
                 Slider(
                     value = value,
                     onValueChange = onValueChange,
@@ -365,6 +368,24 @@ fun SliderRow(
                         inactiveTickColor = Color.Transparent,
                         activeTickColor = Color.Transparent
                     ),
+                    thumb = {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .shadow(2.dp, CircleShape, clip = false)
+                                .background(Color.White, CircleShape)
+                        )
+                    },
+                    track = { sliderState ->
+                        SliderDefaults.Track(
+                            colors = SliderDefaults.colors(
+                                activeTrackColor = actionBlue,
+                                inactiveTrackColor = Color.Gray.copy(alpha = 0.2f)
+                            ),
+                            sliderState = sliderState,
+                            modifier = Modifier.height(4.dp)
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

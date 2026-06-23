@@ -22,11 +22,11 @@ class SettingsRepository(context: Context) {
     // Default values
     private val defaultDarkMode = false
     private val defaultPerformanceMode = false
-    private val defaultFramerate = 60 // 0 = Unlocked
+    private val defaultFramerate = 0 // 0 = Unlocked
     private val defaultLiquidCurve = 0.5f
     private val defaultLiquidRefraction = 0.5f
-    private val defaultUndoLimit = 50
-    private val defaultHapticFeedback = true
+    private val defaultUndoLimit = 0
+    private val defaultHapticFeedback = false
 
     fun setDarkMode(enabled: Boolean) = prefs.edit().putBoolean(KEY_DARK_MODE, enabled).apply()
     fun getDarkModeFlow(): Flow<Boolean> = callbackFlow {
