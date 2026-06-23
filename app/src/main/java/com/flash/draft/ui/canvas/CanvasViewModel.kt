@@ -68,6 +68,7 @@ class CanvasViewModel(
 
     fun undo() {
         if (undoStack.isNotEmpty()) {
+            com.flash.draft.utils.DraftLogger.logTrigger("Undo", payload = "Remaining stack: ${undoStack.size - 1}")
             redoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
             val prevState = undoStack.removeLast()
             _elements.value = prevState.elements
@@ -78,6 +79,7 @@ class CanvasViewModel(
 
     fun redo() {
         if (redoStack.isNotEmpty()) {
+            com.flash.draft.utils.DraftLogger.logTrigger("Redo", payload = "Remaining stack: ${redoStack.size - 1}")
             undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
             val nextState = redoStack.removeLast()
             _elements.value = nextState.elements
@@ -95,13 +97,14 @@ class CanvasViewModel(
             
             // Fast debounce for the actual file
             delay(500)
-            android.util.Log.d("DraftDataSync", "triggerAutoSave: Committing to disk for $projectId")
+            com.flash.draft.utils.DraftLogger.logDb("AutoSave Triggered", details = "Project: $projectId")
             repository.saveElements(projectId, elementsSnapshot)
             repository.saveScenes(projectId, scenesSnapshot)
         }
     }
 
     fun addScene(name: String, offsetX: Float, offsetY: Float, scale: Float): String {
+        com.flash.draft.utils.DraftLogger.logTrigger("Add Scene", payload = name)
         pushToUndoStack()
         val newScene = Scene(name = name, offsetX = offsetX, offsetY = offsetY, scale = scale)
         _scenes.value = _scenes.value + newScene
@@ -110,12 +113,14 @@ class CanvasViewModel(
     }
 
     fun removeScene(id: String) {
+        com.flash.draft.utils.DraftLogger.logTrigger("Remove Scene", payload = id)
         pushToUndoStack()
         _scenes.value = _scenes.value.filterNot { it.id == id }
         triggerAutoSave()
     }
 
     fun renameScene(id: String, newName: String) {
+        com.flash.draft.utils.DraftLogger.logTrigger("Rename Scene", payload = "$id -> $newName")
         pushToUndoStack()
         _scenes.value = _scenes.value.map { if (it.id == id) it.copy(name = newName) else it }
         triggerAutoSave()
@@ -125,13 +130,14 @@ class CanvasViewModel(
         saveJob?.cancel()
         // Fire-and-forget save in an independent scope so it survives ViewModel death (e.g. popping backstack)
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            android.util.Log.d("DraftDataSync", "triggerImmediateSave: Forced commit to disk for $projectId")
+            com.flash.draft.utils.DraftLogger.logDb("ImmediateSave Triggered", details = "Project: $projectId")
             repository.saveElements(projectId, _elements.value)
             repository.saveScenes(projectId, _scenes.value)
         }
     }
 
     fun clearCanvas() {
+        com.flash.draft.utils.DraftLogger.logTrigger("Clear Canvas")
         pushToUndoStack()
         _elements.value = emptyList()
         triggerAutoSave()

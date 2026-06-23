@@ -63,17 +63,19 @@ fun CanvasBackgroundDrawPipeline(
             translate(left = offset.x, top = offset.y)
             scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
         }) {
-            elements.filterIsInstance<CanvasElement.Connector>().forEach { connector ->
-                val startEl = elementMap[connector.startId]
-                val endEl = elementMap[connector.endId]
+            elements.forEach { element ->
+                if (element is CanvasElement.Connector) {
+                    val connector = element
+                    val startEl = elementMap[connector.startId]
+                    val endEl = elementMap[connector.endId]
                 if (startEl != null && endEl != null) {
                     val centerStart = getCenterPoint(startEl)
                     val centerEnd = getCenterPoint(endEl)
-                    if (centerStart != null && centerEnd != null) {
-                        val (startW, startH) = getElementDimensions(startEl)
-                        val (endW, endH) = getElementDimensions(endEl)
-                        val start = getRectangleIntersection(centerStart, centerEnd, startW, startH, 25f)
-                        val end = getRectangleIntersection(centerEnd, centerStart, endW, endH, 25f)
+                    if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
+                        val startDim = getElementDimensions(startEl)
+                        val endDim = getElementDimensions(endEl)
+                        val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f)
+                        val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
                         val isSelected = selectedConnectorId == connector.id
                         val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
                         val drawStroke = connector.strokeWidth
@@ -86,88 +88,83 @@ fun CanvasBackgroundDrawPipeline(
                             else -> null
                         }
 
-                        // Native Hardware Accelerated "Fake Blur" (Multi-pass stroke)
+                        // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
                         // Far faster than setShadowLayer because it entirely bypasses the GPU's Gaussian rasterization pass.
                         if (!isPerformanceMode) {
-                            drawLine(color = shadowColor.copy(alpha = 0.03f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 12f, pathEffect = effect, cap = StrokeCap.Round)
-                            drawLine(color = shadowColor.copy(alpha = 0.06f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 5f, pathEffect = effect, cap = StrokeCap.Round)
+                            drawLine(color = shadowColor.copy(alpha = 0.08f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
                         }
                         
                         // Main Line
                         drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
 
-                        fun drawArrow(tip: Offset, base: Offset, isShadow: Boolean = false) {
+                        fun drawArrow(tip: Offset, base: Offset) {
                             val angle = atan2(tip.y - base.y, tip.x - base.x)
                             val arrowLen = 20f + (drawStroke * 1.5f)
                             val arrowAng = Math.PI / 6
                             
-                            val tX = if (isShadow) tip.x + shadowOffset.x else tip.x
-                            val tY = if (isShadow) tip.y + shadowOffset.y else tip.y
-                            val colorToDraw = if (isShadow) shadowColor else drawColor
+                            // Cache trigonometric calls
+                            val cosAng = cos(angle).toFloat()
+                            val sinAng = sin(angle).toFloat()
+                            val cosMinus = cos(angle - arrowAng).toFloat()
+                            val sinMinus = sin(angle - arrowAng).toFloat()
+                            val cosPlus = cos(angle + arrowAng).toFloat()
+                            val sinPlus = sin(angle + arrowAng).toFloat()
 
                             when (connector.arrowShape) {
                                 "Open" -> {
                                     sharedPath.rewind()
-                                    sharedPath.moveTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
-                                    sharedPath.lineTo(tX, tY)
-                                    sharedPath.lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
+                                    sharedPath.moveTo(tip.x - arrowLen * cosMinus, tip.y - arrowLen * sinMinus)
+                                    sharedPath.lineTo(tip.x, tip.y)
+                                    sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
                                     
-                                    if (isShadow) {
-                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.03f), style = Stroke(width = drawStroke + 12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Stroke(width = drawStroke + 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                    } else {
-                                        drawPath(sharedPath, colorToDraw, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                    if (!isPerformanceMode) {
+                                        withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
+                                            drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Stroke(width = drawStroke + 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                        }
                                     }
+                                    drawPath(sharedPath, drawColor, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
                                 }
                                 "Filled", "Diamond" -> {
                                     sharedPath.rewind()
                                     if (connector.arrowShape == "Filled") {
-                                        sharedPath.moveTo(tX, tY)
-                                        sharedPath.lineTo(tX - arrowLen * cos(angle - arrowAng).toFloat(), tY - arrowLen * sin(angle - arrowAng).toFloat())
-                                        sharedPath.lineTo(tX - arrowLen * cos(angle + arrowAng).toFloat(), tY - arrowLen * sin(angle + arrowAng).toFloat())
+                                        sharedPath.moveTo(tip.x, tip.y)
+                                        sharedPath.lineTo(tip.x - arrowLen * cosMinus, tip.y - arrowLen * sinMinus)
+                                        sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
                                         sharedPath.close()
                                     } else {
-                                        val midX = tX - (arrowLen / 1.5f) * cos(angle).toFloat()
-                                        val midY = tY - (arrowLen / 1.5f) * sin(angle).toFloat()
-                                        val endX = tX - (arrowLen * 1.3f) * cos(angle).toFloat()
-                                        val endY = tY - (arrowLen * 1.3f) * sin(angle).toFloat()
-                                        sharedPath.moveTo(tX, tY)
-                                        sharedPath.lineTo(midX - (arrowLen / 2) * sin(angle).toFloat(), midY + (arrowLen / 2) * cos(angle).toFloat())
+                                        val midX = tip.x - (arrowLen / 1.5f) * cosAng
+                                        val midY = tip.y - (arrowLen / 1.5f) * sinAng
+                                        val endX = tip.x - (arrowLen * 1.3f) * cosAng
+                                        val endY = tip.y - (arrowLen * 1.3f) * sinAng
+                                        sharedPath.moveTo(tip.x, tip.y)
+                                        sharedPath.lineTo(midX - (arrowLen / 2) * sinAng, midY + (arrowLen / 2) * cosAng)
                                         sharedPath.lineTo(endX, endY)
-                                        sharedPath.lineTo(midX + (arrowLen / 2) * sin(angle).toFloat(), midY - (arrowLen / 2) * cos(angle).toFloat())
+                                        sharedPath.lineTo(midX + (arrowLen / 2) * sinAng, midY - (arrowLen / 2) * cosAng)
                                         sharedPath.close()
                                     }
                                     
-                                    if (isShadow) {
-                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Fill)
-                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.03f), style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                        drawPath(sharedPath, shadowColor.copy(alpha = 0.06f), style = Stroke(width = 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                    } else {
-                                        drawPath(sharedPath, colorToDraw, style = Fill)
+                                    if (!isPerformanceMode) {
+                                        withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
+                                            drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Fill)
+                                        }
                                     }
+                                    drawPath(sharedPath, drawColor, style = Fill)
                                 }
                                 "Circle" -> {
-                                    val center = Offset(tX - (arrowLen / 2) * cos(angle).toFloat(), tY - (arrowLen / 2) * sin(angle).toFloat())
-                                    if (isShadow) {
-                                        drawCircle(color = shadowColor.copy(alpha = 0.06f), radius = (arrowLen / 2) + 6f, center = center)
-                                        drawCircle(color = shadowColor.copy(alpha = 0.03f), radius = (arrowLen / 2) + 2.5f, center = center)
-                                    } else {
-                                        drawCircle(color = colorToDraw, radius = arrowLen / 2, center = center)
+                                    val center = Offset(tip.x - (arrowLen / 2) * cosAng, tip.y - (arrowLen / 2) * sinAng)
+                                    if (!isPerformanceMode) {
+                                        drawCircle(color = shadowColor.copy(alpha = 0.08f), radius = (arrowLen / 2) + 4f, center = center + shadowOffset)
                                     }
+                                    drawCircle(color = drawColor, radius = arrowLen / 2, center = center)
                                 }
                             }
                         }
                         
-                        // Draw Arrow Shadows
-                        if (!isPerformanceMode) {
-                            if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = true)
-                            if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = true)
-                        }
-                        
-                        // Draw Arrow Main
-                        if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start, isShadow = false)
-                        if (connector.arrowDirection == "Both") drawArrow(start, end, isShadow = false)
+                        // Draw Arrows (Main + Shadow in one pass)
+                        if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start)
+                        if (connector.arrowDirection == "Both") drawArrow(start, end)
                     }
+                }
                 }
             }
         }
@@ -202,8 +199,9 @@ fun CanvasForegroundDrawPipeline(
             nativeCanvas.save()
 
             // Render existing sketches (Let GPU handle Viewport Culling)
-            elements.filterIsInstance<CanvasElement.Sketch>().forEach { sketch ->
-                if (sketch.xCoords.size > 1) {
+            elements.forEach { element ->
+                if (element is CanvasElement.Sketch && element.xCoords.size > 1) {
+                    val sketch = element
                     if (sketch.cachedStroke == null) {
                         val batch = MutableStrokeInputBatch()
                         var lastTime = -1L
@@ -232,13 +230,6 @@ fun CanvasForegroundDrawPipeline(
                     var strokeToDraw = sketch.cachedStroke
                     val isSelected = selectedGroupIds.contains(sketch.id)
                     if (isSelected && strokeToDraw != null) {
-                        val batch = MutableStrokeInputBatch()
-                        var lastTime = -1L
-                        for (i in sketch.xCoords.indices) {
-                            val safeTime = if (sketch.times[i] < lastTime) lastTime else sketch.times[i]
-                            lastTime = safeTime
-                            batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, sketch.xCoords[i], sketch.yCoords[i], safeTime, sketch.pressures[i])
-                        }
                         val baseColor = getAdaptiveColor(sketch.color, isDarkTheme)
                         val family = when (sketch.toolType) {
                             "Highlighter" -> StockBrushes.highlighterV1
@@ -252,10 +243,13 @@ fun CanvasForegroundDrawPipeline(
                             sketch.strokeWidth,
                             brushEpsilon
                         )
-                        strokeToDraw = Stroke(brush, batch)
+                        // Reuse the batch from the cached stroke!
+                        val inputs = strokeToDraw.inputs
+                        strokeToDraw = Stroke(brush, inputs)
                     }
+
                     if (strokeToDraw != null) {
-                        renderer.draw(nativeCanvas, strokeToDraw, Matrix())
+                        renderer.draw(nativeCanvas, strokeToDraw, android.graphics.Matrix())
                     }
                 }
             }

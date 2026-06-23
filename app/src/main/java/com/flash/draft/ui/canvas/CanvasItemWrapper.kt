@@ -82,7 +82,6 @@ fun CanvasItemWrapper(
     val currentOnLinkUpdate by rememberUpdatedState(onLinkUpdate)
     val currentOnLockedChange by rememberUpdatedState(onLockedChange)
 
-    val screenPos = ViewportMath.worldToScreen(position, canvasOffset, scale)
     var isMultiTouch by remember { mutableStateOf(false) }
     var isDragging by remember { mutableStateOf(false) }
     // Zoom cooldown: stays true briefly after pinch ends to prevent accidental taps/drags
@@ -104,8 +103,8 @@ fun CanvasItemWrapper(
 
     Box(
         modifier = Modifier
-            .offset { IntOffset(screenPos.x.roundToInt(), screenPos.y.roundToInt()) }
-            .graphicsLayer { scaleX = scale * animatedScale; scaleY = scale * animatedScale; transformOrigin = TransformOrigin(0f, 0f) }
+            .offset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }
+            .graphicsLayer { scaleX = animatedScale; scaleY = animatedScale; transformOrigin = TransformOrigin(0f, 0f) }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {

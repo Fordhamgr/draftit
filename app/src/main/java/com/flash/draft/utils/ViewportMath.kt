@@ -4,18 +4,7 @@ import androidx.compose.ui.geometry.Offset
 
 object ViewportMath {
 
-    fun calculateCameraTransform(
-        currentScale: Float,
-        currentOffset: Offset,
-        centroid: Offset,
-        pan: Offset,
-        zoom: Float
-    ): Pair<Float, Offset> {
-        val newScale = (currentScale * zoom).coerceIn(0.01f, 5f)
-        val zoomFactor = newScale / currentScale
-        val newOffset = centroid + (currentOffset + pan - centroid) * zoomFactor
-        return Pair(newScale, newOffset)
-    }
+    // calculateCameraTransform was inlined into DraftCanvas to avoid Pair allocations during high-frequency gesture updates.
 
     fun screenToWorld(screenPos: Offset, cameraOffset: Offset, cameraScale: Float): Offset {
         return Offset(

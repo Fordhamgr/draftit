@@ -41,15 +41,8 @@ fun RenderCanvasElements(
     onNavigateToScene: (String) -> Unit,
     onNavigateToBoard: (String) -> Unit
 ) {
-    val screenTopLeft = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(0f, 0f), offset, scale)
-    val screenBottomRight = com.flash.draft.utils.ViewportMath.screenToWorld(Offset(centerX * 2f, centerY * 2f), offset, scale)
-    // Add a 500px buffer to prevent popping when panning
-    val cullLeft = screenTopLeft.x - 500f
-    val cullTop = screenTopLeft.y - 500f
-    val cullRight = screenBottomRight.x + 500f
-    val cullBottom = screenBottomRight.y + 500f
-
-    elements.toList().forEach { element ->
+    // GPU graphicsLayer natively handles viewport culling, so we don't need CPU-side cull bounds.
+    elements.forEach { element ->
         if (element is CanvasElement.StickyNote) {
 
 

@@ -138,6 +138,16 @@ class MainActivity : ComponentActivity() {
                         // 2. Setup Jetpack Navigation
                         val navController = rememberNavController()
 
+                        androidx.compose.runtime.DisposableEffect(navController) {
+                            val listener = androidx.navigation.NavController.OnDestinationChangedListener { _, destination, _ ->
+                                com.flash.draft.utils.DraftLogger.logNav(destination.route)
+                            }
+                            navController.addOnDestinationChangedListener(listener)
+                            onDispose {
+                                navController.removeOnDestinationChangedListener(listener)
+                            }
+                        }
+
                         NavHost(navController = navController, startDestination = "dashboard") {
 
                             // ROUTE 1: The Glassmorphism Homescreen

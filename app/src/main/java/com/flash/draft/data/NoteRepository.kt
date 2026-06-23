@@ -38,7 +38,7 @@ class NoteRepository(context: Context) {
                 
                 // Garbage Collection for empty ghost projects
                 if (elements.isEmpty() && scenes.isEmpty() && !metaFile.exists()) {
-                    android.util.Log.d("DraftDataSync", "GC: Deleting ghost project $projectId")
+                    com.flash.draft.utils.DraftLogger.logDb("Garbage Collection", details = "Deleting ghost project $projectId")
                     file.delete()
                     File(projectsDir, "${projectId}_scenes.json").delete()
                     return@mapNotNull null
@@ -62,7 +62,7 @@ class NoteRepository(context: Context) {
 
     fun createNewProject(title: String): String {
         val newId = java.util.UUID.randomUUID().toString()
-        android.util.Log.d("DraftDataSync", "Created new project ID: $newId")
+        com.flash.draft.utils.DraftLogger.logDb("Create Project", details = "ID: $newId")
         val metaFile = File(projectsDir, "${newId}_meta.json")
         val json = JSONObject().apply { put("title", title) }
         metaFile.writeText(json.toString())
@@ -95,7 +95,7 @@ class NoteRepository(context: Context) {
         val elements = loadElements(projectId)
         val scenes = loadScenes(projectId)
         
-        android.util.Log.d("DraftDataSync", "Duplicating project $projectId -> $newId")
+        com.flash.draft.utils.DraftLogger.logDb("Duplicate Project", details = "$projectId -> $newId")
         saveElements(newId, elements)
         saveScenes(newId, scenes)
         
@@ -330,16 +330,17 @@ class NoteRepository(context: Context) {
             writer.flush()
             atomicFile.finishWrite(stream)
             val elapsed = (System.nanoTime() - start) / 1_000_000f
-            android.util.Log.d("DraftDataSync", "saveElements: Streamed ${elements.size} elements to $projectId.json in ${String.format("%.2f", elapsed)}ms")
+            com.flash.draft.utils.DraftLogger.logDb("Save Elements", timeMs = elapsed, details = "Streamed ${elements.size} elements to $projectId.json")
         } catch (e: Exception) {
             if (stream != null) atomicFile.failWrite(stream)
-            android.util.Log.e("DraftDataSync", "saveElements FAILED for $projectId", e)
+            com.flash.draft.utils.DraftLogger.logDbError("Save Elements for $projectId", e)
             e.printStackTrace()
         }
         } // end synchronized
     }
 
     fun loadElements(projectId: String): List<CanvasElement> {
+        val start = System.nanoTime()
         val file = File(projectsDir, "$projectId.json")
         if (!file.exists()) return emptyList()
         val jsonString = file.readText()
@@ -421,6 +422,8 @@ class NoteRepository(context: Context) {
         } catch (e: Exception) {
             // Log full file corruption if needed, return whatever was parsed so far
         }
+        val elapsed = (System.nanoTime() - start) / 1_000_000f
+        com.flash.draft.utils.DraftLogger.logDb("Load Elements", timeMs = elapsed, details = "Loaded ${elements.size} elements for $projectId")
         return elements
     }
 
@@ -468,6 +471,7 @@ class NoteRepository(context: Context) {
     }
 
     fun loadScenes(projectId: String): List<com.flash.draft.model.Scene> {
+        val start = System.nanoTime()
         val file = File(projectsDir, "${projectId}_scenes.json")
         if (!file.exists()) return emptyList()
         val jsonString = file.readText()
@@ -491,6 +495,8 @@ class NoteRepository(context: Context) {
         } catch (e: Exception) {
             // Log or ignore
         }
+        val elapsed = (System.nanoTime() - start) / 1_000_000f
+        com.flash.draft.utils.DraftLogger.logDb("Load Scenes", timeMs = elapsed, details = "Loaded ${scenes.size} scenes for $projectId")
         return scenes
     }
 }

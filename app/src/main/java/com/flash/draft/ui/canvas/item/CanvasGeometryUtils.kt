@@ -2,6 +2,7 @@ package com.flash.draft.ui.canvas.item
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
 import com.flash.draft.model.CanvasElement
 import kotlin.math.abs
 import kotlin.math.min
@@ -43,7 +44,7 @@ fun distancePointToSegment(p: Offset, v: Offset, w: Offset): Float {
     return (p - proj).getDistance()
 }
 
-fun getCenterPoint(el: CanvasElement): Offset? {
+fun getCenterPoint(el: CanvasElement): Offset {
     return when (el) {
         is CanvasElement.StickyNote -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
         is CanvasElement.ImageCard -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
@@ -54,32 +55,32 @@ fun getCenterPoint(el: CanvasElement): Offset? {
         is CanvasElement.LabelNode -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
         is CanvasElement.FrameNode -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
         is CanvasElement.TaskListNode -> Offset(el.position.x + (el.width / 2), el.position.y + (el.height / 2))
-        else -> null
+        else -> Offset.Unspecified
     }
 }
 
-fun getCenterPoint(elementId: String, elements: List<CanvasElement>): Offset? {
-    val el = elements.find { it.id == elementId } ?: return null
+fun getCenterPoint(elementId: String, elements: List<CanvasElement>): Offset {
+    val el = elements.find { it.id == elementId } ?: return Offset.Unspecified
     return getCenterPoint(el)
 }
 
-fun getElementDimensions(el: CanvasElement): Pair<Float, Float> {
+fun getElementDimensions(el: CanvasElement): Size {
     return when (el) {
-        is CanvasElement.StickyNote -> Pair(el.width, el.height)
-        is CanvasElement.ImageCard -> Pair(el.width, el.height)
-        is CanvasElement.PdfCard -> Pair(el.width, el.height)
-        is CanvasElement.CodeBlock -> Pair(el.width, el.height)
-        is CanvasElement.AudioNote -> Pair(el.width, el.height)
-        is CanvasElement.ShapeNode -> Pair(el.width, el.height)
-        is CanvasElement.LabelNode -> Pair(el.width, el.height)
-        is CanvasElement.FrameNode -> Pair(el.width, el.height)
-        is CanvasElement.TaskListNode -> Pair(el.width, el.height)
-        else -> Pair(50f, 50f)
+        is CanvasElement.StickyNote -> Size(el.width, el.height)
+        is CanvasElement.ImageCard -> Size(el.width, el.height)
+        is CanvasElement.PdfCard -> Size(el.width, el.height)
+        is CanvasElement.CodeBlock -> Size(el.width, el.height)
+        is CanvasElement.AudioNote -> Size(el.width, el.height)
+        is CanvasElement.ShapeNode -> Size(el.width, el.height)
+        is CanvasElement.LabelNode -> Size(el.width, el.height)
+        is CanvasElement.FrameNode -> Size(el.width, el.height)
+        is CanvasElement.TaskListNode -> Size(el.width, el.height)
+        else -> Size(50f, 50f)
     }
 }
 
-fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Pair<Float, Float> {
-    val el = elements.find { it.id == elementId } ?: return Pair(50f, 50f)
+fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Size {
+    val el = elements.find { it.id == elementId } ?: return Size(50f, 50f)
     return getElementDimensions(el)
 }
 

@@ -1,18 +1,12 @@
 package com.flash.draft.ui.canvas
 
-import android.content.ContentValues
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -56,32 +50,20 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.painterResource
 import com.composables.icons.lucide.R as LucideR
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.draw.drawWithContent
-import android.graphics.pdf.PdfDocument
 import android.widget.Toast
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -101,7 +83,6 @@ import com.flash.draft.ConnectorStyleMenu
 import com.flash.draft.PenStudioPanel
 import com.flash.draft.model.CanvasElement
 import com.flash.draft.model.InkPoint
-import com.flash.draft.utils.GridBackground
 import com.flash.draft.utils.ViewportMath
 
 import com.flash.draft.ui.canvas.item.RenderCanvasElements
@@ -136,12 +117,12 @@ fun DraftCanvas(
     onBack: () -> Unit = {},
     onNavigateToBoard: (String) -> Unit = {}
 ) {
-    var scale by remember { mutableStateOf(0.7f) }
+    var scale by remember { mutableFloatStateOf(0.7f) }
     var lastZoomTime by remember { mutableLongStateOf(0L) }
     var isZooming by remember { mutableStateOf(false) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var centerX by remember { mutableStateOf(0f) }
-    var centerY by remember { mutableStateOf(0f) }
+    var centerX by remember { mutableFloatStateOf(0f) }
+    var centerY by remember { mutableFloatStateOf(0f) }
     var selectedNoteId by remember { mutableStateOf<String?>(null) }
     var selectedConnectorId by remember { mutableStateOf<String?>(null) }
     var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "")) }
@@ -169,9 +150,9 @@ fun DraftCanvas(
     var selectedGroupIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     var activeDrawColor by remember { mutableStateOf(Color.Black) }
-    var activeStrokeWidth by remember { mutableStateOf(6f) }
+    var activeStrokeWidth by remember { mutableFloatStateOf(6f) }
     var activeToolType by remember { mutableStateOf("Pen") }
-    var activeAlpha by remember { mutableStateOf(1f) }
+    var activeAlpha by remember { mutableFloatStateOf(1f) }
 
     // --- LIQUID STATE CONTROL ---
     val liquidState = rememberLiquidState()
@@ -201,9 +182,9 @@ fun DraftCanvas(
     }
     
     // PERF LOGGING: Monitor actual frame rate and detect stutters
-    var frameCount by remember { mutableStateOf(0) }
-    var lastFpsTime by remember { mutableStateOf(System.nanoTime()) }
-    var maxFrameDelta by remember { mutableStateOf(0f) }
+    var frameCount by remember { mutableIntStateOf(0) }
+    var lastFpsTime by remember { mutableLongStateOf(System.nanoTime()) }
+    var maxFrameDelta by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var lastFrameTime = System.nanoTime()
         while (isActive) {
@@ -222,7 +203,7 @@ fun DraftCanvas(
                     val totalCpu = avgBg + avgFg
                     val totalCalls = com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount + com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount
                     
-                    Log.i("DraftCanvasPerf", "[PERF] FPS: $frameCount | MaxFrame: ${String.format("%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format("%.2f", totalCpu)}ms (BG: ${String.format("%.2f", avgBg)}, FG: ${String.format("%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
+                    com.flash.draft.utils.DraftLogger.logUi("CanvasProfiler", "FPS: $frameCount | MaxFrame: ${String.format("%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format("%.2f", totalCpu)}ms (BG: ${String.format("%.2f", avgBg)}, FG: ${String.format("%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
                     
                     frameCount = 0
                     maxFrameDelta = 0f
@@ -270,9 +251,10 @@ fun DraftCanvas(
         var maxX = Float.MIN_VALUE; var maxY = Float.MIN_VALUE
         elements.forEach { el ->
             if (el is CanvasElement.Connector) return@forEach
-            val center = getCenterPoint(el.id, elements) ?: return@forEach
+            val center = getCenterPoint(el.id, elements)
+            if (center == Offset.Unspecified) return@forEach
             val dim = getElementDimensions(el.id, elements)
-            val halfW = dim.first / 2f; val halfH = dim.second / 2f
+            val halfW = dim.width / 2f; val halfH = dim.height / 2f
             if (center.x - halfW < minX) minX = center.x - halfW
             if (center.y - halfH < minY) minY = center.y - halfH
             if (center.x + halfW > maxX) maxX = center.x + halfW
@@ -615,14 +597,16 @@ fun DraftCanvas(
                                 if (!pastSlop) {
                                     zoomAccumulator *= zoomChange
                                     panAccumulator += panChange
-                                    if (zoomAccumulator < 0.97f || zoomAccumulator > 1.03f || panAccumulator.getDistance() > touchSlop) {
+                                    if (zoomAccumulator !in 0.97f..1.03f || panAccumulator.getDistance() > touchSlop) {
                                         pastSlop = true
                                     }
                                 }
 
                                 if (pastSlop) {
-                                    val (newScale, newOffset) = ViewportMath.calculateCameraTransform(scale, offset, centroid, panChange, zoomChange)
-                                    scale = newScale; offset = newOffset
+                                    val newScale = (scale * zoomChange).coerceIn(0.01f, 5f)
+                                    val zoomFactor = newScale / scale
+                                    offset = centroid + (offset + panChange - centroid) * zoomFactor
+                                    scale = newScale
                                 }
                                 event.changes.forEach { if (it.pressed) it.consume() }
                             } else if (activePointers == 1 && pastSlop) {
@@ -657,7 +641,7 @@ fun DraftCanvas(
                                     if (activeToolType == "Eraser") {
                                         val eraseRadius = activeStrokeWidth * 1.5f
                                         elements.removeAll { el ->
-                                            el is CanvasElement.Sketch && (0 until el.xCoords.size).any { i -> (Offset(el.xCoords[i], el.yCoords[i]) - newPoint).getDistance() < eraseRadius }
+                                            el is CanvasElement.Sketch && el.xCoords.indices.any { i -> (Offset(el.xCoords[i], el.yCoords[i]) - newPoint).getDistance() < eraseRadius }
                                         }
                                         // Defer viewModel.updateElements to onDragEnd for smooth erasing!
                                     } else {
@@ -682,7 +666,7 @@ fun DraftCanvas(
                                     val capturedIds = mutableSetOf<String>()
                                     elements.forEach { el ->
                                         val center = getCenterPoint(el.id, elements)
-                                        if (center != null && ViewportMath.isPointInPolygon(center, lassoPath)) capturedIds.add(el.id)
+                                        if (center != Offset.Unspecified && ViewportMath.isPointInPolygon(center, lassoPath)) capturedIds.add(el.id)
                                         else if (el is CanvasElement.Sketch && el.xCoords.isNotEmpty() && ViewportMath.isPointInPolygon(Offset(el.xCoords.first(), el.yCoords.first()), lassoPath)) capturedIds.add(el.id)
                                     }
                                     selectedGroupIds = capturedIds; lassoPath.clear(); isLassoMode = false
@@ -751,9 +735,9 @@ fun DraftCanvas(
                             val worldTap = ViewportMath.screenToWorld(tapPos, offset, scale)
                             val tappedConnector = elements.filterIsInstance<CanvasElement.Connector>().find { conn ->
                                 val centerStart = getCenterPoint(conn.startId, elements); val centerEnd = getCenterPoint(conn.endId, elements)
-                                if (centerStart != null && centerEnd != null) {
-                                    val (startW, startH) = getElementDimensions(conn.startId, elements); val (endW, endH) = getElementDimensions(conn.endId, elements)
-                                    val start = getRectangleIntersection(centerStart, centerEnd, startW, startH, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endW, endH, 25f)
+                                if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
+                                    val startDim = getElementDimensions(conn.startId, elements); val endDim = getElementDimensions(conn.endId, elements)
+                                    val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
                                     distancePointToSegment(worldTap, start, end) < (60f / scale)
                                 } else false
                             }
