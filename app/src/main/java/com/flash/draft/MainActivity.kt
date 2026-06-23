@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
 
                             // ROUTE: About Screen
                             composable("about") {
-                                AboutScreen(onBack = { navController.popBackStack() })
+                                AboutScreen(isDarkTheme = isDarkMode, onBack = { navController.popBackStack() })
                             }
 
                             // ROUTE 2: The Infinite Canvas

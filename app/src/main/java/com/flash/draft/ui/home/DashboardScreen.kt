@@ -544,9 +544,7 @@ fun ProjectCard(
     ) {
         // Thumbnail Area
         val thumbDir = java.io.File(context.filesDir, "projects")
-        val thumbFile = remember(project.id) {
-            thumbDir.listFiles { _, name -> name.startsWith("${project.id}_scene_") && name.endsWith("_thumb.png") }?.firstOrNull()
-        }
+        val thumbFile = java.io.File(thumbDir, "${project.id}_thumb.png")
 
         Box(
             modifier = Modifier
@@ -554,9 +552,17 @@ fun ProjectCard(
                 .aspectRatio(1f), // Perfectly square thumbnail area
             contentAlignment = Alignment.Center
         ) {
-            if (thumbFile != null && thumbFile.exists()) {
+            if (thumbFile.exists()) {
+                val imageRequest = coil.request.ImageRequest.Builder(context)
+                    .data(thumbFile)
+                    .memoryCacheKey("${project.id}_${thumbFile.lastModified()}")
+                    .diskCacheKey("${project.id}_${thumbFile.lastModified()}")
+                    .crossfade(true)
+                    .crossfade(300)
+                    .build()
+                
                 androidx.compose.foundation.Image(
-                    painter = coil.compose.rememberAsyncImagePainter(thumbFile),
+                    painter = coil.compose.rememberAsyncImagePainter(model = imageRequest),
                     contentDescription = "Project Thumbnail",
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -677,7 +683,7 @@ fun ProjectContextMenuOverlay(
         ) {
             Box(
                 modifier = Modifier
-                    .shadow(32.dp, RoundedCornerShape(32.dp), spotColor = Color.White.copy(alpha = 0.5f))
+                    .shadow(32.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.3f))
                     .clip(RoundedCornerShape(32.dp))
             ) {
                 // We use a non-interactive clone of the card

@@ -196,7 +196,7 @@ fun DraftCanvas(
     val recomposeStart = System.nanoTime()
     DisposableEffect(Unit) {
         onDispose { 
-            viewModel.triggerImmediateSave()
+            // Removed redundant triggerImmediateSave to prevent race conditions during exit
         }
     }
     SideEffect {
@@ -378,7 +378,6 @@ fun DraftCanvas(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            viewModel.triggerImmediateSave()
         }
     }
 
@@ -423,6 +422,29 @@ fun DraftCanvas(
             }
             isExportMenuOpen = false
         }
+    }
+
+    // Take a background snapshot when the user is idle for 2 seconds
+    LaunchedEffect(elementsState, renderScale, renderOffset) {
+        kotlinx.coroutines.delay(2000)
+        try {
+            val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+            val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+            if (swBitmap != null) {
+                viewModel.saveProjectThumbnail(swBitmap)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    val handleExit = {
+        viewModel.triggerImmediateSave()
+        onBack()
+    }
+
+    androidx.activity.compose.BackHandler {
+        handleExit()
     }
 
     val quickSave = {
@@ -787,10 +809,8 @@ fun DraftCanvas(
                     .liquefiable(liquidState)
                     .drawWithContent {
                         val drawStart = System.nanoTime()
-                        if (isExporting) {
-                            graphicsLayer.record {
-                                this@drawWithContent.drawContent()
-                            }
+                        graphicsLayer.record {
+                            this@drawWithContent.drawContent()
                         }
                         drawContent()
                         val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
@@ -899,7 +919,7 @@ fun DraftCanvas(
                                 shape = CircleShape,
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                                IconButton(onClick = { handleExit() }, modifier = Modifier.size(48.dp)) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
                                 }
                             }

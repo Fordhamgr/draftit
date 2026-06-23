@@ -130,11 +130,31 @@ class CanvasViewModel(
 
     fun triggerImmediateSave() {
         saveJob?.cancel()
-        // Fire-and-forget save in an independent scope so it survives ViewModel death (e.g. popping backstack)
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             com.flash.draft.utils.DraftLogger.logDb("ImmediateSave Triggered", details = "Project: $projectId")
             repository.saveElements(projectId, _elements.value)
             repository.saveScenes(projectId, _scenes.value)
+        }
+    }
+
+    suspend fun triggerImmediateSaveSync() {
+        saveJob?.cancel()
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            com.flash.draft.utils.DraftLogger.logDb("ImmediateSaveSync Triggered", details = "Project: $projectId")
+            repository.saveElements(projectId, _elements.value)
+            repository.saveScenes(projectId, _scenes.value)
+        }
+    }
+
+    fun saveProjectThumbnail(bitmap: android.graphics.Bitmap) {
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            repository.saveProjectThumbnail(projectId, bitmap)
+        }
+    }
+
+    suspend fun saveProjectThumbnailSync(bitmap: android.graphics.Bitmap) {
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            repository.saveProjectThumbnail(projectId, bitmap)
         }
     }
 

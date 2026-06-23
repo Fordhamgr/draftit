@@ -112,6 +112,28 @@ class NoteRepository(context: Context) {
 
     // --- .DRAFTIT ZIP EXPORT / IMPORT ---
 
+    fun saveProjectThumbnail(projectId: String, swBitmap: android.graphics.Bitmap) {
+        try {
+            val file = java.io.File(projectsDir, "${projectId}_thumb.png")
+
+            val maxDim = 500f
+            val scale = if (swBitmap.width > swBitmap.height) maxDim / swBitmap.width else maxDim / swBitmap.height
+            val scaledBitmap = if (scale < 1f) {
+                android.graphics.Bitmap.createScaledBitmap(swBitmap, (swBitmap.width * scale).toInt(), (swBitmap.height * scale).toInt(), true)
+            } else swBitmap
+
+            java.io.FileOutputStream(file).use { out: java.io.FileOutputStream ->
+                scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            }
+            if (scaledBitmap != swBitmap) {
+                scaledBitmap.recycle()
+            }
+            swBitmap.recycle()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun exportProject(context: Context, projectId: String, outputStream: java.io.OutputStream) {
         val projectJson = getRawJson(projectId) ?: "[]"
         val scenesJson = try {
