@@ -501,41 +501,6 @@ fun DraftCanvas(
         }
     }
 
-    val exportPdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        if (uri != null) {
-            coroutineScope.launch {
-                try {
-                    isExporting = true
-                    delay(100) // Allow recomposition and drawWithContent to record the layer
-                    val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-                    isExporting = false
-                    
-                    val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                    val finalBitmap = android.graphics.Bitmap.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(finalBitmap)
-                    canvas.drawColor(android.graphics.Color.WHITE)
-                    canvas.drawBitmap(swBitmap, 0f, 0f, null)
-
-                    val pdfDocument = android.graphics.pdf.PdfDocument()
-                    val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(finalBitmap.width, finalBitmap.height, 1).create()
-                    val page = pdfDocument.startPage(pageInfo)
-                    page.canvas.drawBitmap(finalBitmap, 0f, 0f, null)
-                    pdfDocument.finishPage(page)
-                    
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        pdfDocument.writeTo(stream)
-                    }
-                    pdfDocument.close()
-                    Toast.makeText(context, "PDF exported successfully!", Toast.LENGTH_SHORT).show()
-                } catch(e: Exception) {
-                    isExporting = false
-                    Toast.makeText(context, "Error exporting PDF.", Toast.LENGTH_SHORT).show()
-                }
-            }
-            isExportMenuOpen = false
-        }
-    }
-
     val exportScenePdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null && sceneToExport != null) {
             val scene = sceneToExport!!
@@ -1121,7 +1086,10 @@ fun DraftCanvas(
                                         Text("As a Project", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
                                         Icon(Icons.Default.Folder, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
                                     }
-                                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPdfLauncher.launch("Board.pdf") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { 
+                                        sceneToExport = com.flash.draft.model.Scene(id = "current", name = "Current", offsetX = offsetX, offsetY = offsetY, scale = scale)
+                                        exportScenePdfLauncher.launch("Board.pdf") 
+                                    }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text("As PDF", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
                                         Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
                                     }
