@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -96,6 +97,7 @@ fun CanvasItemWrapper(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current.density
     
+
     var isEditingLink by remember { mutableStateOf(false) }
     var linkTargetInput by remember(hyperlinkTarget) { mutableStateOf(hyperlinkTarget ?: "") }
     

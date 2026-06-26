@@ -180,7 +180,23 @@ fun AudioItem(
         ) {
             if (audioNote.audioPath.isEmpty() && !audioNote.isRecording) {
                 // State A: Unrecorded capsule trigger
-                IconButton(onClick = { startRecording() }, modifier = Modifier.background(Color(0xFF25D366), CircleShape).size(36.dp)) {
+                val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+                ) { isGranted: Boolean ->
+                    if (isGranted) {
+                        startRecording()
+                    } else {
+                        android.widget.Toast.makeText(context, "Microphone permission is required to record audio", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                IconButton(onClick = {
+                    if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        startRecording()
+                    } else {
+                        permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                }, modifier = Modifier.background(Color(0xFF25D366), CircleShape).size(36.dp)) {
                     Icon(Icons.Default.Mic, contentDescription = "Record", tint = Color.White)
                 }
                 Text("Tap icon to record audio note", fontSize = 12.sp, color = Color.DarkGray)

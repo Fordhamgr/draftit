@@ -206,7 +206,7 @@ fun DrawToolStack(
                             Box(modifier = Modifier.width(1.dp).height(24.dp).background(glassBorder))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Size", color = iconTint, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 8.dp))
-                            IosThicknessSlider(
+                            ThicknessSlider(
                                 value = activeStrokeWidth,
                                 onValueChange = onStrokeWidthChange,
                                 valueRange = 2f..100f,

@@ -236,7 +236,7 @@ fun ToggleRow(
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Color(0xFF34C759) // iOS Green
+                    checkedTrackColor = Color(0xFF34C759) // Green
                 )
             )
         }

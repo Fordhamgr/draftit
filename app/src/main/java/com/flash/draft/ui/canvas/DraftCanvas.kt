@@ -68,6 +68,7 @@ import android.widget.Toast
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -121,26 +122,30 @@ fun DraftCanvas(
     var scale by remember { mutableFloatStateOf(0.7f) }
     var lastZoomTime by remember { mutableLongStateOf(0L) }
     var isZooming by remember { mutableStateOf(false) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
     
     // Decoupled Rendering State (for custom FPS limiter that preserves touch sampling)
     var renderScale by remember { mutableFloatStateOf(0.7f) }
-    var renderOffset by remember { mutableStateOf(Offset.Zero) }
+    var renderOffsetX by remember { mutableFloatStateOf(0f) }
+    var renderOffsetY by remember { mutableFloatStateOf(0f) }
     val framerate by viewModel.framerate.collectAsStateWithLifecycle(initialValue = 60)
 
     LaunchedEffect(framerate) {
         if (framerate in 1..119) {
             val delayMillis = 1000L / framerate
-            while (true) {
+            while (isActive) {
                 renderScale = scale
-                renderOffset = offset
+                renderOffsetX = offsetX; renderOffsetY = offsetY
                 delay(delayMillis.milliseconds)
             }
         } else {
-            // Unlocked (0) or 120Hz native - just continuous sync via snapshotFlow
-            snapshotFlow { Pair(scale, offset) }.collect { (s, o) ->
-                renderScale = s
-                renderOffset = o
+            // Unlocked (0) or 120Hz native - continuous sync using frame timing to avoid GC allocations
+            while (isActive) {
+                renderScale = scale
+                renderOffsetX = offsetX
+                renderOffsetY = offsetY
+                androidx.compose.runtime.withFrameNanos { }
             }
         }
     }
@@ -253,7 +258,7 @@ fun DraftCanvas(
         panJob?.cancel()
         coroutineScope.launch {
             val startScale = scale
-            val startOffset = offset
+            val startOffset = Offset(offsetX, offsetY)
             val targetOffset = Offset(scene.offsetX, scene.offsetY)
             val targetScale = scene.scale
             androidx.compose.animation.core.animate(
@@ -262,7 +267,7 @@ fun DraftCanvas(
                 animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
             ) { progress, _ ->
                 scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
-                offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
+                val lerped = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress); offsetX = lerped.x; offsetY = lerped.y
             }
         }
     }
@@ -296,14 +301,14 @@ fun DraftCanvas(
 
         coroutineScope.launch {
             val startScale = scale
-            val startOffset = offset
+            val startOffset = Offset(offsetX, offsetY)
             androidx.compose.animation.core.animate(
                 initialValue = 0f, 
                 targetValue = 1f, 
                 animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
             ) { progress, _ ->
                 scale = androidx.compose.ui.util.lerp(startScale, targetScale, progress)
-                offset = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress)
+                val lerped = androidx.compose.ui.geometry.lerp(startOffset, targetOffset, progress); offsetX = lerped.x; offsetY = lerped.y
             }
         }
     }
@@ -333,9 +338,13 @@ fun DraftCanvas(
 
     val pdfPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {
+                Log.w("DraftCanvas", "Failed to take persistable URI permission for PDF: ${e.message}")
+            }
             val (fileName, fileSize) = getFileInfo(uri)
-            val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)
+            val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)
             elements.add(CanvasElement.PdfCard(id = UUID.randomUUID().toString(), position = dropPos, uriString = uri.toString(), fileName = fileName, fileSize = fileSize))
             viewModel.updateElements(elements.toList())
         }
@@ -343,8 +352,12 @@ fun DraftCanvas(
 
     val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {
+                Log.w("DraftCanvas", "Failed to take persistable URI permission for Image: ${e.message}")
+            }
+            val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)
             
             // Calculate original dimensions
             val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -426,16 +439,20 @@ fun DraftCanvas(
     }
 
     // Take a background snapshot when the user is idle for 2 seconds
-    LaunchedEffect(elementsState, renderScale, renderOffset) {
-        delay(2000.milliseconds)
-        try {
-            val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-            val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-            if (swBitmap != null) {
-                viewModel.saveProjectThumbnail(swBitmap)
+    LaunchedEffect(Unit) {
+        snapshotFlow { 
+            renderScale.hashCode() xor renderOffsetX.hashCode() xor renderOffsetY.hashCode() xor elementsState.hashCode()
+        }.collectLatest {
+            delay(2000.milliseconds)
+            try {
+                val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                if (swBitmap != null) {
+                    viewModel.saveProjectThumbnail(swBitmap)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
@@ -528,10 +545,10 @@ fun DraftCanvas(
                 coroutineScope.launch {
                     try {
                         val originalScale = scale
-                        val originalOffset = offset
+                        val originalOffset = Offset(offsetX, offsetY)
                         
                         scale = scene.scale
-                        offset = androidx.compose.ui.geometry.Offset(scene.offsetX, scene.offsetY)
+                        offsetX = scene.offsetX; offsetY = scene.offsetY
                         kotlinx.coroutines.delay(400) // Wait for recomposition
                         
                         val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
@@ -555,7 +572,7 @@ fun DraftCanvas(
                         
                         // Restore original camera
                         scale = originalScale
-                        offset = originalOffset
+                        offsetX = originalOffset.x; offsetY = originalOffset.y
                     } catch (e: Exception) {
                         Toast.makeText(context, "Error exporting Scene PDF.", Toast.LENGTH_SHORT).show()
                     }
@@ -621,7 +638,7 @@ fun DraftCanvas(
                 .background(if (isDarkTheme) Color(0xFF121212) else Color(0xFFF0F0F0))
                 .onSizeChanged { size ->
                     centerX = size.width / 2f; centerY = size.height / 2f
-                    if (offset == Offset.Zero) offset = Offset(centerX, centerY)
+                    if (offsetX == 0f && offsetY == 0f) { offsetX = centerX; offsetY = centerY }
                 }
                 .pointerInput(Unit) {
                     val touchSlop = viewConfiguration.touchSlop
@@ -651,7 +668,10 @@ fun DraftCanvas(
                                 if (pastSlop) {
                                     val newScale = (scale * zoomChange).coerceIn(0.01f, 5f)
                                     val zoomFactor = newScale / scale
-                                    offset = centroid + (offset + panChange - centroid) * zoomFactor
+                                    val newOffsetX = centroid.x + (offsetX + panChange.x - centroid.x) * zoomFactor
+                                    val newOffsetY = centroid.y + (offsetY + panChange.y - centroid.y) * zoomFactor
+                                    offsetX = newOffsetX
+                                    offsetY = newOffsetY
                                     scale = newScale
                                 }
                                 event.changes.forEach { if (it.pressed) it.consume() }
@@ -672,16 +692,16 @@ fun DraftCanvas(
                     if (!isCanvasLocked && (isDrawingMode || isLassoMode)) {
                         detectDragGestures(
                             onDragStart = { startPos ->
-                                if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, offset, scale)) }
+                                if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)) }
                                 else { 
                                     currentDrawingPath.clear()
-                                    val worldPoint = ViewportMath.screenToWorld(startPos, offset, scale)
+                                    val worldPoint = ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)
                                     // Use a default time and pressure for the start point since detectDragGestures doesn't provide them initially
                                     currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())) 
                                 }
                             },
                             onDrag = { change, _ ->
-                                val newPoint = ViewportMath.screenToWorld(change.position, offset, scale)
+                                val newPoint = ViewportMath.screenToWorld(change.position, Offset(offsetX, offsetY), scale)
                                 if (isLassoMode) { lassoPath.add(newPoint) }
                                 else {
                                     if (activeToolType == "Eraser") {
@@ -755,7 +775,7 @@ fun DraftCanvas(
                         val velocityTracker = VelocityTracker()
                         detectDragGestures(
                             onDragStart = { panJob?.cancel(); velocityTracker.resetTracking() },
-                            onDrag = { change, dragAmount -> velocityTracker.addPosition(change.uptimeMillis, change.position); offset += dragAmount },
+                            onDrag = { change, dragAmount -> velocityTracker.addPosition(change.uptimeMillis, change.position); offsetX += dragAmount.x; offsetY += dragAmount.y },
                             onDragEnd = {
                                 val velocity = velocityTracker.calculateVelocity()
                                 var currentVelocity = Offset(velocity.x, velocity.y)
@@ -766,7 +786,8 @@ fun DraftCanvas(
                                             val time = androidx.compose.runtime.withFrameNanos { it }
                                             val dt = (time - lastTime) / 1_000_000_000f
                                             lastTime = time
-                                            offset += currentVelocity * dt
+                                            offsetX += currentVelocity.x * dt
+                                            offsetY += currentVelocity.y * dt
                                             currentVelocity *= kotlin.math.exp(-6f * dt)
                                         }
                                     }
@@ -778,14 +799,20 @@ fun DraftCanvas(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onTap = { tapPos ->
-                            val worldTap = ViewportMath.screenToWorld(tapPos, offset, scale)
-                            val tappedConnector = elements.filterIsInstance<CanvasElement.Connector>().find { conn ->
-                                val centerStart = getCenterPoint(conn.startId, elements); val centerEnd = getCenterPoint(conn.endId, elements)
-                                if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
-                                    val startDim = getElementDimensions(conn.startId, elements); val endDim = getElementDimensions(conn.endId, elements)
-                                    val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
-                                    distancePointToSegment(worldTap, start, end) < (60f / scale)
-                                } else false
+                            val worldTap = ViewportMath.screenToWorld(tapPos, Offset(offsetX, offsetY), scale)
+                            var tappedConnector: CanvasElement.Connector? = null
+                            for (el in elements) {
+                                if (el is CanvasElement.Connector) {
+                                    val centerStart = getCenterPoint(el.startId, elements); val centerEnd = getCenterPoint(el.endId, elements)
+                                    if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
+                                        val startDim = getElementDimensions(el.startId, elements); val endDim = getElementDimensions(el.endId, elements)
+                                        val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
+                                        if (distancePointToSegment(worldTap, start, end) < (60f / scale)) {
+                                            tappedConnector = el
+                                            break
+                                        }
+                                    }
+                                }
                             }
                             if (tappedConnector != null) {
                                 selectedConnectorId = tappedConnector.id; selectedNoteId = null; selectedGroupIds = emptySet()
@@ -802,7 +829,7 @@ fun DraftCanvas(
 
                 // Culling removed: GPU graphicsLayer efficiently clips off-screen elements natively.
 
-                // GridBackground(scaleProvider = { scale }, offsetProvider = { offset })
+                // GridBackground(scaleProvider = { scale }, offsetProvider = { Offset(offsetX, offsetY) })
 
                 // --- 1. RECORDING BACKGROUND ---
                 Box(modifier = Modifier
@@ -842,8 +869,8 @@ fun DraftCanvas(
                         Box(modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                translationX = renderOffset.x * resScale
-                                translationY = renderOffset.y * resScale
+                                translationX = renderOffsetX * resScale
+                                translationY = renderOffsetY * resScale
                                 scaleX = renderScale * resScale
                                 scaleY = renderScale * resScale
                                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
@@ -879,7 +906,7 @@ fun DraftCanvas(
                     onUpdateSelectedGroupIds = { updatedGroupIds: Set<String> -> selectedGroupIds = updatedGroupIds },
                     onUpdateSelectedNoteId = { updatedSelectedNoteId: String? -> selectedNoteId = updatedSelectedNoteId },
                     onUpdateConnectingStartNodeId = { updatedConnectingStartNodeId: String? -> connectingStartNodeId = updatedConnectingStartNodeId },
-                    onUpdateScaleAndOffset = { newScale: Float, newOffset: Offset -> scale = newScale; offset = newOffset },
+                    onUpdateScaleAndOffset = { newScale: Float, newOffset: Offset -> scale = newScale; offsetX = newOffset.x; offsetY = newOffset.y },
                     onStartConnection = { startNodeId: String -> 
                         isConnectingMode = true
                         connectingStartNodeId = startNodeId
@@ -893,7 +920,7 @@ fun DraftCanvas(
 
                         CanvasForegroundDrawPipeline(
                             elements = elements,
-                            cameraOffsetProvider = { renderOffset },
+                            cameraOffsetProvider = { Offset(renderOffsetX, renderOffsetY) },
                             cameraScaleProvider = { renderScale },
                             isDarkTheme = isDarkTheme,
                             selectedGroupIds = selectedGroupIds,
@@ -1145,7 +1172,7 @@ fun DraftCanvas(
                                     onCaptureScene = {
                                         coroutineScope.launch {
                                             try {
-                                                viewModel.addScene("Scene ${scenes.size + 1}", offset.x, offset.y, scale)
+                                                viewModel.addScene("Scene ${scenes.size + 1}", Offset(offsetX, offsetY).x, Offset(offsetX, offsetY).y, scale)
                                             } catch (e: Exception) {
                                                 // Ignore thumbnail failure
                                             }
@@ -1300,7 +1327,7 @@ fun DraftCanvas(
                                 when (tool) {
                                     "Draw" -> isDrawingMode = true
                                     "Pan" -> { /* Defaults to panning */ }
-                                    "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale))); viewModel.updateElements(elements.toList()) }
+                                    "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale))); viewModel.updateElements(elements.toList()) }
                                 }
                             },
                             isInsertMenuOpen = isInsertMenuOpen,
@@ -1318,22 +1345,22 @@ fun DraftCanvas(
                             onPdfClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")); isInsertMenuOpen = false },
                             onMediaClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)); isInsertMenuOpen = false },
                             onCodeClick = {
-                                elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },
                             onAudioClick = {
-                                elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },
                             onTaskClick = {
-                                elements.add(CanvasElement.TaskListNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                elements.add(CanvasElement.TaskListNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },
                             onNoteClick = {
-                                elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), offset, scale)))
+                                elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },

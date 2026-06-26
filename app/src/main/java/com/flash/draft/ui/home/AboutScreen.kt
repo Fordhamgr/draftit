@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.flash.draft.AppConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,13 +113,13 @@ fun AboutScreen(isDarkTheme: Boolean, onBack: () -> Unit) {
                         AboutActionRow(
                             label = "Send Feedback",
                             textColor = textColor,
-                            onClick = { android.widget.Toast.makeText(context, "Feedback coming soon", android.widget.Toast.LENGTH_SHORT).show() }
+                            onClick = { sendEmail(context, AppConfig.gmail, "Feedback") }
                         )
                         HorizontalDivider(color = secondaryTextColor.copy(alpha = 0.2f), modifier = Modifier.padding(start = 16.dp))
                         AboutActionRow(
                             label = "Report an Issue",
                             textColor = textColor,
-                            onClick = { android.widget.Toast.makeText(context, "Issue reporter coming soon", android.widget.Toast.LENGTH_SHORT).show() }
+                            onClick = { sendEmail(context, AppConfig.gmail, "Reporting an issue with the application") }
                         )
                     }
                 }
@@ -130,15 +133,12 @@ fun AboutScreen(isDarkTheme: Boolean, onBack: () -> Unit) {
                             .background(surfaceColor)
                     ) {
                         AboutActionRow(
-                            label = "Privacy Policy",
+                            label = "Privacy and Policy",
                             textColor = textColor,
-                            onClick = { android.widget.Toast.makeText(context, "Privacy Policy coming soon", android.widget.Toast.LENGTH_SHORT).show() }
-                        )
-                        HorizontalDivider(color = secondaryTextColor.copy(alpha = 0.2f), modifier = Modifier.padding(start = 16.dp))
-                        AboutActionRow(
-                            label = "Terms & Conditions",
-                            textColor = textColor,
-                            onClick = { android.widget.Toast.makeText(context, "Terms & Conditions coming soon", android.widget.Toast.LENGTH_SHORT).show() }
+                            onClick = { 
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConfig.Privacyandterms))
+                                context.startActivity(intent)
+                            }
                         )
                     }
                 }
@@ -175,5 +175,18 @@ private fun AboutActionRow(
             tint = textColor.copy(alpha = 0.3f),
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+private fun sendEmail(context: Context, email: String, subject: String) {
+    val intent = Intent(Intent.ACTION_SENDTO).apply {
+        data = Uri.parse("mailto:")
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "No email app found", android.widget.Toast.LENGTH_SHORT).show()
     }
 }

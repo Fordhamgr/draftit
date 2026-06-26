@@ -9,6 +9,8 @@ import com.flash.draft.model.CanvasElement
 import com.flash.draft.ui.canvas.* // Pulls in FrameItem, StickyNoteItem, etc.
 import com.flash.draft.utils.StickerMaker
 import java.util.UUID
+import androidx.compose.runtime.getValue
+
 
 @Composable
 fun RenderCanvasElements(
@@ -42,6 +44,12 @@ fun RenderCanvasElements(
     onNavigateToBoard: (String) -> Unit
 ) {
     // GPU graphicsLayer natively handles viewport culling, so we don't need CPU-side cull bounds.
+    val currentSelectedGroupIds by androidx.compose.runtime.rememberUpdatedState(selectedGroupIds)
+    val currentConnectingStartNodeId by androidx.compose.runtime.rememberUpdatedState(connectingStartNodeId)
+    val currentIsConnectingMode by androidx.compose.runtime.rememberUpdatedState(isConnectingMode)
+    val currentIsDrawingMode by androidx.compose.runtime.rememberUpdatedState(isDrawingMode)
+    val currentIsLassoMode by androidx.compose.runtime.rememberUpdatedState(isLassoMode)
+
     elements.forEach { element ->
         if (element is CanvasElement.StickyNote) {
 
@@ -89,12 +97,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -151,12 +159,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -224,12 +232,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -286,12 +294,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -348,12 +356,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -410,12 +418,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -472,12 +480,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)
@@ -533,12 +541,12 @@ fun RenderCanvasElements(
                         onResetSelectedNoteId()
                         onUpdateElements(elements.toList())
                     } },
-                    onSelect = remember(element.id, isConnectingMode, connectingStartNodeId, isDrawingMode, isLassoMode, selectedGroupIds) { {
-                        if (isConnectingMode) {
-                            if (connectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
-                            else if (connectingStartNodeId != element.id) onFinishConnection(element.id)
-                        } else if (!isDrawingMode && !isLassoMode) {
-                            if (!selectedGroupIds.contains(element.id)) {
+                    onSelect = remember(element.id) { {
+                        if (currentIsConnectingMode) {
+                            if (currentConnectingStartNodeId == null) onUpdateConnectingStartNodeId(element.id)
+                            else if (currentConnectingStartNodeId != element.id) onFinishConnection(element.id)
+                        } else if (!currentIsDrawingMode && !currentIsLassoMode) {
+                            if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
                                 onBringToFront(element.id)

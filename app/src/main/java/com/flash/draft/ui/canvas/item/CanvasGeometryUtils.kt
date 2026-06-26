@@ -9,7 +9,7 @@ import kotlin.math.min
 
 val LocalDarkTheme = compositionLocalOf { false }
 val LocalPerformanceMode = compositionLocalOf { false }
-val LocalCameraScaleProvider = compositionLocalOf<() -> Float> { { 1f } }
+
 
 fun getAdaptiveColor(originalColor: Color, isDark: Boolean): Color {
     if (!isDark) {
