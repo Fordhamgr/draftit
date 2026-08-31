@@ -28,6 +28,7 @@ class SettingsRepository(context: Context) {
     private val defaultUndoLimit = 0
     private val defaultHapticFeedback = false
 
+    fun isDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, defaultDarkMode)
     fun setDarkMode(enabled: Boolean) = prefs.edit().putBoolean(KEY_DARK_MODE, enabled).apply()
     fun getDarkModeFlow(): Flow<Boolean> = callbackFlow {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->

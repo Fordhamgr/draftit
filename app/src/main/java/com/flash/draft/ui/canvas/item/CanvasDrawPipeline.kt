@@ -27,6 +27,9 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 object CanvasProfiler {
+    /** Set to true to enable per-frame profiling. False = dead-code-eliminated by compiler. */
+    const val ENABLED = false
+
     var bgDrawTimeSum = 0f
     var bgDrawCount = 0
     var fgDrawTimeSum = 0f
@@ -46,28 +49,39 @@ fun CanvasBackgroundDrawPipeline(
     val elementMap = elements.associateBy { it.id }
     val isPerformanceMode = LocalPerformanceMode.current
 
+    // Cache PathEffect objects — scale is always 1f from DraftCanvas, so these are constant.
+    // Previously allocated new FloatArray + PathEffect on EVERY draw frame.
+    val dashedEffect = remember(scale) { PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f) }
+    val dottedEffect = remember(scale) { PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f) }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val drawStart = System.nanoTime()
+        val drawStart = if (CanvasProfiler.ENABLED) System.nanoTime() else 0L
 
         // HW-Accelerated Fake Blur Configuration
         val shadowOffset = Offset(4f, 8f)
         val shadowColor = Color.Black
 
-        val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f)
-        val dottedEffect = PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f)
-
         // Shared Path object to avoid allocating memory for every arrow
         val sharedPath = Path()
 
-        withTransform({
-            translate(left = offset.x, top = offset.y)
-            scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
-        }) {
-            elements.forEach { element ->
-                if (element is CanvasElement.Connector) {
-                    val connector = element
-                    val startEl = elementMap[connector.startId]
-                    val endEl = elementMap[connector.endId]
+        // Since scale=1f and offset=Offset.Zero are passed from DraftCanvas,
+        // the withTransform was a no-op (translate(0,0) + scale(1,1)) adding GPU state overhead.
+        // Now we skip the transform entirely when it's identity, and only apply when non-trivial.
+        val needsTransform = offset != Offset.Zero || scale != 1f
+        if (needsTransform) {
+            // Non-identity transform: apply it (future-proofing for if scale/offset change)
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.save()
+                canvas.nativeCanvas.translate(offset.x, offset.y)
+                canvas.nativeCanvas.scale(scale, scale)
+            }
+        }
+
+        elements.forEach { element ->
+            if (element is CanvasElement.Connector) {
+                val connector = element
+                val startEl = elementMap[connector.startId]
+                val endEl = elementMap[connector.endId]
                 if (startEl != null && endEl != null) {
                     val centerStart = getCenterPoint(startEl)
                     val centerEnd = getCenterPoint(endEl)
@@ -92,7 +106,6 @@ fun CanvasBackgroundDrawPipeline(
                         }
 
                         // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
-                        // Far faster than setShadowLayer because it entirely bypasses the GPU's Gaussian rasterization pass.
                         if (!isPerformanceMode && !isDarkTheme) {
                             drawLine(color = shadowColor.copy(alpha = 0.08f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
                         }
@@ -168,12 +181,20 @@ fun CanvasBackgroundDrawPipeline(
                         if (connector.arrowDirection == "Both") drawArrow(start, end)
                     }
                 }
-                }
             }
         }
-        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-        CanvasProfiler.bgDrawTimeSum += elapsed
-        CanvasProfiler.bgDrawCount++
+
+        if (needsTransform) {
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.restore()
+            }
+        }
+
+        if (CanvasProfiler.ENABLED) {
+            val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
+            CanvasProfiler.bgDrawTimeSum += elapsed
+            CanvasProfiler.bgDrawCount++
+        }
     }
 }
 
@@ -194,12 +215,17 @@ fun CanvasForegroundDrawPipeline(
     val renderer = remember { CanvasStrokeRenderer.create() }
     val isPerformanceMode = LocalPerformanceMode.current
 
+    // Cache a single Matrix instance to avoid allocating one per-sketch per-frame.
+    // Previously: `renderer.draw(nativeCanvas, stroke, Matrix())` allocated N matrices per frame.
+    val identityMatrix = remember { Matrix() }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val drawStart = System.nanoTime()
+        val drawStart = if (CanvasProfiler.ENABLED) System.nanoTime() else 0L
 
         drawIntoCanvas { canvas ->
             val nativeCanvas = canvas.nativeCanvas
-            nativeCanvas.save()
+            // Removed no-op nativeCanvas.save()/restore() — no transform is applied here
+            // (scale=1f, offset=Zero), so the save/restore was pure overhead.
 
             // Render existing sketches (Let GPU handle Viewport Culling)
             elements.forEach { element ->
@@ -252,7 +278,8 @@ fun CanvasForegroundDrawPipeline(
                     }
 
                     if (strokeToDraw != null) {
-                        renderer.draw(nativeCanvas, strokeToDraw, android.graphics.Matrix())
+                        // Reuse cached identityMatrix instead of allocating new Matrix() per sketch
+                        renderer.draw(nativeCanvas, strokeToDraw, identityMatrix)
                     }
                 }
             }
@@ -282,10 +309,9 @@ fun CanvasForegroundDrawPipeline(
                 )
 
                 val stroke = Stroke(brush, batch)
-                renderer.draw(nativeCanvas, stroke, Matrix())
+                // Reuse cached identityMatrix
+                renderer.draw(nativeCanvas, stroke, identityMatrix)
             }
-            
-            nativeCanvas.restore()
         }
 
         // Draw lasso path in standard Compose layer (already translated/scaled by parent graphicsLayer)
@@ -299,8 +325,11 @@ fun CanvasForegroundDrawPipeline(
             val cameraScale = cameraScaleProvider()
             drawPath(path, color = Color.Blue, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f / cameraScale, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f / cameraScale, 15f / cameraScale))))
         }
-        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-        CanvasProfiler.fgDrawTimeSum += elapsed
-        CanvasProfiler.fgDrawCount++
+
+        if (CanvasProfiler.ENABLED) {
+            val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
+            CanvasProfiler.fgDrawTimeSum += elapsed
+            CanvasProfiler.fgDrawCount++
+        }
     }
 }

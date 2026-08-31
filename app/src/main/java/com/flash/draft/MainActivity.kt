@@ -83,8 +83,9 @@ class MainActivity : ComponentActivity() {
         val settingsRepo = com.flash.draft.data.SettingsRepository(this)
 
         setContent {
+            val initialDarkMode = androidx.compose.runtime.remember { settingsRepo.isDarkMode() }
             val isDarkModeFlow = androidx.compose.runtime.remember { settingsRepo.getDarkModeFlow() }
-            val isDarkMode by isDarkModeFlow.collectAsStateWithLifecycle(initialValue = false)
+            val isDarkMode by isDarkModeFlow.collectAsStateWithLifecycle(initialValue = initialDarkMode)
             
             val isPerformanceMode by settingsRepo.getPerformanceModeFlow().collectAsStateWithLifecycle(initialValue = false)
             val framerate by settingsRepo.getFramerateFlow().collectAsStateWithLifecycle(initialValue = 60)
@@ -162,7 +163,7 @@ class MainActivity : ComponentActivity() {
 
                             // ROUTE: About Screen
                             composable("about") {
-                                AboutScreen(isDarkTheme = isDarkMode, onBack = { navController.navigateUp() })
+                                AboutScreen(onBack = { navController.navigateUp() })
                             }
 
                             // ROUTE 2: The Infinite Canvas

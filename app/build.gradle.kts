@@ -1,14 +1,19 @@
+import java.io.FileInputStream
+import java.util.Properties
 
-    plugins {
-        alias(libs.plugins.android.application)
-        alias(libs.plugins.kotlin.compose)
-        // TODO: UNCOMMENT these two lines after adding your google-services.json to the app/ folder!
-        // alias(libs.plugins.google.services)
-        // alias(libs.plugins.firebase.crashlytics)
-    }
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    // TODO: UNCOMMENT these two lines after adding your google-services.json to the app/ folder!
+    // alias(libs.plugins.google.services)
+    // alias(libs.plugins.firebase.crashlytics)
+}
 
-kotlin {
-    jvmToolchain(21)
+// Load keystore credentials from keystore.properties (never committed to Git)
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -25,15 +30,31 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Uses release keystore if keystore.properties exists, falls back to debug for local builds
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

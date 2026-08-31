@@ -189,6 +189,7 @@ fun DraftCanvas(
     val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle(initialValue = 0.5f)
     var isExportMenuOpen by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
+    var isCapturingThumbnail by remember { mutableStateOf(false) }
 
     val resScale = if (isPerformanceMode && !isExporting) 0.7f else 1f
     val inverseScale = 1f / resScale
@@ -198,49 +199,51 @@ fun DraftCanvas(
     var panJob: Job? by remember { mutableStateOf(null) }
     val coroutineScope = rememberCoroutineScope()
     
-    // PERF LOGGING: Measure entire canvas recomposition
-    val recomposeStart = System.nanoTime()
     DisposableEffect(Unit) {
         onDispose { 
             // Removed redundant triggerImmediateSave to prevent race conditions during exit
         }
     }
-    SideEffect {
-        com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount++
+    if (com.flash.draft.ui.canvas.item.CanvasProfiler.ENABLED) {
+        SideEffect {
+            com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount++
+        }
     }
     
-    // PERF LOGGING: Monitor actual frame rate and detect stutters
-    var frameCount by remember { mutableIntStateOf(0) }
-    var lastFpsTime by remember { mutableLongStateOf(System.nanoTime()) }
-    var maxFrameDelta by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        var lastFrameTime = System.nanoTime()
-        while (isActive) {
-            withFrameNanos { time ->
-                frameCount++
-                val dtMs = (time - lastFrameTime) / 1_000_000f
-                if (dtMs > maxFrameDelta) maxFrameDelta = dtMs
-                if (dtMs > 18f && lastFrameTime != 0L) { // Stutter detected
-                    Log.w("DraftCanvasPerf", "Frame Drop: ${dtMs}ms")
-                }
-                lastFrameTime = time
-                
-                if (time - lastFpsTime > 1_000_000_000L) {
-                    val avgBg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount else 0f
-                    val avgFg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount else 0f
-                    val totalCpu = avgBg + avgFg
-                    val totalCalls = com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount + com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount
+    // PERF LOGGING: Monitor actual frame rate and detect stutters (gated by compile-time flag)
+    if (com.flash.draft.ui.canvas.item.CanvasProfiler.ENABLED) {
+        var frameCount by remember { mutableIntStateOf(0) }
+        var lastFpsTime by remember { mutableLongStateOf(System.nanoTime()) }
+        var maxFrameDelta by remember { mutableFloatStateOf(0f) }
+        LaunchedEffect(Unit) {
+            var lastFrameTime = System.nanoTime()
+            while (isActive) {
+                withFrameNanos { time ->
+                    frameCount++
+                    val dtMs = (time - lastFrameTime) / 1_000_000f
+                    if (dtMs > maxFrameDelta) maxFrameDelta = dtMs
+                    if (dtMs > 18f && lastFrameTime != 0L) {
+                        Log.w("DraftCanvasPerf", "Frame Drop: ${dtMs}ms")
+                    }
+                    lastFrameTime = time
                     
-                    com.flash.draft.utils.DraftLogger.logUi("CanvasProfiler", "FPS: $frameCount | MaxFrame: ${String.format(java.util.Locale.US, "%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format(java.util.Locale.US, "%.2f", totalCpu)}ms (BG: ${String.format(java.util.Locale.US, "%.2f", avgBg)}, FG: ${String.format(java.util.Locale.US, "%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
-                    
-                    frameCount = 0
-                    maxFrameDelta = 0f
-                    lastFpsTime = time
-                    com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum = 0f
-                    com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount = 0
-                    com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum = 0f
-                    com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount = 0
-                    com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount = 0
+                    if (time - lastFpsTime > 1_000_000_000L) {
+                        val avgBg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount else 0f
+                        val avgFg = if (com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount > 0) com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum / com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount else 0f
+                        val totalCpu = avgBg + avgFg
+                        val totalCalls = com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount + com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount
+                        
+                        com.flash.draft.utils.DraftLogger.logUi("CanvasProfiler", "FPS: $frameCount | MaxFrame: ${String.format(java.util.Locale.US, "%.1f", maxFrameDelta)}ms | CPU Draw: ${String.format(java.util.Locale.US, "%.2f", totalCpu)}ms (BG: ${String.format(java.util.Locale.US, "%.2f", avgBg)}, FG: ${String.format(java.util.Locale.US, "%.2f", avgFg)}) | Recomp: ${com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount} | Calls: $totalCalls")
+                        
+                        frameCount = 0
+                        maxFrameDelta = 0f
+                        lastFpsTime = time
+                        com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawTimeSum = 0f
+                        com.flash.draft.ui.canvas.item.CanvasProfiler.bgDrawCount = 0
+                        com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawTimeSum = 0f
+                        com.flash.draft.ui.canvas.item.CanvasProfiler.fgDrawCount = 0
+                        com.flash.draft.ui.canvas.item.CanvasProfiler.recomposeCount = 0
+                    }
                 }
             }
         }
@@ -438,27 +441,32 @@ fun DraftCanvas(
         }
     }
 
-    // Take a background snapshot when the user is idle for 2 seconds
-    LaunchedEffect(Unit) {
-        snapshotFlow { 
-            renderScale.hashCode() xor renderOffsetX.hashCode() xor renderOffsetY.hashCode() xor elementsState.hashCode()
-        }.collectLatest {
-            delay(2000.milliseconds)
+    // Capture a thumbnail once when the user exits the canvas
+    val handleExit: () -> Unit = {
+        coroutineScope.launch {
             try {
+                // 1. Briefly enable exporting so drawWithContent records into graphicsLayer
+                isCapturingThumbnail = true
+                delay(100.milliseconds)
+
+                // 2. Capture the recorded layer
                 val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
                 val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                if (swBitmap != null) {
-                    viewModel.saveProjectThumbnail(swBitmap)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
+                isCapturingThumbnail = false
 
-    val handleExit = {
-        viewModel.triggerImmediateSave()
-        onBack()
+                // 3. Save thumbnail + project data
+                if (swBitmap != null) {
+                    viewModel.saveProjectThumbnailSync(swBitmap)
+                }
+                viewModel.triggerImmediateSaveSync()
+            } catch (_: Exception) {
+                // Ensure we always navigate even if capture fails
+                isCapturingThumbnail = false
+                viewModel.triggerImmediateSave()
+            }
+            onBack()
+        }
+        Unit
     }
 
     androidx.activity.compose.BackHandler {
@@ -788,9 +796,7 @@ fun DraftCanvas(
                     )
                 }
         ) {
-                SideEffect {
-                    Log.d("DraftCanvasPerf", "BoxWithConstraints lambda recomposed!")
-                }
+                // Recomposition log removed — was firing every frame during pan/zoom, adding overhead
 
                 // Culling removed: GPU graphicsLayer efficiently clips off-screen elements natively.
 
@@ -801,15 +807,14 @@ fun DraftCanvas(
                     .fillMaxSize()
                     .liquefiable(liquidState)
                     .drawWithContent {
-                        val drawStart = System.nanoTime()
-                        graphicsLayer.record {
-                            this@drawWithContent.drawContent()
+                        if (isExporting || isCapturingThumbnail) {
+                            // Only record into graphicsLayer when actually exporting.
+                            // This eliminates a full canvas double-draw on every frame.
+                            graphicsLayer.record {
+                                this@drawWithContent.drawContent()
+                            }
                         }
                         drawContent()
-                        val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-                        if (elapsed > 5f && isExporting) {
-                            Log.d("DraftCanvasPerf", "drawWithContent (graphicsLayer.record) took ${elapsed}ms")
-                        }
                     }
                 ) {
                 // Outer Box: Scales up the inner content

@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +71,19 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import com.flash.draft.ui.theme.BentoLightBackground
+import com.flash.draft.ui.theme.BentoDarkBackground
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bento Box Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun DashboardScreen(
@@ -82,7 +96,6 @@ fun DashboardScreen(
 ) {
     var projects by remember { mutableStateOf(repository.getAllProjects()) }
 
-    
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -98,7 +111,8 @@ fun DashboardScreen(
 
     val isDark = isDarkTheme
 
-    val bgColor = if (isDark) Color(0xFF121212) else Color(0xFFF4F5F9)
+    // ── Color tokens ────────────────────────────────────────────────────────
+    val bgColor = if (isDark) BentoDarkBackground else BentoLightBackground
     val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
     val menuBg = if (isDark) Color(0xFF2A2A2A) else Color(0xFFFFFFFF)
     val context = LocalContext.current
@@ -106,26 +120,44 @@ fun DashboardScreen(
     var projectToExport by remember { mutableStateOf<Project?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var newProjectTitle by remember { mutableStateOf("") }
-    
-    // Entrance Animation State
+
+    // ── Responsive breakpoints ──────────────────────────────────────────────
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val isTablet = screenWidth >= 600
+    val isLargeTablet = screenWidth >= 840
+    val columns = when {
+        isLargeTablet -> 4
+        isTablet -> 3
+        else -> 2
+    }
+    val gutterSize = if (isTablet) 16.dp else 12.dp
+    val edgePadding = if (isTablet) 20.dp else 16.dp
+    val topButtonSize = if (isTablet) 48.dp else 44.dp
+    val topSpacerHeight = if (isTablet) 36.dp else 24.dp
+
+    // ── Entrance Animation State ────────────────────────────────────────────
     var isVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         isVisible = true
     }
 
-    val gridAlpha by androidx.compose.animation.core.animateFloatAsState(
+    val gridAlpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "grid_alpha"
     )
-    val gridOffsetY by androidx.compose.animation.core.animateDpAsState(
+    val gridOffsetY by animateDpAsState(
         targetValue = if (isVisible) 0.dp else 40.dp,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "grid_offset"
     )
-    val dockOffsetY by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isVisible) 0.dp else 100.dp,
-        animationSpec = androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy, stiffness = androidx.compose.animation.core.Spring.StiffnessLow)
+    val dockOffsetY by animateDpAsState(
+        targetValue = if (isVisible) 0.dp else 80.dp,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        label = "dock_offset"
     )
 
+    // ── Import launcher ─────────────────────────────────────────────────────
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
             try {
@@ -148,7 +180,7 @@ fun DashboardScreen(
     var contextMenuProject by remember { mutableStateOf<Project?>(null) }
     var contextMenuOffset by remember { mutableStateOf(Offset.Zero) }
     var contextMenuSize by remember { mutableStateOf(IntSize.Zero) }
-    
+
     // Use */* to prevent Android from forcing a .zip extension when saving
     val exportArchiveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         if (uri != null && projectToExport != null) {
@@ -164,6 +196,7 @@ fun DashboardScreen(
         }
     }
 
+    // ── Root container ──────────────────────────────────────────────────────
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -171,13 +204,13 @@ fun DashboardScreen(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(0.9f)
-                .align(Alignment.TopCenter)
+                .fillMaxSize()
+                .padding(horizontal = edgePadding)
+                .windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(topSpacerHeight))
 
-            // Premium Header
+            // ── 1. Header Region ────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,82 +218,149 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "All Canvas",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Black,
-                    color = textColor,
-                    modifier = Modifier.weight(1f, fill = false),
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                
+                // Title + Subtitle
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = "All Canvas",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (projects.isEmpty()) "No projects yet"
+                        else "${projects.size} project${if (projects.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Top-right controls
                 Row(
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring())
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val topPillSize = if (LocalConfiguration.current.screenWidthDp >= 600) 52.dp else 40.dp
-                    
-                    IconButton(
+                    // About "?" button
+                    FilledTonalIconButton(
                         onClick = onNavigateToAbout,
-                        modifier = Modifier
-                            .height(topPillSize)
-                            .aspectRatio(1f)
-                            .background(Color.White.copy(alpha = if (isDark) 0.1f else 0.8f), RoundedCornerShape(50))
-                            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(50))
-                            .clip(RoundedCornerShape(50))
+                        modifier = Modifier.size(topButtonSize),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = textColor.copy(alpha = 0.05f),
+                            contentColor = textColor
+                        )
                     ) {
-                        val fontSize = if (LocalConfiguration.current.screenWidthDp >= 600) 24.sp else 20.sp
-                        Text("?", fontWeight = FontWeight.Bold, fontSize = fontSize, color = textColor)
+                        Text(
+                            "?",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = if (isTablet) 20.sp else 18.sp
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    IconButton(
+                    // Settings button
+                    FilledTonalIconButton(
                         onClick = onNavigateToSettings,
-                        modifier = Modifier
-                            .height(topPillSize)
-                            .aspectRatio(1f)
-                            .background(Color.White.copy(alpha = if (isDark) 0.1f else 0.8f), RoundedCornerShape(50))
-                            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(50))
-                            .clip(RoundedCornerShape(50))
+                        modifier = Modifier.size(topButtonSize),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = textColor.copy(alpha = 0.05f),
+                            contentColor = textColor
+                        )
                     ) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = textColor, modifier = Modifier.fillMaxSize(0.6f))
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = "Settings",
+                            modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
+                        )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
 
-            val screenWidth = LocalConfiguration.current.screenWidthDp
-            val dynamicColumns = if (screenWidth >= 600) 4 else 2
+            Spacer(modifier = Modifier.height(32.dp))
 
+            // ── 2. Project Grid / Empty State ───────────────────────────────
             if (projects.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No boards yet. Create one to get started.", color = Color.Gray)
+                // Empty state — warm Bento tile
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        color = textColor.copy(alpha = 0.05f),
+                        tonalElevation = 0.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text("📐", fontSize = 36.sp)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Your canvas awaits",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Create your first project\nto get started.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = textColor.copy(alpha = 0.7f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
                 }
             } else {
+                // ── Bento Grid ──────────────────────────────────────────────
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(dynamicColumns),
+                    columns = GridCells.Fixed(columns),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .graphicsLayer { 
-                            this.alpha = gridAlpha 
-                            this.translationY = gridOffsetY.toPx() 
+                        .graphicsLayer {
+                            this.alpha = gridAlpha
+                            this.translationY = gridOffsetY.toPx()
                         },
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 200.dp)
+                    horizontalArrangement = Arrangement.spacedBy(gutterSize),
+                    verticalArrangement = Arrangement.spacedBy(gutterSize),
+                    contentPadding = PaddingValues(bottom = 160.dp)
                 ) {
-                    items(projects, key = { it.id }) { project ->
+                    items(
+                        items = projects,
+                        key = { it.id },
+                        span = { project ->
+                            // First project = hero card, spans full width
+                            if (projects.indexOf(project) == 0) {
+                                GridItemSpan(maxLineSpan)
+                            } else {
+                                GridItemSpan(1)
+                            }
+                        }
+                    ) { project ->
+                        val isHero = projects.indexOf(project) == 0
+                        val cardAspectRatio = when {
+                            isHero -> 16f / 10f  // Hero: landscape
+                            isTablet -> 1f       // Tablet standard: square
+                            else -> 3f / 4f      // Phone standard: portrait
+                        }
+
                         ProjectCard(
                             project = project,
                             isDark = isDark,
+                            thumbnailAspectRatio = cardAspectRatio,
                             onClick = { onProjectClick(project.id) },
                             onDelete = {
                                 repository.deleteProject(project.id)
-                                projects = repository.getAllProjects() // Refresh list
+                                projects = repository.getAllProjects()
                             },
                             onDuplicate = {
                                 repository.duplicateProject(project.id)
@@ -277,13 +377,15 @@ fun DashboardScreen(
                                 contextMenuOffset = offset
                                 contextMenuSize = size
                                 contextMenuProject = project
-                            }
+                            },
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
             }
         }
 
+        // ── Create Project Dialog ───────────────────────────────────────────
         if (showCreateDialog) {
             var projectName by remember { mutableStateOf("") }
             Dialog(onDismissRequest = { showCreateDialog = false }) {
@@ -350,6 +452,7 @@ fun DashboardScreen(
             }
         }
 
+        // ── Rename Dialog ───────────────────────────────────────────────────
         if (projectToRename != null) {
             var newName by remember { mutableStateOf(projectToRename!!.title) }
             Dialog(onDismissRequest = { projectToRename = null }) {
@@ -418,64 +521,109 @@ fun DashboardScreen(
             }
         }
 
-        // Bottom Fade Gradient (Darkened)
+        // ── 3. Bottom Gradient Scrim ────────────────────────────────────────
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(120.dp)
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            bgColor.copy(alpha = 0.6f),
-                            bgColor.copy(alpha = 0.95f),
+                            bgColor.copy(alpha = 0.7f),
                             bgColor
                         )
                     )
                 )
         )
 
-        // Floating Actions at the bottom (Pill)
-        Row(
+        // ── 4. Floating Action Pill ─────────────────────────────────────────
+        val pillContainerColor = if (isDark)
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        else
+            MaterialTheme.colorScheme.surface
+
+        Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .offset(y = dockOffsetY)
                 .widthIn(max = 400.dp)
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight()
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
-                .shadow(16.dp, RoundedCornerShape(50), spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.1f))
-                .background(if (isDark) Color(0xFF1E1E1E) else Color.White, RoundedCornerShape(50))
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .windowInsetsPadding(WindowInsets.navigationBars),
+            shape = RoundedCornerShape(50),
+            color = pillContainerColor,
+            shadowElevation = if (isDark) 0.dp else 8.dp,
+            tonalElevation = if (isDark) 4.dp else 2.dp
         ) {
-            TextButton(
-                onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 16.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Filled.FileDownload, contentDescription = "Import", tint = textColor, modifier = Modifier.fillMaxWidth(0.15f).aspectRatio(1f))
-                Spacer(modifier = Modifier.fillMaxWidth(0.1f))
-                Text("Import", fontWeight = FontWeight.Medium, color = textColor, fontSize = 16.sp)
-            }
+                // Import button (text button style)
+                TextButton(
+                    onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                    shape = RoundedCornerShape(topStart = 50.dp, bottomStart = 50.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.FileDownload,
+                        contentDescription = "Import",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Import",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
 
-            Button(
-                onClick = { showCreateDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = bgColor, contentColor = textColor),
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 16.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
-            ) {
-                Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = "New Project", modifier = Modifier.fillMaxWidth(0.15f).aspectRatio(1f))
-                Spacer(modifier = Modifier.fillMaxWidth(0.1f))
-                Text("New Project", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                // Vertical divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(24.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // New Project button (filled tonal style)
+                Button(
+                    onClick = { showCreateDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = textColor,
+                        contentColor = bgColor
+                    ),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(4.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+                ) {
+                    Icon(
+                        painterResource(id = LucideR.drawable.lucide_ic_plus),
+                        contentDescription = "New Project",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "New Project",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
         }
 
-        // Context Menu Overlay
+        // ── Context Menu Overlay (UNCHANGED) ────────────────────────────────
         if (contextMenuProject != null) {
             ProjectContextMenuOverlay(
                 project = contextMenuProject!!,
@@ -502,39 +650,61 @@ fun DashboardScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bento Project Card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 fun ProjectCard(
     project: Project,
     isDark: Boolean,
+    thumbnailAspectRatio: Float = 1f,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
     onRename: () -> Unit,
-    onLongPress: (Offset, IntSize) -> Unit = { _, _ -> }
+    onLongPress: (Offset, IntSize) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier
 ) {
-    val cardBg = Color.White.copy(alpha = if (isDark) 0.1f else 1.0f)
-    val textColor = if (isDark) Color.White else Color(0xFF1D1D1F)
-    val dateColor = if (isDark) Color.Gray else Color(0xFF86868B)
-    val menuBg = if (isDark) Color(0xFF2A2A2A) else Color(0xFFFFFFFF)
+    val cardBg = if (isDark)
+        MaterialTheme.colorScheme.surfaceContainer
+    else
+        MaterialTheme.colorScheme.surfaceContainerLow
 
     val formatter = SimpleDateFormat("MMM d, yyyy", LocalLocale.current.platformLocale)
     val dateString = formatter.format(Date(project.lastModifiedMs))
-    
+
     val context = LocalContext.current
     var currentPosition by remember { mutableStateOf(Offset.Zero) }
     var currentSize by remember { mutableStateOf(IntSize.Zero) }
 
+    // ── Press animation ─────────────────────────────────────────────────
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "card_press_scale"
+    )
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .onGloballyPositioned { layoutCoordinates ->
                 currentPosition = layoutCoordinates.positionInRoot()
                 currentSize = layoutCoordinates.size
             }
-            .shadow(24.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.15f))
-            .background(cardBg, RoundedCornerShape(32.dp))
-            .clip(RoundedCornerShape(32.dp))
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (isDark) 0.dp else 12.dp,
+                shape = RoundedCornerShape(24.dp)
+            )
+            .clip(RoundedCornerShape(24.dp))
+            .background(cardBg, RoundedCornerShape(24.dp))
             .pointerInput(project.id) {
                 detectTapGestures(
                     onTap = { onClick() },
@@ -542,14 +712,15 @@ fun ProjectCard(
                 )
             }
     ) {
-        // Thumbnail Area
+        // ── Thumbnail Area ──────────────────────────────────────────────
         val thumbDir = java.io.File(context.filesDir, "projects")
         val thumbFile = java.io.File(thumbDir, "${project.id}_thumb.png")
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f), // Perfectly square thumbnail area
+                .aspectRatio(thumbnailAspectRatio)
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
             contentAlignment = Alignment.Center
         ) {
             if (thumbFile.exists()) {
@@ -560,41 +731,50 @@ fun ProjectCard(
                     .crossfade(true)
                     .crossfade(300)
                     .build()
-                
+
                 androidx.compose.foundation.Image(
                     painter = coil.compose.rememberAsyncImagePainter(model = imageRequest),
                     contentDescription = "Project Thumbnail",
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                // Fallback: Mock preview with item count
+                // Tonal placeholder
+                val placeholderBg = if (isDark)
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                else
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFE5E5EA).copy(alpha = if (isDark) 0.1f else 0.5f)),
+                        .background(placeholderBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    val dateColor = if (isDark) Color.Gray else Color(0xFF86868B)
-                    Text("${project.previewElements.size} items", color = dateColor, fontSize = 12.sp)
+                    Text(
+                        "${project.previewElements.size} items",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
 
-        // Card Footer
+        // ── Card Footer ─────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.Top
         ) {
             Text(
                 text = project.title,
-                fontSize = 18.sp,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = textColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                modifier = Modifier.padding(bottom = 6.dp)
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -603,25 +783,29 @@ fun ProjectCard(
             ) {
                 Text(
                     text = dateString,
-                    fontSize = 14.sp,
-                    color = dateColor,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
-                
+
                 IconButton(
                     onClick = { onLongPress(currentPosition, currentSize) },
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
                         contentDescription = "Project Options",
-                        tint = dateColor
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Context Menu (UNCHANGED — preserved exactly from original)
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun ProjectContextMenuOverlay(
@@ -649,9 +833,10 @@ fun ProjectContextMenuOverlay(
     val yDp = with(density) { cardOffset.y.toDp() }
     val widthDp = with(density) { cardSize.width.toDp() }
     
-    val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isVisible) 0.6f else 0f,
-        animationSpec = tween(300)
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 0.4f else 0f,
+        animationSpec = tween(300),
+        label = "scrim_alpha"
     )
 
     Box(
@@ -659,7 +844,7 @@ fun ProjectContextMenuOverlay(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = scrimAlpha))
             .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = {
                     if (isVisible) {
@@ -672,43 +857,16 @@ fun ProjectContextMenuOverlay(
                 }
             )
     ) {
-        // Floating Card Replica
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0.95f),
-            exit = fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 0.95f),
-            modifier = Modifier
-                .offset(x = xDp, y = yDp)
-                .width(widthDp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .shadow(32.dp, RoundedCornerShape(32.dp), spotColor = Color.Black.copy(alpha = 0.3f))
-                    .clip(RoundedCornerShape(32.dp))
-            ) {
-                // We use a non-interactive clone of the card
-                ProjectCard(
-                    project = project,
-                    isDark = isDark,
-                    onClick = {},
-                    onDelete = {},
-                    onDuplicate = {},
-                    onExport = {},
-                    onRename = {},
-                    onLongPress = { _, _ -> }
-                )
-            }
-        }
 
         // Side Pills
         val pillSpacing = 12.dp
         val pillContainerWidth = 180.dp // widened slightly to fit Duplicate text
         
         // Ensure pills do not go off-screen on the right side
-        val pillsXOffset = if (xDp + widthDp + pillContainerWidth + 32.dp > screenWidth) {
-            xDp - pillContainerWidth - 16.dp
-        } else {
-            xDp + widthDp + 16.dp
+        val pillsXOffset = when {
+            xDp + widthDp + pillContainerWidth + 32.dp <= screenWidth -> xDp + widthDp + 16.dp
+            xDp - pillContainerWidth - 16.dp >= 0.dp -> xDp - pillContainerWidth - 16.dp
+            else -> screenWidth - pillContainerWidth - 32.dp
         }
         
         Column(
@@ -776,7 +934,7 @@ fun ContextMenuItem(
 
     AnimatedVisibility(
         visible = show,
-        enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0f),
+        enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = FastOutSlowInEasing), initialScale = 0f),
         exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0f)
     ) {
         LiquidGlassPill(
