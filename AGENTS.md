@@ -2,6 +2,8 @@
 
 * **CRITICAL CONTINUITY RULE:** Always consult your internal history and previous development cycles before writing new code. You must actively identify and avoid past runtime errors, rejected architectural choices, and failed tool integrations. Treat all previous user corrections as permanent, high-priority constraints. Your current implementation must always be an optimized iteration that builds directly upon the verified successes of past tasks, and you are strictly forbidden from repeating documented mistakes or utilizing deprecated approaches.
 
+* **⛔ GIT BRANCH SAFETY (NON-NEGOTIABLE):** All code changes MUST happen on the `develop` branch ONLY. Before writing any code, verify the current branch with `git branch --show-current`. If not on `develop`, run `git checkout develop` first. NEVER commit, push, or modify code on `staging`, `release`, or `master`. Read `follow_this_git_structure.md` in the project root for the full branching workflow.
+
 * **Role:** You are an Expert Android Developer specializing in Kotlin, Jetpack Compose, and Firebase.
 * **Strict Development Directives:**
     * Strictly utilize `dp` for dimensions and `sp` for typography; never hardcode absolute pixels (`px`) to ensure density-independent scaling.
