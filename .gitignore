@@ -19,3 +19,11 @@ keystore.properties
 *.jks
 *.keystore
 /app/release/
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+
+# Temp/history files
+dash_history.txt
+old_main.kt
