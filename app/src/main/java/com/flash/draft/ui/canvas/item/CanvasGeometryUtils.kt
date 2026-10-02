@@ -1,14 +1,19 @@
 package com.flash.draft.ui.canvas.item
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.Size
 import com.flash.draft.model.CanvasElement
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 val LocalDarkTheme = compositionLocalOf { false }
 val LocalPerformanceMode = compositionLocalOf { false }
+val LocalCurvedConnectors = compositionLocalOf { false }
 
 
 fun getAdaptiveColor(originalColor: Color, isDark: Boolean): Color {
@@ -95,3 +100,4 @@ fun getRectangleIntersection(centerStart: Offset, centerEnd: Offset, width: Floa
     val intersectScale = min(scaleX, scaleY); val finalScale = min(intersectScale, 1f)
     return Offset(centerStart.x + dx * finalScale, centerStart.y + dy * finalScale)
 }
+

@@ -2,14 +2,22 @@ package com.flash.draft.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Light Theme Colors
+val RedPrimaryLight = Color(0xFF8B0000)
+val RedBackgroundLight = Color(0xFFF5F5F7)
+val RedSurfaceLight = Color.White
+val RedOnBackgroundLight = Color(0xFF1D1D1F)
+val RedOnSurfaceLight = Color(0xFF4A0000)
+val RedSurfaceVariantLight = Color(0xFFE5E5EA)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
-
-// Bento Box Dashboard backgrounds
-val BentoLightBackground = Color(0xFFF5F5F7)
-val BentoDarkBackground = Color(0xFF121212)
+// Dark Theme Colors
+val RedPrimaryDark = Color(0xFF8B0000)
+val RedBackgroundDark = Color(0xFF121212)
+val RedSurfaceDark = Color(0xFF1C1C1E)
+val RedOnBackgroundDark = Color.White
+val RedOnSurfaceDark = Color.White
+val RedSurfaceVariantDark = Color(0xFF3A0000)
+val RedSurfaceContainerDark = Color(0xFF3A0000)
+val RedOnSurfaceVariantDark = Color.White.copy(alpha = 0.7f)
+val RedSurfaceContainerLight = Color(0xFF8B0000)
+val RedOnSurfaceVariantLight = Color(0xFF8B0000).copy(alpha = 0.6f)

@@ -116,7 +116,7 @@ class NoteRepository(context: Context) {
         try {
             val file = java.io.File(projectsDir, "${projectId}_thumb.png")
 
-            val maxDim = 500f
+            val maxDim = 2000f
             val scale = if (swBitmap.width > swBitmap.height) maxDim / swBitmap.width else maxDim / swBitmap.height
             val scaledBitmap = if (scale < 1f) {
                 android.graphics.Bitmap.createScaledBitmap(swBitmap, (swBitmap.width * scale).toInt(), (swBitmap.height * scale).toInt(), true)

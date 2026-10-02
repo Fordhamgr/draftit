@@ -2,7 +2,7 @@ package com.flash.draft
 
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import com.flash.draft.R
+import com.flash.draft99.R
 
 object AppFonts {
     // Reference the local .ttf files in your res/font folder

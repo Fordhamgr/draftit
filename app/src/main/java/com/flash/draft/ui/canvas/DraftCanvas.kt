@@ -601,6 +601,7 @@ fun DraftCanvas(
     CompositionLocalProvider(
         LocalDarkTheme provides isDarkTheme,
         com.flash.draft.ui.canvas.item.LocalPerformanceMode provides (isPerformanceMode && !isExporting),
+
         LocalLiquidState provides liquidState,
         LocalLiquidRefraction provides liquidRefraction,
         LocalLiquidCurve provides liquidCurve
@@ -780,7 +781,8 @@ fun DraftCanvas(
                                     if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
                                         val startDim = getElementDimensions(el.startId, elements); val endDim = getElementDimensions(el.endId, elements)
                                         val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f); val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
-                                        if (distancePointToSegment(worldTap, start, end) < (60f / scale)) {
+                                        val hitDist = distancePointToSegment(worldTap, start, end)
+                                        if (hitDist < (60f / scale)) {
                                             tappedConnector = el
                                             break
                                         }

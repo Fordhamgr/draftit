@@ -11,6 +11,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,8 +102,37 @@ fun CanvasItemWrapper(
 
     var isEditingLink by remember { mutableStateOf(false) }
     var linkTargetInput by remember(hyperlinkTarget) { mutableStateOf(hyperlinkTarget ?: "") }
-    
 
+    // ── Bubble animation for toolbars ───────────────────────────────────
+    // Track previous selection state to trigger the animation only on transition
+    var wasSelected by remember { mutableStateOf(false) }
+    var bubbleAnimTrigger by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isSelected) {
+        if (isSelected && !wasSelected) {
+            // Just became selected — trigger bubble grow
+            bubbleAnimTrigger = false
+            // Small delay to reset the animation state before growing
+            delay(16)
+            bubbleAnimTrigger = true
+        }
+        wasSelected = isSelected
+    }
+
+    val bubbleScale by animateFloatAsState(
+        targetValue = if (isSelected && bubbleAnimTrigger) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "bubble_scale"
+    )
+
+    val bubbleAlpha by animateFloatAsState(
+        targetValue = if (isSelected && bubbleAnimTrigger) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "bubble_alpha"
+    )
 
     Box(
         modifier = Modifier
@@ -195,9 +226,13 @@ fun CanvasItemWrapper(
         }
 
         if (isSelected) {
+            // All toolbars and overlays live INSIDE this explicitly-sized Box.
+            // Alignment against requiredSize is pixel-accurate at ANY item dimension.
             Box(modifier = Modifier.requiredSize(width.dp, height.dp)) {
+                // Selection border
                 Box(modifier = Modifier.fillMaxSize().border(2.dp, Color(0xFF2196F3), RoundedCornerShape(12.dp)))
 
+                // Resize handle (bottom-right)
                 if (!isLocked) {
                     Box(
                         modifier = Modifier
@@ -226,66 +261,157 @@ fun CanvasItemWrapper(
                         )
                     }
                 }
-            }
 
-            Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-16).dp).wrapContentWidth(unbounded = true)) {
-                Box(modifier = Modifier.graphicsLayer { translationY = -size.height }) {
-                    Row(
+                // ── TOP TOOLBAR (custom content: fonts, size, colors) ────────
+                // Anchored to TopCenter of the requiredSize parent — always tracks.
+                if (customMenuContent != null) {
+                    Box(
                         modifier = Modifier
-                            .wrapContentSize()
-                            .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
-                            .then(
-                                if (LocalLiquidState.current != null && !isPerformance) {
-                                    val currentRefraction = LocalLiquidRefraction.current
-                                    val currentCurve = LocalLiquidCurve.current
-                                    Modifier.liquid(LocalLiquidState.current!!) {
-                                        refraction = currentRefraction
-                                        curve = currentCurve
-                                        shape = RoundedCornerShape(24.dp)
-                                    }
-                                } else Modifier
-                            )
-                            .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(24.dp))
-                            .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-16).dp)
+                            .wrapContentSize(unbounded = true)
                     ) {
-                        if (customMenuContent != null) {
-                            customMenuContent()
-                            Box(modifier = Modifier.width(1.dp).height(48.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                        }
-
-                        // Utility Items Grid (2x3 or flow)
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.CallMade, contentDescription = "Connect", tint = Color(0xFF2196F3), modifier = Modifier.size(22.dp).clickable { currentOnConnectRequest() })
-                                
-                                val hasHyperlink = hyperlinkTarget != null
-                                Icon(Icons.Default.Link, contentDescription = "Link", tint = if (hasHyperlink) Color(0xFF4CAF50) else Color.Gray, modifier = Modifier.size(22.dp).clickable { isEditingLink = !isEditingLink })
-                                
-                                val isTeleportable = hasHyperlink && (
-                                    (hyperlinkTarget!!.startsWith("scene:") && hyperlinkTarget.length > "scene:".length) || 
-                                    (hyperlinkTarget.startsWith("board:") && hyperlinkTarget.length > "board:".length)
-                                )
-                                if (isTeleportable) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Teleport", tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp).clickable { currentOnLinkUpdate("TELEPORT") })
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    translationY = -size.height
+                                    scaleX = bubbleScale
+                                    scaleY = bubbleScale
+                                    alpha = bubbleAlpha
+                                    transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(if (isLocked) androidx.compose.material.icons.Icons.Default.Lock else androidx.compose.material.icons.Icons.Default.LockOpen, contentDescription = "Lock", tint = if (isLocked) Color.Red else Color.Gray, modifier = Modifier.size(22.dp).clickable { currentOnLockedChange(!isLocked) })
-                                if (currentOnDuplicate != null) {
-                                    Icon(androidx.compose.material.icons.Icons.Default.ContentCopy, contentDescription = "Duplicate", tint = Color.Gray, modifier = Modifier.size(22.dp).clickable { currentOnDuplicate?.invoke() })
-                                }
-                                Icon(androidx.compose.material.icons.Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(22.dp).clickable { currentOnDelete() })
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .wrapContentSize()
+                                    .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
+                                    .then(
+                                        if (LocalLiquidState.current != null && !isPerformance) {
+                                            val currentRefraction = LocalLiquidRefraction.current
+                                            val currentCurve = LocalLiquidCurve.current
+                                            Modifier.liquid(LocalLiquidState.current!!) {
+                                                refraction = currentRefraction
+                                                curve = currentCurve
+                                                shape = RoundedCornerShape(24.dp)
+                                            }
+                                        } else Modifier
+                                    )
+                                    .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(24.dp))
+                                    .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                customMenuContent()
                             }
                         }
                     }
-                        
-                        // 3. Link Editor Dialog (Inline next to pill)
-                        androidx.compose.animation.AnimatedVisibility(visible = isEditingLink) {
+                }
+
+                // ── RIGHT TOOLBAR (utility actions) ──────────────────────────
+                // Anchored to TopEnd of the requiredSize parent — always tracks
+                // the right edge, just like the resize handle tracks BottomEnd.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 16.dp)
+                        .wrapContentSize(unbounded = true)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationX = size.width
+                                scaleX = bubbleScale
+                                scaleY = bubbleScale
+                                alpha = bubbleAlpha
+                                transformOrigin = TransformOrigin(0f, 0f)
+                            }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .wrapContentSize()
+                                .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
+                                .then(
+                                    if (LocalLiquidState.current != null && !isPerformance) {
+                                        val currentRefraction = LocalLiquidRefraction.current
+                                        val currentCurve = LocalLiquidCurve.current
+                                        Modifier.liquid(LocalLiquidState.current!!) {
+                                            refraction = currentRefraction
+                                            curve = currentCurve
+                                            shape = RoundedCornerShape(20.dp)
+                                        }
+                                    } else Modifier
+                                )
+                                .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(20.dp))
+                                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(20.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.CallMade,
+                                contentDescription = "Connect",
+                                tint = Color(0xFF2196F3),
+                                modifier = Modifier.size(22.dp).clickable { currentOnConnectRequest() }
+                            )
+
+                            val hasHyperlink = hyperlinkTarget != null
+                            Icon(
+                                Icons.Default.Link,
+                                contentDescription = "Link",
+                                tint = if (hasHyperlink) Color(0xFF4CAF50) else Color.Gray,
+                                modifier = Modifier.size(22.dp).clickable { isEditingLink = !isEditingLink }
+                            )
+
+                            val isTeleportable = hasHyperlink && (
+                                (hyperlinkTarget!!.startsWith("scene:") && hyperlinkTarget.length > "scene:".length) ||
+                                (hyperlinkTarget.startsWith("board:") && hyperlinkTarget.length > "board:".length)
+                            )
+                            if (isTeleportable) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Teleport",
+                                    tint = Color(0xFF4CAF50),
+                                    modifier = Modifier.size(22.dp).clickable { currentOnLinkUpdate("TELEPORT") }
+                                )
+                            }
+
+                            Box(modifier = Modifier.width(24.dp).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
+
+                            Icon(
+                                if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = "Lock",
+                                tint = if (isLocked) Color.Red else Color.Gray,
+                                modifier = Modifier.size(22.dp).clickable { currentOnLockedChange(!isLocked) }
+                            )
+
+                            if (currentOnDuplicate != null) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Duplicate",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(22.dp).clickable { currentOnDuplicate?.invoke() }
+                                )
+                            }
+
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.Red,
+                                modifier = Modifier.size(22.dp).clickable { currentOnDelete() }
+                            )
+                        }
+
+                        // Link Editor Dialog
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = isEditingLink,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .offset(y = 8.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
+                                    .graphicsLayer { translationY = size.height }
                                     .then(if (!isPerformance && !isDark) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier)
                                     .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(12.dp))
                                     .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(12.dp))
@@ -312,5 +438,6 @@ fun CanvasItemWrapper(
                     }
                 }
             }
+        }
     }
 }

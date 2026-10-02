@@ -1,6 +1,7 @@
 package com.flash.draft.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,21 +46,40 @@ fun SettingsScreen(
     val secondaryTextColor = if (isDarkMode) Color(0xFFEBEBF5).copy(alpha = 0.6f) else Color(0xFF3C3C43).copy(alpha = 0.6f)
     val actionBlue = Color(0xFF007AFF)
 
+    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBackIos, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = backgroundColor,
-                    titleContentColor = textColor,
-                    navigationIconContentColor = textColor
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isTablet) 24.dp else 16.dp)
+                    .padding(top = if (isTablet) 24.dp else 16.dp, bottom = if (isTablet) 16.dp else 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(if (isTablet) 48.dp else 40.dp)
+                        .border(1.dp, textColor.copy(alpha = 0.15f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBackIos, 
+                        contentDescription = "Back",
+                        modifier = Modifier
+                            .size(if (isTablet) 20.dp else 16.dp)
+                            .offset(x = 2.dp),
+                        tint = textColor
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Settings",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (isTablet) 28.sp else 22.sp,
+                    color = textColor
                 )
-            )
+            }
         },
         containerColor = backgroundColor
     ) { padding ->
@@ -168,6 +188,19 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleHapticFeedback(it) },
                             textColor = textColor
                         )
+                    }
+                }
+
+                item {
+                    SettingsGroup(title = "EXPERIMENTAL", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
+                        Column {
+                            Text(
+                                text = "More experimental features coming soon",
+                                fontSize = 15.sp,
+                                color = secondaryTextColor,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            )
+                        }
                     }
                 }
 

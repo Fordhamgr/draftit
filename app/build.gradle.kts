@@ -17,15 +17,15 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.flash.draft"
+    namespace = "com.flash.draft99"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.flash.draft"
+        applicationId = "com.flash.draft99"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -54,6 +54,9 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
+            }
+            ndk {
+                debugSymbolLevel = "FULL"
             }
         }
     }

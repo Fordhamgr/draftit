@@ -93,9 +93,6 @@ class MainActivity : ComponentActivity() {
             
 
 
-            // Override the MaterialTheme color scheme based on user setting
-            val colorScheme = if (isDarkMode) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme()
-
             val nativeHaptic = LocalHapticFeedback.current
             val customHaptic = remember(isHapticFeedbackEnabled, nativeHaptic) {
                 object : HapticFeedback {
@@ -108,7 +105,7 @@ class MainActivity : ComponentActivity() {
             }
 
             CompositionLocalProvider(LocalHapticFeedback provides customHaptic) {
-                MaterialTheme(colorScheme = colorScheme) {
+                com.flash.draft.ui.theme.DraftitTheme(darkTheme = isDarkMode, dynamicColor = false) {
                 AdaptiveLayout {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
