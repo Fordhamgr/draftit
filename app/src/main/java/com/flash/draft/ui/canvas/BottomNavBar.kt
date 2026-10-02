@@ -35,6 +35,12 @@ import io.github.fletchmckee.liquid.liquid
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import com.flash.draft.ui.canvas.tools.InsertToolStack
 
 @Composable
@@ -46,6 +52,8 @@ fun BottomNavBar(
     showDynamicLeft: Boolean,
     onDynamicLeftClick: () -> Unit,
     dynamicLeftContent: @Composable () -> Unit,
+    isDrawToolsExpanded: Boolean,
+    expandedToolsContent: @Composable () -> Unit,
     onPdfClick: () -> Unit,
     onMediaClick: () -> Unit,
     onCodeClick: () -> Unit,
@@ -84,28 +92,62 @@ fun BottomNavBar(
         // ----------------------------------------------------
         // 1. DYNAMIC PILL (Bottom Left - Perfect Circle)
         // ----------------------------------------------------
+        // --- MORPHING PILL: Circle → Expanded Tool Dock ---
         AnimatedVisibility(
             visible = showDynamicLeft,
             enter = scaleIn(tween(250)) + fadeIn(tween(250)),
             exit = scaleOut(tween(200)) + fadeOut(tween(200)),
             modifier = Modifier.align(Alignment.BottomStart)
         ) {
+            val morphSpec = spring<androidx.compose.ui.unit.Dp>(dampingRatio = 0.78f, stiffness = 400f)
+            val cornerRadius by animateDpAsState(
+                targetValue = if (isDrawToolsExpanded) 28.dp else dockHeight / 2,
+                animationSpec = morphSpec,
+                label = "cornerMorph"
+            )
+            val morphShape = RoundedCornerShape(cornerRadius)
+
             Box(
                 modifier = Modifier
-                    .size(dockHeight)
-                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                            refraction = liquidRefraction; curve = liquidCurve; shape = CircleShape
+                            refraction = liquidRefraction; curve = liquidCurve; shape = morphShape
                         } else Modifier
                     )
-                    .background(glassBg, CircleShape)
-                    .border(2.dp, glassBorder.copy(alpha = 0.6f), CircleShape)
-                    .clip(CircleShape)
-                    .clickable { onDynamicLeftClick() },
-                contentAlignment = Alignment.Center
+                    .background(glassBg, morphShape)
+                    .border(
+                        width = if (isDrawToolsExpanded) 1.dp else 2.dp,
+                        color = glassBorder.copy(alpha = if (isDrawToolsExpanded) 1f else 0.6f),
+                        shape = morphShape
+                    )
+                    // .clip(morphShape) -> Removed to allow SVG tools to stick out (iOS style)
+                    .clickable(
+                        interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { if (!isDrawToolsExpanded) onDynamicLeftClick() }
             ) {
-                dynamicLeftContent()
+                AnimatedContent(
+                    targetState = isDrawToolsExpanded,
+                    transitionSpec = {
+                        (fadeIn(tween(300, delayMillis = 150)) togetherWith fadeOut(tween(150)))
+                            .using(SizeTransform(clip = false) { _, _ ->
+                                spring(dampingRatio = 0.78f, stiffness = 400f)
+                            })
+                    },
+                    label = "pillMorph"
+                ) { expanded ->
+                    if (expanded) {
+                        expandedToolsContent()
+                    } else {
+                        Box(
+                            modifier = Modifier.size(dockHeight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            dynamicLeftContent()
+                        }
+                    }
+                }
             }
         }
 
@@ -113,7 +155,7 @@ fun BottomNavBar(
         // 2. MAIN DOCK (Center - Dynamically Shrinking)
         // ----------------------------------------------------
         AnimatedVisibility(
-            visible = !isInsertMenuOpen,
+            visible = !isInsertMenuOpen && !isDrawToolsExpanded,
             enter = scaleIn(spring(stiffness = 400f)) + fadeIn(),
             exit = scaleOut(spring(stiffness = 400f)) + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -150,10 +192,20 @@ fun BottomNavBar(
         // ----------------------------------------------------
         // 3. SEPARATE '+' PILL (Bottom Right)
         // ----------------------------------------------------
+        // --- + BUTTON: Collapses when draw tools are expanded ---
+        val plusScale by animateFloatAsState(if (isDrawToolsExpanded) 0.5f else 1f, spring(stiffness = 400f), label = "plusScale")
+        val plusAlpha by animateFloatAsState(if (isDrawToolsExpanded) 0f else 1f, tween(200), label = "plusAlpha")
+
         val popoverShape = RoundedCornerShape(24.dp)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .graphicsLayer {
+                    alpha = plusAlpha
+                    scaleX = plusScale
+                    scaleY = plusScale
+                    transformOrigin = TransformOrigin(1f, 1f)
+                }
                 .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
@@ -173,7 +225,7 @@ fun BottomNavBar(
                         .clickable(
                             interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
-                        ) { onAddClick() },
+                        ) { if (!isDrawToolsExpanded) onAddClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

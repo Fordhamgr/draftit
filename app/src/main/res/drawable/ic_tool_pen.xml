@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="120dp"
+    android:viewportWidth="60"
+    android:viewportHeight="300">
+
+    <!-- Clicker Mechanism -->
+    <path android:pathData="M22,10 L38,10 L38,25 L22,25 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="22" android:startY="0"
+                android:endX="38" android:endY="0">
+                <item android:offset="0" android:color="#FF999999"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="0.7" android:color="#FFcccccc"/>
+                <item android:offset="1" android:color="#FF666666"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Top Cap -->
+    <path android:pathData="M15,25 C15,15 45,15 45,25 L45,80 L15,80 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="15" android:startY="0"
+                android:endX="45" android:endY="0">
+                <item android:offset="0" android:color="#FF999999"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="0.7" android:color="#FFcccccc"/>
+                <item android:offset="1" android:color="#FF666666"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Pocket Clip -->
+    <path android:pathData="M12,30 L18,30 L18,100 C18,105 12,105 12,100 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="12" android:startY="0"
+                android:endX="18" android:endY="0">
+                <item android:offset="0" android:color="#FF999999"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="0.7" android:color="#FFcccccc"/>
+                <item android:offset="1" android:color="#FF666666"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Main Barrel -->
+    <path android:pathData="M15,80 L45,80 L45,230 L15,230 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="15" android:startY="0"
+                android:endX="45" android:endY="0">
+                <item android:offset="0" android:color="#FF2a2a2a"/>
+                <item android:offset="0.3" android:color="#FF5a5a5a"/>
+                <item android:offset="0.7" android:color="#FF2a2a2a"/>
+                <item android:offset="1" android:color="#FF111111"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Metal Tip Base -->
+    <path android:pathData="M15,230 L45,230 L35,270 L25,270 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="15" android:startY="0"
+                android:endX="45" android:endY="0">
+                <item android:offset="0" android:color="#FF999999"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="0.7" android:color="#FFcccccc"/>
+                <item android:offset="1" android:color="#FF666666"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Ink Tip -->
+    <path android:pathData="M27,270 L33,270 L31,280 L29,280 Z"
+        android:fillColor="#FF111111"/>
+</vector>

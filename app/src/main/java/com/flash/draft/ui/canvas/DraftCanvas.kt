@@ -1227,24 +1227,7 @@ fun DraftCanvas(
                     val deselectAll = { isDrawingMode = false; isConnectingMode = false; isLassoMode = false; connectingStartNodeId = null; selectedGroupIds = emptySet(); isInsertMenuOpen = false }
 
                     // --- NEW: THE VERTICAL DRAW TOOL STACK & POPOUTS ---
-                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 108.dp).zIndex(2f)) {
-                        com.flash.draft.ui.canvas.tools.DrawToolStack(
-                            isOpen = isDrawingMode && isDrawMenuOpen,
-                            activeColor = activeDrawColor,
-                            activeToolType = activeToolType,
-                            activeSubMenu = activeSubMenu,
-                            onToolChange = { tool ->
-                                activeToolType = tool
-                                activeSubMenu = if (tool != "Eraser") "Brush" else null
-                            },
-                            onColorClick = { activeSubMenu = if (activeSubMenu == "Color") null else "Color" },
-                            onThicknessClick = { activeSubMenu = if (activeSubMenu == "Thickness") null else "Thickness" },
-                            activeStrokeWidth = activeStrokeWidth,
-                            onStrokeWidthChange = { activeStrokeWidth = it },
-                            onColorSelect = { activeDrawColor = it },
-                            onRainbowClick = { activeSubMenu = "CustomColor" }
-                        )
-                    }
+                    // Draw tools are now embedded inside the morphing BottomNavBar
 
                     // Group Selection Overlay
                     androidx.compose.animation.AnimatedVisibility(
@@ -1288,7 +1271,7 @@ fun DraftCanvas(
                         }
                     }
 
-                    Box(modifier = Modifier.align(Alignment.BottomCenter).zIndex(2f)) {
+                    Box(modifier = Modifier.align(Alignment.BottomCenter).zIndex(2f), contentAlignment = Alignment.BottomCenter) {
                         androidx.compose.animation.AnimatedVisibility(
                             visible = !(showConnectorMenu && activeConnector != null && !isCanvasLocked),
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { 50 }),
@@ -1315,7 +1298,26 @@ fun DraftCanvas(
                             },
                             showDynamicLeft = isDrawingMode,
                             onDynamicLeftClick = {
-                                isDrawMenuOpen = !isDrawMenuOpen // Toggles the vertical stack!
+                                isDrawMenuOpen = !isDrawMenuOpen // Toggles the morphing stack!
+                            },
+                            isDrawToolsExpanded = isDrawingMode && isDrawMenuOpen,
+                            expandedToolsContent = {
+                                com.flash.draft.ui.canvas.tools.DrawToolsContent(
+                                    activeColor = activeDrawColor,
+                                    activeToolType = activeToolType,
+                                    activeSubMenu = activeSubMenu,
+                                    onToolChange = { tool ->
+                                        activeToolType = tool
+                                        activeSubMenu = if (tool != "Eraser") "Brush" else null
+                                    },
+                                    onColorClick = { activeSubMenu = if (activeSubMenu == "Color") null else "Color" },
+                                    onThicknessClick = { activeSubMenu = if (activeSubMenu == "Thickness") null else "Thickness" },
+                                    activeStrokeWidth = activeStrokeWidth,
+                                    onStrokeWidthChange = { activeStrokeWidth = it },
+                                    onColorSelect = { activeDrawColor = it },
+                                    onRainbowClick = { activeSubMenu = "CustomColor" },
+                                    onClose = { isDrawMenuOpen = false }
+                                )
                             },
                             onPdfClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")); isInsertMenuOpen = false },
                             onMediaClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)); isInsertMenuOpen = false },
@@ -1374,6 +1376,20 @@ fun DraftCanvas(
                             }
                         )
                         }
+
+                        // Floating Draw Tools (completely separated from the dock!)
+                        // Floating Draw Tools (staggered animation handled internally)
+                        com.flash.draft.ui.canvas.tools.FloatingDrawTools(
+                            isVisible = isDrawingMode && isDrawMenuOpen && activeSubMenu != "Color" && activeSubMenu != "CustomColor" && activeSubMenu != "Thickness",
+                            activeToolType = activeToolType,
+                            onToolChange = { tool ->
+                                activeToolType = tool
+                                activeSubMenu = if (tool != "Eraser") "Brush" else null
+                            },
+                            modifier = Modifier
+                                .navigationBarsPadding()
+                                .padding(bottom = 84.dp) // Perfect height above the slim pill!
+                        )
                     }
                 }
                 } // END OF BOTTOM WORKSPACE BAR VISIBILITY

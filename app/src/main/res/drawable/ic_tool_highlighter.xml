@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="120dp"
+    android:viewportWidth="60"
+    android:viewportHeight="300">
+
+    <!-- Cap -->
+    <path android:pathData="M10,30 C10,15 50,15 50,30 L50,90 L10,90 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="10" android:startY="0"
+                android:endX="50" android:endY="0">
+                <item android:offset="0" android:color="#FFcccc22"/>
+                <item android:offset="0.3" android:color="#FFffff33"/>
+                <item android:offset="0.7" android:color="#FFdddd22"/>
+                <item android:offset="1" android:color="#FFaaaa11"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Clip on Cap -->
+    <path android:pathData="M27,25 L33,25 A5,5 0 0,1 38,30 L38,75 A5,5 0 0,1 33,80 L27,80 A5,5 0 0,1 22,75 L22,30 A5,5 0 0,1 27,25 Z"
+        android:fillColor="#FFe5d925"
+        android:fillAlpha="0.8"/>
+
+    <!-- Main Body -->
+    <path android:pathData="M15,92 L45,92 A3,3 0 0,1 48,95 L48,229 A3,3 0 0,1 45,232 L15,232 A3,3 0 0,1 12,229 L12,95 A3,3 0 0,1 15,92 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="12" android:startY="0"
+                android:endX="48" android:endY="0">
+                <item android:offset="0" android:color="#FFd4c919"/>
+                <item android:offset="0.3" android:color="#FFffff66"/>
+                <item android:offset="0.7" android:color="#FFe5d925"/>
+                <item android:offset="1" android:color="#FFb2a812"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Tapered Neck -->
+    <path android:pathData="M12,232 L48,232 L40,255 L20,255 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="12" android:startY="0"
+                android:endX="48" android:endY="0">
+                <item android:offset="0" android:color="#FFcccc22"/>
+                <item android:offset="0.3" android:color="#FFffff33"/>
+                <item android:offset="0.7" android:color="#FFdddd22"/>
+                <item android:offset="1" android:color="#FFaaaa11"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Chisel Tip -->
+    <path android:pathData="M22,255 L38,255 L38,270 L22,280 Z"
+        android:fillColor="#FFffff00"/>
+</vector>

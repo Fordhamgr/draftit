@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="120dp"
+    android:viewportWidth="60"
+    android:viewportHeight="300">
+
+    <!-- Pink Eraser Top -->
+    <path android:pathData="M10,25 C10,10 50,10 50,25 L50,40 L10,40 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="10" android:startY="0"
+                android:endX="50" android:endY="0">
+                <item android:offset="0" android:color="#FFffb5a7"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="1" android:color="#FFf08080"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Metal Ferrule -->
+    <path android:pathData="M10,40 L50,40 L50,65 L10,65 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="10" android:startY="0"
+                android:endX="50" android:endY="0">
+                <item android:offset="0" android:color="#FF999999"/>
+                <item android:offset="0.3" android:color="#FFffffff"/>
+                <item android:offset="0.7" android:color="#FFcccccc"/>
+                <item android:offset="1" android:color="#FF666666"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Ferrule Lines -->
+    <path android:pathData="M10,45 L50,45"
+        android:strokeColor="#FF777777"
+        android:strokeWidth="1"
+        android:fillColor="#00000000"/>
+    <path android:pathData="M10,60 L50,60"
+        android:strokeColor="#FF777777"
+        android:strokeWidth="1"
+        android:fillColor="#00000000"/>
+
+    <!-- Orange Painted Body -->
+    <path android:pathData="M10,65 L50,65 L50,240 L10,240 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="10" android:startY="0"
+                android:endX="50" android:endY="0">
+                <item android:offset="0" android:color="#FFe76f51"/>
+                <item android:offset="0.3" android:color="#FFf4a261"/>
+                <item android:offset="0.7" android:color="#FFe76f51"/>
+                <item android:offset="1" android:color="#FFbc472a"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Exposed Wood Cone -->
+    <path android:pathData="M10,240 L50,240 L30,285 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="10" android:startY="0"
+                android:endX="50" android:endY="0">
+                <item android:offset="0" android:color="#FFd4a373"/>
+                <item android:offset="0.5" android:color="#FFfaedcd"/>
+                <item android:offset="1" android:color="#FFa68a64"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Graphite Tip -->
+    <path android:pathData="M23,270 L37,270 L30,290 Z"
+        android:fillColor="#FF333333"/>
+</vector>
