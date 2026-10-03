@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -52,60 +53,81 @@ fun ImageItem(
         onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = imageCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(imageCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             val isDark = LocalDarkTheme.current
+            val btnBg = if (isDark) Color(0xFF2A2A2E) else Color(0xFFF0F0F0)
+            val textColor = if (isDark) Color.White else Color.Black
+            val highlightBg = Color(0xFF2979FF)
             
-            Row(
-                modifier = Modifier
-                    .height(48.dp)
-                    .background(if (isDark) Color(0x33000000) else Color(0x0D000000), RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Alpha Slider (Miniaturized)
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(100.dp)) {
-                    Text("A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
-                    Slider(
-                        value = imageCard.alpha, 
-                        onValueChange = { onUpdate(imageCard.copy(alpha = it)) }, 
-                        onValueChangeFinished = onSaveRequest, 
-                        valueRange = 0.1f..1f,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+            Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Opacity Row
+                    Row(
+                        modifier = Modifier
+                            .width(408.dp)
+                            .height(56.dp)
+                            .background(btnBg, RoundedCornerShape(28.dp))
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Opacity, contentDescription = null, tint = textColor, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("OPACITY", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textColor, letterSpacing = 1.sp)
+                        
+                        Spacer(Modifier.width(16.dp))
+                        
+                        Slider(
+                            value = imageCard.alpha, 
+                            onValueChange = { onUpdate(imageCard.copy(alpha = it)) }, 
+                            onValueChangeFinished = onSaveRequest, 
+                            valueRange = 0.1f..1f,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Spacer(Modifier.width(16.dp))
+                        
+                        Box(
+                            modifier = Modifier
+                                .background(if (isDark) Color(0xFF1E1E1E) else Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("${(imageCard.alpha * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textColor)
+                        }
+                    }
+                    
+                    // Buttons Row
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        @Composable
+                        fun ToolBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, isHighlighted: Boolean = false, onClick: () -> Unit) {
+                            Column(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .background(if (isHighlighted) highlightBg else btnBg, RoundedCornerShape(20.dp))
+                                    .clickable { onClick() },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(icon, contentDescription = label, tint = if (isHighlighted) Color.White else textColor, modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.height(4.dp))
+                                Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (isHighlighted) Color.White else textColor)
+                            }
+                        }
 
-                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-
-                IconButton(onClick = { onUpdate(imageCard.copy(scaleX = imageCard.scaleX * -1f)); onSaveRequest() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.SwapHoriz, "Flip H", modifier = Modifier.size(20.dp))
+                        ToolBtn(Icons.Default.SwapHoriz, "Flip X") { onUpdate(imageCard.copy(scaleX = imageCard.scaleX * -1f)); onSaveRequest() }
+                        ToolBtn(Icons.Default.SwapVert, "Flip Y") { onUpdate(imageCard.copy(scaleY = imageCard.scaleY * -1f)); onSaveRequest() }
+                        ToolBtn(Icons.Default.AspectRatio, "Aspect") {
+                            val ratio = imageCard.originalWidth / imageCard.originalHeight
+                            val newHeight = imageCard.width / ratio
+                            onUpdate(imageCard.copy(height = newHeight, scaleX = 1f, scaleY = 1f))
+                            onSaveRequest()
+                        }
+                        ToolBtn(Icons.Default.ContentCopy, "Copy") { onDuplicate() }
+                        ToolBtn(Icons.Default.AutoFixHigh, "Eraser", isHighlighted = true) { onMakeSticker() }
+                    }
                 }
-                IconButton(onClick = { onUpdate(imageCard.copy(scaleY = imageCard.scaleY * -1f)); onSaveRequest() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.SwapVert, "Flip V", modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = { onUpdate(imageCard.copy(rotation = imageCard.rotation + 90f)); onSaveRequest() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.RotateRight, "Rotate", modifier = Modifier.size(20.dp))
-                }
-
-                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-
-                // Reset Ratio
-                IconButton(onClick = {
-                    val ratio = imageCard.originalWidth / imageCard.originalHeight
-                    val newHeight = imageCard.width / ratio
-                    onUpdate(imageCard.copy(height = newHeight, scaleX = 1f, scaleY = 1f))
-                    onSaveRequest()
-                }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.AspectRatio, "Reset Ratio", modifier = Modifier.size(20.dp), tint = Color(0xFF007AFF))
-                }
-
-                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-
-                IconButton(onClick = onDuplicate, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.ContentCopy, "Duplicate", modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onMakeSticker, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.AutoFixHigh, "Make Sticker", tint = Color(0xFF673AB7), modifier = Modifier.size(20.dp))
-                }
-            }
         }
     ) { isLocked ->
         val context = LocalContext.current

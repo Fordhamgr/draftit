@@ -611,7 +611,7 @@ fun DraftCanvas(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isDarkTheme) Color(0xFF121212) else Color(0xFFF0F0F0))
+                .background(Color(0xFFF0F0F0))
                 .onSizeChanged { size ->
                     centerX = size.width / 2f; centerY = size.height / 2f
                     if (offsetX == 0f && offsetY == 0f) { offsetX = centerX; offsetY = centerY }

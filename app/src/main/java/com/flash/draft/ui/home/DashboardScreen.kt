@@ -289,7 +289,7 @@ fun DashboardScreen(
             ) {
                 // Title
                 Text(
-                    text = "Projects",
+                    text = "Dashboard",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = textColor,
@@ -392,7 +392,7 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isTablet) 28.dp else 24.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
 
             // ── 3. Section Header: "Recent Files" + "View all" ──────────
             Row(
@@ -679,7 +679,7 @@ fun DashboardScreen(
             )
             Surface(
                 shape = RoundedCornerShape(cornerRadius),
-                color = accentColor,
+                color = if (isDark) Color.White else Color.Black,
                 shadowElevation = if (fabState == FabState.COLLAPSED) 6.dp else 16.dp,
                 modifier = Modifier.size(width, height)
             ) {
@@ -699,7 +699,7 @@ fun DashboardScreen(
                             Icon(
                                 painterResource(id = LucideR.drawable.lucide_ic_plus),
                                 contentDescription = "Menu",
-                                tint = Color.White,
+                                tint = if (isDark) Color.Black else Color.White,
                                 modifier = Modifier.size(if (isTablet) 32.dp else 24.dp)
                             )
                         }
@@ -716,11 +716,11 @@ fun DashboardScreen(
                                     modifier = Modifier.fillMaxWidth().weight(1f).clickable { fabState = FabState.CREATE }.padding(horizontal = if (isTablet) 24.dp else 16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = null, modifier = Modifier.size(if (isTablet) 24.dp else 20.dp), tint = Color.White)
+                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_plus), contentDescription = null, modifier = Modifier.size(if (isTablet) 24.dp else 20.dp), tint = if (isDark) Color.Black else Color.White)
                                     Spacer(modifier = Modifier.width(if (isTablet) 16.dp else 12.dp))
-                                    Text("New Project", fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
+                                    Text("New Project", fontWeight = FontWeight.Medium, color = if (isDark) Color.Black else Color.White, maxLines = 1, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
                                 }
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+                                HorizontalDivider(color = if (isDark) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.2f))
                                 Row(
                                     modifier = Modifier.fillMaxWidth().weight(1f).clickable { 
                                         fabState = FabState.COLLAPSED
@@ -728,9 +728,9 @@ fun DashboardScreen(
                                     }.padding(horizontal = if (isTablet) 24.dp else 16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(if (isTablet) 24.dp else 20.dp), tint = Color.White)
+                                    Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(if (isTablet) 24.dp else 20.dp), tint = if (isDark) Color.Black else Color.White)
                                     Spacer(modifier = Modifier.width(if (isTablet) 16.dp else 12.dp))
-                                    Text("Import", fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
+                                    Text("Import", fontWeight = FontWeight.Medium, color = if (isDark) Color.Black else Color.White, maxLines = 1, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
                                 }
                             }
                         }
@@ -749,18 +749,18 @@ fun DashboardScreen(
                                 OutlinedTextField(
                                     value = newProjectName,
                                     onValueChange = { newProjectName = it },
-                                    placeholder = { Text("Project Name", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Medium, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified) },
+                                    placeholder = { Text("Project Name", color = if (isDark) Color.Black.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Medium, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified) },
                                     singleLine = true,
-                                    textStyle = TextStyle(color = Color.White, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified),
+                                    textStyle = TextStyle(color = if (isDark) Color.Black else Color.White, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Color.White,
-                                        unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        cursorColor = Color.White,
-                                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
-                                        unfocusedContainerColor = Color.White.copy(alpha = 0.1f)
+                                        focusedBorderColor = if (isDark) Color.Black else Color.White,
+                                        unfocusedBorderColor = if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f),
+                                        focusedTextColor = if (isDark) Color.Black else Color.White,
+                                        unfocusedTextColor = if (isDark) Color.Black else Color.White,
+                                        cursorColor = if (isDark) Color.Black else Color.White,
+                                        focusedContainerColor = if (isDark) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f),
+                                        unfocusedContainerColor = if (isDark) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f)
                                     ),
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -776,7 +776,7 @@ fun DashboardScreen(
                                         modifier = Modifier.weight(1f).height(if (isTablet) 56.dp else 44.dp),
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
-                                        Text("Cancel", color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
+                                        Text("Cancel", color = if (isDark) Color.Black.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold, fontSize = if (isTablet) 18.sp else TextUnit.Unspecified)
                                     }
                                     Button(
                                         onClick = {
@@ -786,7 +786,7 @@ fun DashboardScreen(
                                             onCreateNewProject(finalName)
                                         },
                                         modifier = Modifier.weight(1f).height(if (isTablet) 56.dp else 44.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = accentColor),
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color.Black else Color.White, contentColor = if (isDark) Color.White else Color.Black),
                                         shape = RoundedCornerShape(10.dp),
                                         elevation = ButtonDefaults.buttonElevation(0.dp)
                                     ) {
@@ -905,10 +905,10 @@ fun ProjectCard(
                 .fillMaxWidth()
                 .aspectRatio(thumbnailAspectRatio)
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(if (isDark) MaterialTheme.colorScheme.surfaceContainerHighest else Color(0xFFF8F8F8))
+                .background(Color(0xFFF8F8F8))
                 .border(
                     width = 1.dp,
-                    color = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
+                    color = Color.Black.copy(alpha = 0.05f),
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                 ),
             contentAlignment = Alignment.Center
@@ -943,10 +943,7 @@ fun ProjectCard(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                val placeholderBg = if (isDark)
-                    MaterialTheme.colorScheme.surfaceContainerHighest
-                else
-                    Color(0xFFF2F2F7)
+                val placeholderBg = Color(0xFFF2F2F7)
 
                 Box(
                     modifier = Modifier
