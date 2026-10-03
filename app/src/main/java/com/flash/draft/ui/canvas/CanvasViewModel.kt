@@ -40,7 +40,8 @@ class CanvasViewModel(
     val isHapticFeedbackEnabled: StateFlow<Boolean> = settingsRepo.getHapticFeedbackFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), true)
 
-
+    val isStylusSupportEnabled: StateFlow<Boolean> = settingsRepo.getStylusSupportFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
 
     private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
     val scenes = _scenes.asStateFlow()

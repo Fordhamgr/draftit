@@ -17,6 +17,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_LIQUID_REFRACTION = "liquid_refraction"
         private const val KEY_UNDO_LIMIT = "undo_limit"
         private const val KEY_HAPTIC_FEEDBACK = "haptic_feedback"
+        private const val KEY_STYLUS_SUPPORT = "stylus_support"
     }
 
     // Default values
@@ -27,6 +28,7 @@ class SettingsRepository(context: Context) {
     private val defaultLiquidRefraction = 0.5f
     private val defaultUndoLimit = 0
     private val defaultHapticFeedback = false
+    private val defaultStylusSupport = false
 
     fun isDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, defaultDarkMode)
     fun setDarkMode(enabled: Boolean) = prefs.edit().putBoolean(KEY_DARK_MODE, enabled).apply()
@@ -98,6 +100,16 @@ class SettingsRepository(context: Context) {
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(prefs.getBoolean(KEY_HAPTIC_FEEDBACK, defaultHapticFeedback))
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    
+    fun setStylusSupportEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_STYLUS_SUPPORT, enabled).apply()
+    fun getStylusSupportFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_STYLUS_SUPPORT) trySend(prefs.getBoolean(KEY_STYLUS_SUPPORT, defaultStylusSupport))
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(prefs.getBoolean(KEY_STYLUS_SUPPORT, defaultStylusSupport))
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 }

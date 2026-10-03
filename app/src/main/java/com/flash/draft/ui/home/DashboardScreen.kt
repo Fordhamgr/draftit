@@ -151,8 +151,7 @@ fun DashboardScreen(
     val secondaryTextColor = colorScheme.onSurfaceVariant
     val menuBg = colorScheme.surface
     val searchBarBg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
-    val accentBlue = Color(0xFF3478F6)
-    val accentRed = colorScheme.primary
+    val accentColor = colorScheme.primary
 
     val context = LocalContext.current
     var projectToRename by remember { mutableStateOf<Project?>(null) }
@@ -277,9 +276,9 @@ fun DashboardScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
                 .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier)
         ) {
-            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 12.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 16.dp else 8.dp))
 
-            // ── 1. Top Bar: Avatar + "Projects" + Settings Gear ─────────
+            // ── 1. Top Bar: "Projects" + Actions ─────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -288,50 +287,56 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Profile avatar placeholder
-                Surface(
-                    modifier = Modifier
-                        .size(if (isTablet) 56.dp else 40.dp)
-                        .clickable { onNavigateToAbout() },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shadowElevation = 4.dp
+                // Title
+                Text(
+                    text = "Projects",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    fontSize = if (isTablet) 42.sp else 34.sp
+                )
+
+                // Actions Group
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    // Profile Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(if (isTablet) 40.dp else 36.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color.White else Color.Black)
+                            .clickable { onNavigateToAbout() },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = "D",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontSize = if (isTablet) 24.sp else 18.sp
+                            color = if (isDark) Color.Black else Color.White,
+                            fontSize = if (isTablet) 18.sp else 16.sp
                         )
                     }
-                }
 
-                // Centered title
-                Text(
-                    text = "Projects",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    fontSize = if (isTablet) 32.sp else 24.sp
-                )
-
-                // Settings Action
-                Surface(
-                    modifier = Modifier
-                        .size(if (isTablet) 56.dp else 40.dp)
-                        .clickable { onNavigateToSettings() },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shadowElevation = 4.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    // Settings Action
+                    Box(
+                        modifier = Modifier
+                            .size(if (isTablet) 40.dp else 36.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                shape = CircleShape
+                            )
+                            .clickable { onNavigateToSettings() },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             Icons.Filled.Settings,
                             contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(if (isTablet) 28.dp else 22.dp)
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
                         )
                     }
                 }
@@ -358,7 +363,7 @@ fun DashboardScreen(
                     Icon(
                         Icons.Filled.Search,
                         contentDescription = "Search",
-                        tint = secondaryTextColor,
+                        tint = Color.Gray,
                         modifier = Modifier.size(if (isTablet) 22.dp else 18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -376,7 +381,7 @@ fun DashboardScreen(
                                 if (searchQuery.isEmpty()) {
                                     Text(
                                         text = "Search projects...",
-                                        color = secondaryTextColor,
+                                        color = Color.Gray,
                                         fontSize = if (isTablet) 16.sp else 14.sp
                                     )
                                 }
@@ -387,14 +392,14 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isTablet) 32.dp else 28.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 28.dp else 24.dp))
 
             // ── 3. Section Header: "Recent Files" + "View all" ──────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = edgePadding)
-                    .padding(bottom = if (isTablet) 16.dp else 12.dp),
+                    .padding(bottom = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -410,7 +415,7 @@ fun DashboardScreen(
                     Text(
                         text = if (showAllProjects) "Show less" else "View all",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = accentBlue,
+                        color = accentColor,
                         fontWeight = FontWeight.Medium,
                         fontSize = if (isTablet) 16.sp else 14.sp,
                         modifier = Modifier.clickable { showAllProjects = !showAllProjects }
@@ -501,7 +506,7 @@ fun DashboardScreen(
                         },
                     horizontalArrangement = Arrangement.spacedBy(gutterSize),
                     verticalArrangement = Arrangement.spacedBy(gutterSize),
-                    contentPadding = PaddingValues(start = edgePadding, end = edgePadding, bottom = 140.dp)
+                    contentPadding = PaddingValues(start = edgePadding, end = edgePadding, top = if (isTablet) 12.dp else 8.dp, bottom = 140.dp)
                 ) {
                     items(
                         items = filteredProjects,
@@ -674,7 +679,7 @@ fun DashboardScreen(
             )
             Surface(
                 shape = RoundedCornerShape(cornerRadius),
-                color = accentRed,
+                color = accentColor,
                 shadowElevation = if (fabState == FabState.COLLAPSED) 6.dp else 16.dp,
                 modifier = Modifier.size(width, height)
             ) {
@@ -781,7 +786,7 @@ fun DashboardScreen(
                                             onCreateNewProject(finalName)
                                         },
                                         modifier = Modifier.weight(1f).height(if (isTablet) 56.dp else 44.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = accentRed),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = accentColor),
                                         shape = RoundedCornerShape(10.dp),
                                         elevation = ButtonDefaults.buttonElevation(0.dp)
                                     ) {
@@ -842,7 +847,7 @@ fun ProjectCard(
     onLongPress: (Offset, IntSize) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val cardBg = MaterialTheme.colorScheme.surfaceContainer
+    val cardBg = MaterialTheme.colorScheme.surface
 
     val dateString = formatRelativeDate(project.lastModifiedMs)
 
@@ -874,10 +879,10 @@ fun ProjectCard(
                 scaleY = scale
             }
             .steadyShadow(
-                color = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.15f),
+                color = if (isDark) Color.Black.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.08f),
                 borderRadius = 16.dp,
-                blurRadius = 12.dp,
-                offsetY = 6.dp
+                blurRadius = 24.dp,
+                offsetY = 4.dp
             )
             .clip(cardShape)
             .background(cardBg, cardShape)
@@ -962,25 +967,26 @@ fun ProjectCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = project.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = dateString,
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray,
                 fontWeight = FontWeight.Medium,
+                fontSize = 11.sp,
                 maxLines = 1,
-                letterSpacing = 0.3.sp,
-                modifier = Modifier.align(Alignment.End)
+                letterSpacing = 0.5.sp
             )
         }
     }

@@ -39,6 +39,7 @@ fun SettingsScreen(
     val liquidRefraction by viewModel.liquidRefraction.collectAsStateWithLifecycle()
     val undoHistoryLimit by viewModel.undoHistoryLimit.collectAsStateWithLifecycle()
     val isHapticFeedbackEnabled by viewModel.isHapticFeedbackEnabled.collectAsStateWithLifecycle()
+    val isStylusSupportEnabled by viewModel.isStylusSupportEnabled.collectAsStateWithLifecycle()
 
     val backgroundColor = if (isDarkMode) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
     val surfaceColor = if (isDarkMode) Color(0xFF2C2C2E) else Color.White
@@ -193,14 +194,13 @@ fun SettingsScreen(
 
                 item {
                     SettingsGroup(title = "EXPERIMENTAL", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        Column {
-                            Text(
-                                text = "More experimental features coming soon",
-                                fontSize = 15.sp,
-                                color = secondaryTextColor,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
-                        }
+                        ToggleRow(
+                            label = "Stylus Support",
+                            icon = Icons.Default.Create,
+                            checked = isStylusSupportEnabled,
+                            onCheckedChange = { viewModel.toggleStylusSupport(it) },
+                            textColor = textColor
+                        )
                     }
                 }
 

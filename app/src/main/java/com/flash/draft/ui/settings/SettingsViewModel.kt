@@ -32,6 +32,9 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     val isHapticFeedbackEnabled: StateFlow<Boolean> = repository.getHapticFeedbackFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val isStylusSupportEnabled: StateFlow<Boolean> = repository.getStylusSupportFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     fun toggleDarkMode(enabled: Boolean) = repository.setDarkMode(enabled)
     fun togglePerformanceMode(enabled: Boolean) = repository.setPerformanceMode(enabled)
     fun setFramerate(framerate: Int) = repository.setFramerate(framerate)
@@ -40,6 +43,7 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     fun setLiquidRefraction(level: Float) = repository.setLiquidRefraction(level)
     fun setUndoHistoryLimit(limit: Int) = repository.setUndoHistoryLimit(limit)
     fun toggleHapticFeedback(enabled: Boolean) = repository.setHapticFeedbackEnabled(enabled)
+    fun toggleStylusSupport(enabled: Boolean) = repository.setStylusSupportEnabled(enabled)
 }
 
 class SettingsViewModelFactory(private val repository: SettingsRepository) : ViewModelProvider.Factory {

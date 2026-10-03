@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.drawWithContent
 import android.widget.Toast
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.layout.onSizeChanged
@@ -158,6 +159,7 @@ fun DraftCanvas(
 
     val isDarkTheme by viewModel.isDarkMode.collectAsStateWithLifecycle(initialValue = false)
     val isPerformanceMode by viewModel.isPerformanceMode.collectAsStateWithLifecycle(initialValue = false)
+    val isStylusSupportEnabled by viewModel.isStylusSupportEnabled.collectAsStateWithLifecycle(initialValue = false)
 
     var isScenesMenuOpen by remember { mutableStateOf(false) }
     var isThreeDotsMenuOpen by remember { mutableStateOf(false) }
@@ -662,7 +664,7 @@ fun DraftCanvas(
                         }
                     }
                 }
-                .pointerInput(isDrawingMode, isLassoMode, isCanvasLocked) {
+                .pointerInput(isDrawingMode, isLassoMode, isCanvasLocked, isStylusSupportEnabled) {
                     if (!isCanvasLocked && (isDrawingMode || isLassoMode)) {
                         detectDragGestures(
                             onDragStart = { startPos ->
@@ -675,10 +677,13 @@ fun DraftCanvas(
                                 }
                             },
                             onDrag = { change, _ ->
+                                // Optional Palm Rejection: If Stylus Support is on, and it's a touch event, we could ignore it, but for now we just take the pressure.
+                                val isStylus = isStylusSupportEnabled && (change.type == PointerType.Stylus || change.type == PointerType.Eraser)
+                                
                                 val newPoint = ViewportMath.screenToWorld(change.position, Offset(offsetX, offsetY), scale)
                                 if (isLassoMode) { lassoPath.add(newPoint) }
                                 else {
-                                    if (activeToolType == "Eraser") {
+                                    if (activeToolType == "Eraser" || (isStylus && change.type == PointerType.Eraser)) {
                                         val eraseRadius = activeStrokeWidth * 1.5f
                                         elements.removeAll { el ->
                                             el is CanvasElement.Sketch && el.xCoords.indices.any { i -> (Offset(el.xCoords[i], el.yCoords[i]) - newPoint).getDistance() < eraseRadius }
@@ -687,7 +692,8 @@ fun DraftCanvas(
                                     } else {
                                         val lastPoint = currentDrawingPath.lastOrNull()
                                         if (lastPoint == null || (Offset(newPoint.x, newPoint.y) - Offset(lastPoint.x, lastPoint.y)).getDistance() > (3f / scale)) { 
-                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, change.pressure, change.uptimeMillis)) 
+                                            val pressure = if (isStylus) change.pressure else 1f
+                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, pressure, change.uptimeMillis)) 
                                         }
                                     }
                                 }
