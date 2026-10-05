@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +49,8 @@ fun InsertToolStack(
     onCodeClick: () -> Unit,
     onAudioClick: () -> Unit,
     onTaskClick: () -> Unit,
-    onNoteClick: () -> Unit
+    onNoteClick: () -> Unit,
+    onShapeClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     val textColor = if (isDark) Color.White else Color.Black
@@ -88,6 +90,7 @@ fun InsertToolStack(
                 GridItem(Icons.Default.StickyNote2, "Note", onNoteClick, textColor)
                 GridItem(Icons.AutoMirrored.Filled.List, "Task List", onTaskClick, textColor)
                 GridItem(Icons.Default.Code, "Code", onCodeClick, textColor)
+                GridItem(Icons.Default.Category, "Shape", onShapeClick, textColor)
             }
         }
         

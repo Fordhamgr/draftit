@@ -60,10 +60,11 @@ fun BottomNavBar(
     onAudioClick: () -> Unit,
     onTaskClick: () -> Unit,
     onNoteClick: () -> Unit,
+    onShapeClick: () -> Unit,
     forceCenter: Boolean = false
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
+    val glassBg = if (isDark) Color(0x1AFFFFFF) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x4DFFFFFF) else Color(0x66FFFFFF)
 
     val liquidState = LocalLiquidState.current
@@ -243,7 +244,8 @@ fun BottomNavBar(
                         onCodeClick = onCodeClick,
                         onAudioClick = onAudioClick,
                         onTaskClick = onTaskClick,
-                        onNoteClick = onNoteClick
+                        onNoteClick = onNoteClick,
+                        onShapeClick = onShapeClick
                     )
                     // The collapse button at the bottom right corner (where the + button was)
                     Box(

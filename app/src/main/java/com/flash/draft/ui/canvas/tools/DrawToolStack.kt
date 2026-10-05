@@ -2,9 +2,13 @@ package com.flash.draft.ui.canvas.tools
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -31,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -331,7 +337,7 @@ private fun ToolIllustration(
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val offsetY by animateFloatAsState(
-        targetValue = if (isActive) with(density) { -16.dp.toPx() } else 0f, // Reduced jump to prevent disconnect
+        targetValue = if (isActive) with(density) { -16.dp.toPx() } else 0f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
         label = "toolOffset"
     )
@@ -339,6 +345,8 @@ private fun ToolIllustration(
     Box(
         contentAlignment = Alignment.BottomCenter,
         modifier = Modifier
+            .width(84.dp)
+            .fillMaxHeight()
             .clickable(
                 interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null
@@ -346,32 +354,53 @@ private fun ToolIllustration(
     ) {
         Box(
             modifier = Modifier
-                .requiredHeight(150.dp) // SVGs stick out of container
+                .requiredHeight(150.dp)
                 .graphicsLayer {
-                    translationY = offsetY // Much larger jump, goes way above dock
+                    translationY = offsetY
                 },
             contentAlignment = Alignment.BottomCenter
         ) {
-            Box(contentAlignment = Alignment.BottomCenter) {
-                // Drop shadow based on the SVG alpha mask
+            if (isActive) {
+                // Drop shadow layers tracing the exact SVG shape
                 Image(
                     painter = painterResource(id = drawableRes),
                     contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color.Black),
                     modifier = Modifier
                         .fillMaxHeight()
-                        .offset(y = 4.dp, x = 2.dp)
-                        .alpha(if (isActive) 0.4f else 0.15f),
-                    contentScale = ContentScale.Fit,
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black)
+                        .offset(x = 2.dp, y = 4.dp)
+                        .alpha(0.18f),
+                    contentScale = ContentScale.Fit
                 )
-                // Main SVG Image
                 Image(
                     painter = painterResource(id = drawableRes),
-                    contentDescription = name,
-                    modifier = Modifier.fillMaxHeight(),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color.Black),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .offset(x = 3.dp, y = 7.dp)
+                        .alpha(0.12f),
+                    contentScale = ContentScale.Fit
+                )
+                Image(
+                    painter = painterResource(id = drawableRes),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color.Black),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .offset(x = 4.dp, y = 10.dp)
+                        .alpha(0.07f),
                     contentScale = ContentScale.Fit
                 )
             }
+
+            // Main SVG Image
+            Image(
+                painter = painterResource(id = drawableRes),
+                contentDescription = name,
+                modifier = Modifier.fillMaxHeight(),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }

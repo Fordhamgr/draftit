@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import android.widget.Toast
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -164,6 +165,7 @@ fun DraftCanvas(
     var isScenesMenuOpen by remember { mutableStateOf(false) }
     var isThreeDotsMenuOpen by remember { mutableStateOf(false) }
     var isCanvasLocked by remember { mutableStateOf(false) }
+    var isBgMenuOpen by remember { mutableStateOf(false) }
     var sceneToExport by remember { mutableStateOf<com.flash.draft.model.Scene?>(null) }
 
     var isDrawMenuOpen by remember { mutableStateOf(false) }
@@ -192,6 +194,18 @@ fun DraftCanvas(
     var isExportMenuOpen by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var isCapturingThumbnail by remember { mutableStateOf(false) }
+
+    val closeAllMenus = {
+        isExportMenuOpen = false
+        isScenesMenuOpen = false
+        isThreeDotsMenuOpen = false
+        isInsertMenuOpen = false
+        isDrawMenuOpen = false
+        isBgMenuOpen = false
+        if (activeSubMenu == "CustomColor" || activeSubMenu == "Color" || activeSubMenu == "Thickness") {
+            activeSubMenu = null
+        }
+    }
 
     val resScale = if (isPerformanceMode && !isExporting) 0.7f else 1f
     val inverseScale = 1f / resScale
@@ -252,7 +266,7 @@ fun DraftCanvas(
     }
 
 
-    val elementsState by viewModel.elements.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val elements = remember { mutableStateListOf<CanvasElement>() }
 
     var isUiVisible by remember { mutableStateOf(true) }
@@ -318,10 +332,10 @@ fun DraftCanvas(
         }
     }
 
-    LaunchedEffect(elementsState) {
-        if (elements.toList() != elementsState) {
+    LaunchedEffect(uiState.elements) {
+        if (elements.toList() != uiState.elements) {
             elements.clear()
-            elements.addAll(elementsState)
+            elements.addAll(uiState.elements)
         }
     }
 
@@ -608,12 +622,84 @@ fun DraftCanvas(
         LocalLiquidRefraction provides liquidRefraction,
         LocalLiquidCurve provides liquidCurve
     ) {
+        val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF0F0F0))
-                .onSizeChanged { size ->
-                    centerX = size.width / 2f; centerY = size.height / 2f
+                .background(if (isDarkTheme) Color(0xFF18181A) else Color(0xFFF0F0F0))
+                .drawBehind {
+                    val style = uiState.backgroundStyle
+                    if (style == BackgroundStyle.Solid) return@drawBehind
+
+                    val patternColor = colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+                    val spacing = 100f * scale // Scale the grid!
+                    
+                    // We need to offset the grid based on camera pan
+                    val startX = (offsetX % spacing) - spacing
+                    val startY = (offsetY % spacing) - spacing
+                    
+                    when (style) {
+                        BackgroundStyle.DotGrid -> {
+                            var x = startX
+                            while (x < size.width + spacing) {
+                                var y = startY
+                                while (y < size.height + spacing) {
+                                    drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
+                                    y += spacing
+                                }
+                                x += spacing
+                            }
+                        }
+                        BackgroundStyle.GraphPaper -> {
+                            var x = startX
+                            while (x < size.width + spacing) {
+                                drawLine(color = patternColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                x += spacing
+                            }
+                            var y = startY
+                            while (y < size.height + spacing) {
+                                drawLine(color = patternColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                y += spacing
+                            }
+                        }
+                        BackgroundStyle.Blueprint -> {
+                            drawRect(color = Color(0xFF1E3A8A)) // Deep blue background for blueprint
+                            val bpColor = Color.White.copy(alpha = 0.2f)
+                            var x = startX
+                            while (x < size.width + spacing) {
+                                drawLine(color = bpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                x += spacing
+                            }
+                            var y = startY
+                            while (y < size.height + spacing) {
+                                drawLine(color = bpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                y += spacing
+                            }
+                        }
+                        BackgroundStyle.Isometric -> {
+                            // Triangle grid
+                            val isoSpacing = spacing * 0.866f // sqrt(3)/2
+                            val startIsoX = (offsetX % spacing) - spacing
+                            val startIsoY = (offsetY % isoSpacing) - isoSpacing
+
+                            var y = startIsoY
+                            var row = 0
+                            while (y < size.height + isoSpacing) {
+                                val xOffset = if (row % 2 == 0) 0f else spacing / 2f
+                                var x = startIsoX - xOffset
+                                while (x < size.width + spacing) {
+                                    drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
+                                    x += spacing
+                                }
+                                y += isoSpacing
+                                row++
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+                .onSizeChanged { newSize ->
+                    centerX = newSize.width / 2f; centerY = newSize.height / 2f
                     if (offsetX == 0f && offsetY == 0f) { offsetX = centerX; offsetY = centerY }
                 }
                 .pointerInput(Unit) {
@@ -638,6 +724,7 @@ fun DraftCanvas(
                                     panAccumulator += panChange
                                     if (zoomAccumulator !in 0.97f..1.03f || panAccumulator.getDistance() > touchSlop) {
                                         pastSlop = true
+                                        closeAllMenus()
                                     }
                                 }
 
@@ -668,6 +755,7 @@ fun DraftCanvas(
                     if (!isCanvasLocked && (isDrawingMode || isLassoMode)) {
                         detectDragGestures(
                             onDragStart = { startPos ->
+                                closeAllMenus()
                                 if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)) }
                                 else { 
                                     currentDrawingPath.clear()
@@ -754,7 +842,7 @@ fun DraftCanvas(
                     } else {
                         val velocityTracker = VelocityTracker()
                         detectDragGestures(
-                            onDragStart = { panJob?.cancel(); velocityTracker.resetTracking() },
+                            onDragStart = { panJob?.cancel(); velocityTracker.resetTracking(); closeAllMenus() },
                             onDrag = { change, dragAmount -> velocityTracker.addPosition(change.uptimeMillis, change.position); offsetX += dragAmount.x; offsetY += dragAmount.y },
                             onDragEnd = {
                                 val velocity = velocityTracker.calculateVelocity()
@@ -811,9 +899,80 @@ fun DraftCanvas(
                 // GridBackground(scaleProvider = { scale }, offsetProvider = { Offset(offsetX, offsetY) })
 
                 // --- 1. RECORDING BACKGROUND ---
+                val colorSchemeRec = androidx.compose.material3.MaterialTheme.colorScheme
                 Box(modifier = Modifier
                     .fillMaxSize()
                     .liquefiable(liquidState)
+                    .background(if (isDarkTheme) Color(0xFF18181A) else Color(0xFFF0F0F0))
+                    .drawBehind {
+                        val style = uiState.backgroundStyle
+                        if (style == BackgroundStyle.Solid) return@drawBehind
+
+                        val patternColor = colorSchemeRec.onSurfaceVariant.copy(alpha = 0.15f)
+                        val spacing = 100f * scale
+                        
+                        val startX = (offsetX % spacing) - spacing
+                        val startY = (offsetY % spacing) - spacing
+                        
+                        when (style) {
+                            BackgroundStyle.DotGrid -> {
+                                var x = startX
+                                while (x < size.width + spacing) {
+                                    var y = startY
+                                    while (y < size.height + spacing) {
+                                        drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
+                                        y += spacing
+                                    }
+                                    x += spacing
+                                }
+                            }
+                            BackgroundStyle.GraphPaper -> {
+                                var x = startX
+                                while (x < size.width + spacing) {
+                                    drawLine(color = patternColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                    x += spacing
+                                }
+                                var y = startY
+                                while (y < size.height + spacing) {
+                                    drawLine(color = patternColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                    y += spacing
+                                }
+                            }
+                            BackgroundStyle.Blueprint -> {
+                                drawRect(color = Color(0xFF1E3A8A))
+                                val bpColor = Color.White.copy(alpha = 0.2f)
+                                var x = startX
+                                while (x < size.width + spacing) {
+                                    drawLine(color = bpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                    x += spacing
+                                }
+                                var y = startY
+                                while (y < size.height + spacing) {
+                                    drawLine(color = bpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                    y += spacing
+                                }
+                            }
+                            BackgroundStyle.Isometric -> {
+                                val isoSpacing = spacing * 0.866f
+                                val startIsoX = (offsetX % spacing) - spacing
+                                val startIsoY = (offsetY % isoSpacing) - isoSpacing
+
+                                var y = startIsoY
+                                var row = 0
+                                while (y < size.height + isoSpacing) {
+                                    val xOffset = if (row % 2 == 0) 0f else spacing / 2f
+                                    var x = startIsoX - xOffset
+                                    while (x < size.width + spacing) {
+                                        drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
+                                        x += spacing
+                                    }
+                                    y += isoSpacing
+                                    row++
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
                     .drawWithContent {
                         if (isExporting || isCapturingThumbnail) {
                             // Only record into graphicsLayer when actually exporting.
@@ -979,18 +1138,11 @@ fun DraftCanvas(
                 }
                 
                 // CLICK OUTSIDE OVERLAY FOR ALL MENUS
-                if (isExportMenuOpen || isScenesMenuOpen || isThreeDotsMenuOpen || isInsertMenuOpen || (isDrawingMode && isDrawMenuOpen)) {
+                if (isExportMenuOpen || isScenesMenuOpen || isThreeDotsMenuOpen || isInsertMenuOpen || (isDrawingMode && isDrawMenuOpen) || isBgMenuOpen) {
                     Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-                        detectTapGestures {
-                            isExportMenuOpen = false
-                            isScenesMenuOpen = false
-                            isThreeDotsMenuOpen = false
-                            isInsertMenuOpen = false
-                            isDrawMenuOpen = false
-                            if (activeSubMenu == "CustomColor" || activeSubMenu == "Color" || activeSubMenu == "Thickness") {
-                                activeSubMenu = null
-                            }
-                        }
+                        detectTapGestures(
+                            onPress = { closeAllMenus() }
+                        )
                     })
                 }
 
@@ -1165,6 +1317,67 @@ fun DraftCanvas(
                                 )
                             }
                         }
+                        }
+                    }
+                    
+                    // BACKGROUND MENU (Morphing)
+                    val bgMenuAlpha by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    val bgMenuScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) 1f else 0.8f,
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 128.dp) // 64dp (Scenes pill gap) + 64dp
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                alpha = bgMenuAlpha
+                                scaleX = bgMenuScale
+                                scaleY = bgMenuScale
+                            }
+                    ) {
+                        LiquidGlassPill(
+                            shape = RoundedCornerShape(24.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
+                                if (!isBgMenuOpen) {
+                                    IconButton(onClick = { if (!isExportMenuOpen && !isScenesMenuOpen) isBgMenuOpen = true }, modifier = Modifier.size(48.dp)) {
+                                        Icon(painterResource(id = LucideR.drawable.lucide_ic_layout_grid), contentDescription = "Background Style", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier.width(160.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        BackgroundStyle.entries.forEach { style ->
+                                            val isSelected = style == uiState.backgroundStyle
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { 
+                                                        viewModel.onEvent(CanvasUiEvent.ChangeBackgroundStyle(style))
+                                                        isBgMenuOpen = false
+                                                    }
+                                                    .background(if (isSelected) (if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f)) else Color.Transparent)
+                                                    .padding(vertical = 14.dp, horizontal = 16.dp),
+                                                verticalAlignment = Alignment.CenterVertically, 
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(style.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                                if (isSelected) {
+                                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_check), contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1344,6 +1557,11 @@ fun DraftCanvas(
                             },
                             onNoteClick = {
                                 elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
+                                viewModel.updateElements(elements.toList())
+                                isInsertMenuOpen = false
+                            },
+                            onShapeClick = {
+                                elements.add(CanvasElement.ShapeNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
                                 viewModel.updateElements(elements.toList())
                                 isInsertMenuOpen = false
                             },

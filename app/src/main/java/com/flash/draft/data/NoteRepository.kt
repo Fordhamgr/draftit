@@ -102,12 +102,43 @@ class NoteRepository(context: Context) {
         val metaFile = File(projectsDir, "${projectId}_meta.json")
         if (metaFile.exists()) {
             try {
-                val oldTitle = JSONObject(metaFile.readText()).getString("title")
+                val oldJson = JSONObject(metaFile.readText())
+                val oldTitle = oldJson.getString("title")
                 val newMetaFile = File(projectsDir, "${newId}_meta.json")
-                newMetaFile.writeText(JSONObject().apply { put("title", "$oldTitle Copy") }.toString())
+                val newJson = JSONObject().apply { 
+                    put("title", "$oldTitle Copy")
+                    if (oldJson.has("backgroundStyle")) {
+                        put("backgroundStyle", oldJson.getString("backgroundStyle"))
+                    }
+                }
+                newMetaFile.writeText(newJson.toString())
             } catch(e: Exception) {}
         }
         return newId
+    }
+
+    fun getProjectBackgroundStyle(projectId: String): com.flash.draft.ui.canvas.BackgroundStyle {
+        val metaFile = File(projectsDir, "${projectId}_meta.json")
+        if (metaFile.exists()) {
+            try {
+                val json = JSONObject(metaFile.readText())
+                if (json.has("backgroundStyle")) {
+                    return com.flash.draft.ui.canvas.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
+                }
+            } catch (e: Exception) {}
+        }
+        return com.flash.draft.ui.canvas.BackgroundStyle.Solid
+    }
+
+    fun updateProjectBackgroundStyle(projectId: String, style: com.flash.draft.ui.canvas.BackgroundStyle) {
+        val metaFile = File(projectsDir, "${projectId}_meta.json")
+        val json = if (metaFile.exists()) {
+            try { JSONObject(metaFile.readText()) } catch(e: Exception) { JSONObject() }
+        } else {
+            JSONObject()
+        }
+        json.put("backgroundStyle", style.name)
+        metaFile.writeText(json.toString())
     }
 
     // --- .DRAFTIT ZIP EXPORT / IMPORT ---

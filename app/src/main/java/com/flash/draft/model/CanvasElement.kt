@@ -26,6 +26,7 @@ sealed class CanvasElement {
         val height: Float = 200f,
         val fontSize: Float = 16f,
         val fontFamily: String = "SansSerif",
+        val style: String = "Classic",
         val isLocked: Boolean = false,
         override val hyperlinkTarget: String? = null
     ) : CanvasElement()

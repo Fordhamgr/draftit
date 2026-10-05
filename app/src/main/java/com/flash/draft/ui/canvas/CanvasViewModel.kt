@@ -17,6 +17,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class BackgroundStyle {
+    Solid, DotGrid, GraphPaper, Blueprint, Isometric
+}
+
+data class CanvasUiState(
+    val isLoading: Boolean = true,
+    val error: String? = null,
+    val backgroundStyle: BackgroundStyle = BackgroundStyle.Solid,
+    val elements: List<CanvasElement> = emptyList(),
+    val scenes: List<Scene> = emptyList()
+)
+
+sealed interface CanvasUiEvent {
+    data class ChangeBackgroundStyle(val style: BackgroundStyle) : CanvasUiEvent
+}
+
 data class CanvasState(
     val elements: List<CanvasElement>,
     val scenes: List<Scene>
@@ -27,6 +43,9 @@ class CanvasViewModel(
     private val settingsRepo: com.flash.draft.data.SettingsRepository,
     val projectId: String // <--- NEW: The Brain now knows WHICH board it is managing!
 ) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(CanvasUiState())
+    val uiState: StateFlow<CanvasUiState> = _uiState.asStateFlow()
 
     private val _elements = MutableStateFlow<List<CanvasElement>>(emptyList())
     val elements = _elements.asStateFlow()
@@ -45,6 +64,17 @@ class CanvasViewModel(
 
     private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
     val scenes = _scenes.asStateFlow()
+
+    fun onEvent(event: CanvasUiEvent) {
+        when (event) {
+            is CanvasUiEvent.ChangeBackgroundStyle -> {
+                _uiState.value = _uiState.value.copy(backgroundStyle = event.style)
+                viewModelScope.launch(Dispatchers.IO) {
+                    repository.updateProjectBackgroundStyle(projectId, event.style)
+                }
+            }
+        }
+    }
 
     private val undoStack = ArrayDeque<CanvasState>()
     private val redoStack = ArrayDeque<CanvasState>()
@@ -202,6 +232,14 @@ class CanvasViewModel(
             _elements.value = savedData
             val savedScenes = repository.loadScenes(projectId)
             _scenes.value = savedScenes
+            
+            val bgStyle = repository.getProjectBackgroundStyle(projectId)
+            _uiState.value = _uiState.value.copy(
+                backgroundStyle = bgStyle,
+                isLoading = false,
+                elements = savedData,
+                scenes = savedScenes
+            )
         }
 
         // Observe Settings

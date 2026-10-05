@@ -116,7 +116,7 @@ fun ConnectorStyleMenu(
     onClose: () -> Unit = {}
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xFFF9F9F9)
+    val glassBg = if (isDark) Color(0x1AFFFFFF) else Color(0xFFF9F9F9)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)
     val dividerColor = if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)
     val colors = listOf(Color.Black, Color.Red, Color.Blue, Color(0xFF34C759), Color(0xFFFF9500), Color.Gray)

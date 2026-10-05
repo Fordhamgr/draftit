@@ -131,18 +131,26 @@ class MainActivity : ComponentActivity() {
 
                         NavHost(navController = navController, startDestination = "dashboard") {
 
-                            // ROUTE 1: The Glassmorphism Homescreen
                             composable("dashboard") {
+                                val dashboardViewModel: com.flash.draft.ui.home.DashboardViewModel = viewModel(
+                                    factory = com.flash.draft.ui.home.DashboardViewModelFactory(repo)
+                                )
+                                val uiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+
+                                androidx.compose.runtime.LaunchedEffect(dashboardViewModel.effect) {
+                                    dashboardViewModel.effect.collect { effect ->
+                                        when (effect) {
+                                            is com.flash.draft.ui.home.DashboardEffect.NavigateToCanvas -> {
+                                                navController.navigate("canvas/${effect.projectId}") { launchSingleTop = true }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 DashboardScreen(
-                                    repository = repo,
+                                    state = uiState,
+                                    onEvent = dashboardViewModel::onEvent,
                                     isDarkTheme = isDarkMode,
-                                    onProjectClick = { projectId ->
-                                        navController.navigate("canvas/$projectId") { launchSingleTop = true }
-                                    },
-                                    onCreateNewProject = { title ->
-                                        val newProjectId = repo.createNewProject(title)
-                                        navController.navigate("canvas/$newProjectId") { launchSingleTop = true }
-                                    },
                                     onNavigateToAbout = {
                                         navController.navigate("about") { launchSingleTop = true }
                                     },

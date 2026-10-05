@@ -35,7 +35,7 @@ fun DrawThicknessMenu(
     onStrokeWidthChange: (Float) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF)
+    val glassBg = if (isDark) Color(0x1AFFFFFF) else Color(0xCCFFFFFF)
     val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
     val textColor = if (isDark) Color.LightGray else Color.DarkGray
 
