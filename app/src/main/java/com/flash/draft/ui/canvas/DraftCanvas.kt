@@ -155,7 +155,7 @@ fun DraftCanvas(
     var centerY by remember { mutableFloatStateOf(0f) }
     var selectedNoteId by remember { mutableStateOf<String?>(null) }
     var selectedConnectorId by remember { mutableStateOf<String?>(null) }
-    var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "")) }
+    var defaultConnectorStyle by remember { mutableStateOf(CanvasElement.Connector(id = "", startId = "", endId = "", arrowDirection = "Both")) }
 
     val isDarkTheme by viewModel.isDarkMode.collectAsStateWithLifecycle(initialValue = false)
     val isPerformanceMode by viewModel.isPerformanceMode.collectAsStateWithLifecycle(initialValue = false)
@@ -855,7 +855,7 @@ fun DraftCanvas(
                             }
                         ) {
                         CanvasBackgroundDrawPipeline(
-                            elements = elements, scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
+                            elements = elements.toList(), scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
                             isDarkTheme = isDarkTheme
                         )
 
@@ -1383,8 +1383,7 @@ fun DraftCanvas(
                         )
                         }
 
-                        // Floating Draw Tools (completely separated from the dock!)
-                        // Floating Draw Tools (staggered animation handled internally)
+                        // Floating Draw Tools (rendered outside dock for 3D effect)
                         com.flash.draft.ui.canvas.tools.FloatingDrawTools(
                             isVisible = isDrawingMode && isDrawMenuOpen && activeSubMenu != "Color" && activeSubMenu != "CustomColor" && activeSubMenu != "Thickness",
                             activeToolType = activeToolType,
@@ -1394,7 +1393,7 @@ fun DraftCanvas(
                             },
                             modifier = Modifier
                                 .navigationBarsPadding()
-                                .padding(bottom = 84.dp) // Perfect height above the slim pill!
+                                .padding(bottom = 84.dp)
                         )
                     }
                 }

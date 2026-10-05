@@ -58,13 +58,11 @@ fun AudioItem(
 
     // Playback progression ticker loop
     LaunchedEffect(isPlaying) {
-        if (isPlaying && player != null) {
-            while (player!!.isPlaying) {
+        while (isPlaying) {
+            if (player?.isPlaying == true) {
                 currentPlaybackPosition = player!!.currentPosition.toFloat()
-                delay(100)
             }
-            isPlaying = false
-            currentPlaybackPosition = 0f
+            delay(50) // Smoother animation
         }
     }
 
@@ -128,9 +126,12 @@ fun AudioItem(
                     setOnCompletionListener {
                         isPlaying = false
                         currentPlaybackPosition = 0f
+                        seekTo(0)
                     }
                 }
                 totalDuration = player!!.duration.toFloat()
+            } else {
+                player?.seekTo(currentPlaybackPosition.toInt())
             }
             player?.start()
             isPlaying = true

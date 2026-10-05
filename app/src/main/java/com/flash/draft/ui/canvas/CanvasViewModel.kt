@@ -32,16 +32,16 @@ class CanvasViewModel(
     val elements = _elements.asStateFlow()
 
     val isDarkMode: StateFlow<Boolean> = settingsRepo.getDarkModeFlow()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isDarkMode())
 
     val isPerformanceMode: StateFlow<Boolean> = settingsRepo.getPerformanceModeFlow()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isPerformanceMode())
 
     val isHapticFeedbackEnabled: StateFlow<Boolean> = settingsRepo.getHapticFeedbackFlow()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isHapticFeedbackEnabled())
 
     val isStylusSupportEnabled: StateFlow<Boolean> = settingsRepo.getStylusSupportFlow()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isStylusSupportEnabled())
 
     private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
     val scenes = _scenes.asStateFlow()

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.flash.draft99.R
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
 
@@ -50,7 +52,7 @@ fun DrawToolsContent(
     activeSubMenu: String?,
     onToolChange: (String) -> Unit,
     onColorClick: () -> Unit,
-    onThicknessClick: () -> Unit, // Kept for compatibility, but unused here
+    onThicknessClick: () -> Unit,
     onRainbowClick: () -> Unit,
     activeStrokeWidth: Float,
     onStrokeWidthChange: (Float) -> Unit,
@@ -63,97 +65,83 @@ fun DrawToolsContent(
 
     val isPropertiesOpen = activeSubMenu == "Color" || activeSubMenu == "CustomColor" || activeSubMenu == "Thickness"
 
+    // The entire content uses animateContentSize on a wrapper Column.
+    // This is the SAME pattern as the '+' insert pill in BottomNavBar:
+    // a single container that swaps its children and smoothly resizes.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp, start = 16.dp, end = 16.dp, top = 8.dp),
+            .padding(bottom = 12.dp, start = 16.dp, end = 16.dp, top = 8.dp)
+            .animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 600f)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AnimatedContent(
-            targetState = isPropertiesOpen,
-            transitionSpec = {
-                if (targetState) {
-                    // Opening: Morph out from the bottom-left Color Circle (x = 10%, y = 100%)
-                    (scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0.6f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.1f, 1f)) + 
-                     fadeIn(tween(300))) togetherWith
-                    (scaleOut(tween(200), targetScale = 0.6f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.1f, 1f)) + 
-                     fadeOut(tween(200)))
-                } else {
-                    // Closing: Morph back into the bottom-left Color Circle
-                    (scaleIn(tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0.6f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.1f, 1f)) + 
-                     fadeIn(tween(300))) togetherWith
-                    (scaleOut(tween(200), targetScale = 0.6f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.1f, 1f)) + 
-                     fadeOut(tween(200)))
-                }.using(SizeTransform(clip = true) { _, _ ->
-                    spring(dampingRatio = 0.8f, stiffness = 600f)
-                })
-            },
-            label = "dockContent"
-        ) { propertiesOpen ->
-            if (propertiesOpen) {
-                ColorPickerView(
-                    activeColor = activeColor,
-                    onColorSelect = onColorSelect
-                )
-            } else {
-                // 96.dp acts as the tall frosted glass background for the floating tools, covering ~70% of them.
-                Box(modifier = Modifier.fillMaxWidth().height(96.dp))
-            }
-        }
         if (isPropertiesOpen) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(iconTint.copy(alpha = 0.08f)))
-            Spacer(modifier = Modifier.height(10.dp))
-        } else {
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-        
-        // Bottom Control Bar
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Color indicator (clicks to toggle properties)
+            // ── COLOR PICKER MODE ──
+            // Only the gradient picker + hue slider, no size slider, no SVG tools
+            ColorPickerView(
+                activeColor = activeColor,
+                onColorSelect = onColorSelect
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            // Done button to close the picker
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(activeColor, CircleShape)
-                    .border(2.dp, glassBorder, CircleShape)
-                    .clickable { 
-                        if (isPropertiesOpen) {
-                            onToolChange(activeToolType) // Close properties
-                        } else {
-                            onColorClick() // Open properties
-                        }
-                    }
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Thickness slider taking remaining space
-            ThicknessView(
-                activeStrokeWidth = activeStrokeWidth,
-                onStrokeWidthChange = onStrokeWidthChange,
-                modifier = Modifier.weight(1f).height(36.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Close button (closes properties or the whole dock)
-            Box(
-                modifier = Modifier
-                    .size(48.dp) // Larger touch target
-                    .clip(CircleShape)
-                    .clickable { 
-                        if (isPropertiesOpen) {
-                            onToolChange(activeToolType) // Back to tools
-                        } else {
-                            onClose() // Close the whole dock
-                        }
-                    },
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(if (isDark) Color(0xFF2C2C2E) else Color(0xFFF2F2F7))
+                    .clickable { onToolChange(activeToolType) },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = iconTint, modifier = Modifier.size(24.dp))
+                androidx.compose.material3.Text(
+                    text = "Done",
+                    color = iconTint,
+                    fontSize = 15.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                )
+            }
+        } else {
+            // 96.dp spacer for the floating tools rendered externally in DraftCanvas
+            Box(modifier = Modifier.fillMaxWidth().height(96.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Bottom row: [color circle] [PremiumSlider] [X]
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Color circle – tapping it opens the picker
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(activeColor, CircleShape)
+                        .border(2.dp, glassBorder, CircleShape)
+                        .clip(CircleShape)
+                        .clickable { onColorClick() }
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Thickness slider using PremiumSlider
+                com.flash.draft.ui.components.PremiumSlider(
+                    value = activeStrokeWidth,
+                    onValueChange = onStrokeWidthChange,
+                    valueRange = 2f..40f,
+                    modifier = Modifier.weight(1f).height(36.dp)
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Close button (closes the whole dock)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable { onClose() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = iconTint, modifier = Modifier.size(24.dp))
+                }
             }
         }
     }

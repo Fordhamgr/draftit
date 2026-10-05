@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignRight
+import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -54,65 +55,146 @@ fun LabelItem(
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
+            var activeColorPicker by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+            val isDark = LocalDarkTheme.current
+            val btnBg = if (isDark) Color(0x33FFFFFF) else Color(0x0D000000)
+            val activeTabBg = if (isDark) Color.White else Color.Black
+            val activeTabText = if (isDark) Color.Black else Color.White
+            val iconColor = if (isDark) Color.White else Color.Black
+            val inactiveIconColor = Color.Gray
+
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Row 1: Typography tools & Alignment
+                // Row 1: Typography & Alignment & Fonts
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.FormatBold, "Bold", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isBold = !labelNode.isBold)); onSaveRequest() }, tint = if (labelNode.isBold) Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatItalic, "Italic", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isItalic = !labelNode.isItalic)); onSaveRequest() }, tint = if (labelNode.isItalic) Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatUnderlined, "Underline", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(isUnderline = !labelNode.isUnderline)); onSaveRequest() }, tint = if (labelNode.isUnderline) Color(0xFF2196F3) else Color.Gray)
+                    // BIU
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        @Composable
+                        fun FormatIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, isActive: Boolean, onClick: () -> Unit) {
+                            Box(
+                                modifier = Modifier.size(28.dp).background(if (isActive) btnBg else Color.Transparent, CircleShape).clickable { onClick() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = if (isActive) iconColor else inactiveIconColor)
+                            }
+                        }
+                        FormatIcon(Icons.Default.FormatBold, labelNode.isBold) { onUpdate(labelNode.copy(isBold = !labelNode.isBold)); onSaveRequest() }
+                        FormatIcon(Icons.Default.FormatItalic, labelNode.isItalic) { onUpdate(labelNode.copy(isItalic = !labelNode.isItalic)); onSaveRequest() }
+                        FormatIcon(Icons.Default.FormatUnderlined, labelNode.isUnderline) { onUpdate(labelNode.copy(isUnderline = !labelNode.isUnderline)); onSaveRequest() }
+                    }
                     
-                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                    // Alignment
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        @Composable
+                        fun AlignIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, isActive: Boolean, onClick: () -> Unit) {
+                            Box(
+                                modifier = Modifier.size(28.dp).background(if (isActive) btnBg else Color.Transparent, CircleShape).clickable { onClick() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = if (isActive) iconColor else inactiveIconColor)
+                            }
+                        }
+                        AlignIcon(Icons.Default.FormatAlignLeft, labelNode.textAlign == "Left") { onUpdate(labelNode.copy(textAlign = "Left")); onSaveRequest() }
+                        AlignIcon(Icons.Default.FormatAlignCenter, labelNode.textAlign == "Center") { onUpdate(labelNode.copy(textAlign = "Center")); onSaveRequest() }
+                        AlignIcon(Icons.Default.FormatAlignRight, labelNode.textAlign == "Right") { onUpdate(labelNode.copy(textAlign = "Right")); onSaveRequest() }
+                    }
                     
-                    Icon(Icons.Default.FormatAlignLeft, "Left", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Left")); onSaveRequest() }, tint = if (labelNode.textAlign == "Left") Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatAlignCenter, "Center", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Center")); onSaveRequest() }, tint = if (labelNode.textAlign == "Center") Color(0xFF2196F3) else Color.Gray)
-                    Icon(Icons.Default.FormatAlignRight, "Right", modifier = Modifier.size(24.dp).clickable { onUpdate(labelNode.copy(textAlign = "Right")); onSaveRequest() }, tint = if (labelNode.textAlign == "Right") Color(0xFF2196F3) else Color.Gray)
+                    // Fonts Group
+                    Row(
+                        modifier = Modifier.background(btnBg, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("Sans", "Serif", "Mono", "Curs").forEach { fontName ->
+                            val isSelected = labelNode.fontFamily == fontName || (labelNode.fontFamily == "SansSerif" && fontName == "Sans")
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isSelected) activeTabBg else Color.Transparent, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                                    .clickable { onUpdate(labelNode.copy(fontFamily = fontName)); onSaveRequest() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = fontName, 
+                                    fontSize = 11.sp, 
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) activeTabText else inactiveIconColor
+                                )
+                            }
+                        }
+                    }
                 }
                 
-                // Row 2: Fonts & Size
+                // Row 2: Size & Colors
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    listOf("Sans", "Serif", "Mono", "Cursive").forEach { fontName ->
-                        val isSelectedFont = labelNode.fontFamily == fontName || (labelNode.fontFamily == "SansSerif" && fontName == "Sans")
-                        Text(
-                            text = fontName.take(4), fontSize = 12.sp, fontWeight = if (isSelectedFont) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelectedFont) Color.White else Color.Gray,
-                            modifier = Modifier.background(if (isSelectedFont) Color(0xFF2196F3) else Color.Transparent, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                                .clickable { onUpdate(labelNode.copy(fontFamily = fontName)); onSaveRequest() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                    // Slider
+                    Row(
+                        modifier = Modifier.background(btnBg, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("A", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = inactiveIconColor)
+                        Spacer(Modifier.width(6.dp))
+                        Slider(
+                            value = labelNode.fontSize,
+                            onValueChange = { onUpdate(labelNode.copy(fontSize = it)) },
+                            onValueChangeFinished = { onSaveRequest() },
+                            valueRange = 12f..72f,
+                            modifier = Modifier.width(100.dp).height(24.dp)
                         )
+                        Spacer(Modifier.width(6.dp))
+                        Text("A", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = inactiveIconColor)
                     }
-                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                    Text("${labelNode.fontSize.toInt()}", fontSize = 12.sp, color = Color.Gray)
-                    Slider(
-                        value = labelNode.fontSize,
-                        onValueChange = { onUpdate(labelNode.copy(fontSize = it)) },
-                        onValueChangeFinished = { onSaveRequest() },
-                        valueRange = 12f..72f,
-                        modifier = Modifier.width(80.dp).height(24.dp)
-                    )
+                    
+                    Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                    
+                    // Color Toggles
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // FG
+                        Box(
+                            modifier = Modifier.size(32.dp).background(if (activeColorPicker == "fg") btnBg else Color.Transparent, CircleShape).clickable { activeColorPicker = if (activeColorPicker == "fg") null else "fg" },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("T", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = iconColor)
+                                Spacer(Modifier.height(2.dp))
+                                Box(Modifier.size(12.dp, 2.dp).background(labelNode.color, CircleShape))
+                            }
+                        }
+                        
+                        // BG
+                        Box(
+                            modifier = Modifier.size(32.dp).background(if (activeColorPicker == "bg") btnBg else Color.Transparent, CircleShape).clickable { activeColorPicker = if (activeColorPicker == "bg") null else "bg" },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.FormatColorFill, contentDescription = "Bg Color", modifier = Modifier.size(16.dp), tint = iconColor)
+                                Spacer(Modifier.height(2.dp))
+                                Box(Modifier.size(12.dp, 2.dp).background(if (labelNode.backgroundColor.alpha == 0f) Color.Transparent else labelNode.backgroundColor, CircleShape).border(0.5.dp, Color.Gray, CircleShape))
+                            }
+                        }
+                    }
                 }
 
-                // Row 3: Colors
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("T", fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
-                    listOf(0xFF000000, 0xFFFFFFFF, 0xFF2196F3, 0xFF4CAF50, 0xFFF44336).forEach { colorVal ->
-                        val color = Color(colorVal)
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp).background(color, CircleShape)
-                                .border(if (labelNode.color == color) 2.dp else 1.dp, if (color == Color(0xFFFFFFFF)) Color.LightGray else Color.Transparent, CircleShape)
-                                .clickable { onUpdate(labelNode.copy(color = color)); onSaveRequest() }
-                        )
-                    }
-                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)).padding(horizontal = 4.dp))
-                    Text("Bg", fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
-                    listOf(0x00000000, 0xFFFFFFFF, 0xFFFFF9C4, 0xFFBBDEFB, 0xFFC8E6C9, 0xFF1A1A1A).forEach { colorVal ->
-                        val color = Color(colorVal.toLong())
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp).background(color, CircleShape)
-                                .border(if (labelNode.backgroundColor == color) 2.dp else 1.dp, if (labelNode.backgroundColor == color) Color.DarkGray else Color.LightGray, CircleShape)
-                                .clickable { onUpdate(labelNode.copy(backgroundColor = color)); onSaveRequest() }
-                        )
+                // Row 3: Color Picker (Animated Expansion)
+                androidx.compose.animation.AnimatedVisibility(visible = activeColorPicker != null) {
+                    val isFg = activeColorPicker == "fg"
+                    val colors = if (isFg) listOf(0xFF000000, 0xFFFFFFFF, 0xFF2196F3, 0xFF4CAF50, 0xFFF44336) else listOf(0x00000000, 0xFFFFFFFF, 0xFFFFF9C4, 0xFFBBDEFB, 0xFFC8E6C9, 0xFF1A1A1A)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(btnBg, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        colors.forEach { colorVal ->
+                            val color = Color(colorVal.toLong())
+                            val isSelected = if (isFg) labelNode.color == color else labelNode.backgroundColor == color
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(color, CircleShape)
+                                    .border(if (isSelected) 2.dp else 1.dp, if (isSelected) Color(0xFF2196F3) else Color.LightGray, CircleShape)
+                                    .clickable { 
+                                        if (isFg) onUpdate(labelNode.copy(color = color)) else onUpdate(labelNode.copy(backgroundColor = color))
+                                        onSaveRequest()
+                                    }
+                            )
+                        }
                     }
                 }
             }

@@ -87,9 +87,14 @@ class MainActivity : ComponentActivity() {
             val isDarkModeFlow = androidx.compose.runtime.remember { settingsRepo.getDarkModeFlow() }
             val isDarkMode by isDarkModeFlow.collectAsStateWithLifecycle(initialValue = initialDarkMode)
             
-            val isPerformanceMode by settingsRepo.getPerformanceModeFlow().collectAsStateWithLifecycle(initialValue = false)
-            val framerate by settingsRepo.getFramerateFlow().collectAsStateWithLifecycle(initialValue = 60)
-            val isHapticFeedbackEnabled by settingsRepo.getHapticFeedbackFlow().collectAsStateWithLifecycle(initialValue = true)
+            val initialPerformanceMode = androidx.compose.runtime.remember { settingsRepo.isPerformanceMode() }
+            val isPerformanceMode by settingsRepo.getPerformanceModeFlow().collectAsStateWithLifecycle(initialValue = initialPerformanceMode)
+            
+            val initialFramerate = androidx.compose.runtime.remember { settingsRepo.getFramerate() }
+            val framerate by settingsRepo.getFramerateFlow().collectAsStateWithLifecycle(initialValue = initialFramerate)
+            
+            val initialHapticFeedback = androidx.compose.runtime.remember { settingsRepo.isHapticFeedbackEnabled() }
+            val isHapticFeedbackEnabled by settingsRepo.getHapticFeedbackFlow().collectAsStateWithLifecycle(initialValue = initialHapticFeedback)
             
 
 

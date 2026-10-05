@@ -7,12 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,10 +32,10 @@ import com.flash.draft.ui.canvas.LocalLiquidState
 import com.flash.draft.ui.canvas.LocalLiquidRefraction
 import com.flash.draft.ui.canvas.LocalLiquidCurve
 import io.github.fletchmckee.liquid.liquid
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import com.flash.draft.ui.components.PremiumSlider
 
 @Composable
 fun PremiumSegmentedControl(options: List<String>, selectedOption: String, onOptionSelected: (String) -> Unit, isDark: Boolean) {
@@ -76,7 +71,6 @@ fun PremiumSegmentedControl(options: List<String>, selectedOption: String, onOpt
     }
 }
 
-// A compact segmented control icon version for the dock
 @Composable
 fun DockSegmentedIconControl(
     options: List<Pair<String, @Composable (Color) -> Unit>>,
@@ -84,14 +78,14 @@ fun DockSegmentedIconControl(
     onOptionSelected: (String) -> Unit,
     isDark: Boolean
 ) {
-    val containerBg = if (isDark) Color(0x33000000) else Color(0x0D000000)
-    val activeBg = if (isDark) Color(0xFF3A3A3C) else Color(0xFFFFFFFF)
+    val containerBg = if (isDark) Color(0x33000000) else Color(0xFFF0F0F0)
+    val activeBg = if (isDark) Color(0xFF3A3A3C) else Color.White
     val activeTint = if (isDark) Color.White else Color.Black
-    val inactiveTint = if (isDark) Color.Gray else Color.DarkGray
+    val inactiveTint = if (isDark) Color.Gray else Color.Gray
 
     Row(
         modifier = Modifier
-            .height(36.dp)
+            .height(32.dp)
             .background(containerBg, RoundedCornerShape(percent = 50))
             .padding(2.dp),
         horizontalArrangement = Arrangement.Center,
@@ -101,10 +95,10 @@ fun DockSegmentedIconControl(
             val isSelected = selectedOption == option
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(if (isSelected) activeBg else Color.Transparent)
-                    .then(if (isSelected) Modifier.shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.1f)) else Modifier)
+                    .then(if (isSelected) Modifier.shadow(1.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.1f)) else Modifier)
                     .clickable { onOptionSelected(option) },
                 contentAlignment = Alignment.Center
             ) {
@@ -122,21 +116,23 @@ fun ConnectorStyleMenu(
     onClose: () -> Unit = {}
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xB3FFFFFF)
-    val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x4DFFFFFF)
+    val glassBg = if (isDark) Color(0xB31A1A1A) else Color(0xFFF9F9F9)
+    val glassBorder = if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)
+    val dividerColor = if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)
     val colors = listOf(Color.Black, Color.Red, Color.Blue, Color(0xFF34C759), Color(0xFFFF9500), Color.Gray)
 
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
 
-    val dockHeight = 56.dp
-    val pillShape = RoundedCornerShape(percent = 50)
+    val configuration = LocalConfiguration.current
+    val dockHeight = if (configuration.screenWidthDp >= 600) 56.dp else 104.dp
+    val pillShape = RoundedCornerShape(24.dp)
     
     var isColorPickerExpanded by remember { mutableStateOf(false) }
 
-    val configuration = LocalConfiguration.current
     val maxDockWidth = configuration.screenWidthDp.dp - 32.dp
+    val isTablet = configuration.screenWidthDp >= 600
 
     Box(
         modifier = Modifier
@@ -154,19 +150,10 @@ fun ConnectorStyleMenu(
             .border(1.dp, glassBorder, pillShape)
             .clip(pillShape)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxHeight()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .animateContentSize(animationSpec = tween(300)),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Colors (Expandable)
+        val colorPicker = @Composable {
             Row(
                 modifier = Modifier
-                    .background(if (isDark) Color(0x33000000) else Color(0x0D000000), RoundedCornerShape(percent = 50))
+                    .background(if (isDark) Color(0x33000000) else Color(0xFFF0F0F0), RoundedCornerShape(percent = 50))
                     .padding(horizontal = 6.dp, vertical = 6.dp)
                     .animateContentSize(animationSpec = tween(300)),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -196,18 +183,12 @@ fun ConnectorStyleMenu(
                     )
                 }
             }
-            
-            // Only show the rest if color picker is NOT expanded to save space, or just show them anyway
-            // The prompt says "which is a single circle that expands to show more colors on click, saving space"
-            // Since it's a pill, it can just grow horizontally. We can show all elements always, it will just stretch.
-            
-            // Vertical Divider
-            Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
+        }
 
-            val dashedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f) }
-            val dottedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 10f), 0f) }
+        val dashedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f) }
+        val dottedEffect = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(2f, 10f), 0f) }
 
-            // Line Style Options
+        val lineStyleSelector = @Composable {
             val lineStyleOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
                 "Solid" to { color ->
                     androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
@@ -229,39 +210,127 @@ fun ConnectorStyleMenu(
                 }
             )
             DockSegmentedIconControl(lineStyleOptions, connector.lineStyle, { onUpdate(connector.copy(lineStyle = it)) }, isDark)
+        }
 
-            // Thickness Adjuster
+        val arrowShapeSelector = @Composable {
+            val arrowShapeOptions: List<Pair<String, @Composable (Color) -> Unit>> = listOf(
+                "None" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(0f, size.height/2), end = androidx.compose.ui.geometry.Offset(size.width, size.height/2), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                },
+                "Open" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(0f, size.height/2), end = androidx.compose.ui.geometry.Offset(size.width, size.height/2), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width/2f, 0f), end = androidx.compose.ui.geometry.Offset(size.width, size.height/2), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(size.width/2f, size.height), end = androidx.compose.ui.geometry.Offset(size.width, size.height/2), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                },
+                "Filled" to { color ->
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
+                        drawLine(color, start = androidx.compose.ui.geometry.Offset(0f, size.height/2), end = androidx.compose.ui.geometry.Offset(size.width - 4.dp.toPx(), size.height/2), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(size.width, size.height/2)
+                            lineTo(size.width/2f, 0f)
+                            lineTo(size.width/2f, size.height)
+                            close()
+                        }
+                        drawPath(path, color)
+                    }
+                }
+            )
+            val currentShapeStr = if (connector.arrowDirection == "None") "None" else connector.arrowShape
+            DockSegmentedIconControl(arrowShapeOptions, currentShapeStr, { shape ->
+                if (shape == "None") {
+                    onUpdate(connector.copy(arrowDirection = "None"))
+                } else {
+                    onUpdate(connector.copy(arrowShape = shape, arrowDirection = "Both"))
+                }
+            }, isDark)
+        }
+
+        val sizeSlider = @Composable {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(horizontal = 4.dp).widthIn(min = 100.dp).fillMaxWidth()
             ) {
-                Text("Size", color = if (isDark) Color.LightGray else Color.DarkGray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                androidx.compose.material3.Slider(
+                Text("Size", color = if (isDark) Color.LightGray else Color.DarkGray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                PremiumSlider(
                     value = connector.strokeWidth,
                     onValueChange = { onUpdate(connector.copy(strokeWidth = it)) },
                     valueRange = 2f..20f,
-                    modifier = Modifier.width(100.dp),
-                    colors = androidx.compose.material3.SliderDefaults.colors(
-                        thumbColor = if (isDark) Color.White else Color.Black,
-                        activeTrackColor = if (isDark) Color.White else Color.Black,
-                        inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    activeColor = if (isDark) Color.White else Color.Black,
+                    inactiveColor = if (isDark) Color(0x33FFFFFF) else Color(0xFFE0E0E0)
                 )
             }
+        }
 
-            // Vertical Divider
-            Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.Gray.copy(alpha = 0.3f)))
-
-            // Delete
+        val deleteBtn = @Composable {
             IconButton(
                 onClick = onDelete,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(32.dp)
                     .background(Color(0x1AFF3B30), CircleShape)
                     .clip(CircleShape)
             ) {
-                Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(20.dp))
+                Icon(painterResource(id = LucideR.drawable.lucide_ic_trash), "Delete", tint = Color(0xFFFF3B30), modifier = Modifier.size(16.dp))
+            }
+        }
+
+        val divider = @Composable {
+            Box(modifier = Modifier.width(1.dp).height(24.dp).background(dividerColor))
+        }
+
+        if (isTablet) {
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .animateContentSize(animationSpec = tween(300)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                colorPicker()
+                divider()
+                lineStyleSelector()
+                divider()
+                arrowShapeSelector()
+                divider()
+                Box(modifier = Modifier.width(120.dp)) { sizeSlider() }
+                divider()
+                deleteBtn()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .animateContentSize(animationSpec = tween(300)),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    colorPicker()
+                    divider()
+                    lineStyleSelector()
+                    divider()
+                    deleteBtn()
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    arrowShapeSelector()
+                    divider()
+                    Box(modifier = Modifier.weight(1f)) { sizeSlider() }
+                }
             }
         }
     }

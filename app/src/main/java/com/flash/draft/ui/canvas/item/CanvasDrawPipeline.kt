@@ -104,18 +104,39 @@ fun CanvasBackgroundDrawPipeline(
 
                         // ── STRAIGHT LINE RENDERING (original, unchanged) ──
 
+                            var lineStart = start
+                            var lineEnd = end
+                            val angleLine = atan2(end.y - start.y, end.x - start.x)
+                            val cosA = cos(angleLine).toFloat()
+                            val sinA = sin(angleLine).toFloat()
+                            val arrowLenForRetraction = 20f + (drawStroke * 1.5f)
+                            val distance = kotlin.math.hypot(end.x - start.x, end.y - start.y)
+                            val retraction = when (connector.arrowShape) {
+                                "Filled", "Diamond" -> arrowLenForRetraction * 0.8f
+                                "Circle" -> arrowLenForRetraction * 0.5f
+                                "Open" -> drawStroke * 0.5f
+                                else -> 0f
+                            }.coerceAtMost(distance / 2.5f)
+
+                            if (connector.arrowDirection == "Start" || connector.arrowDirection == "Both") {
+                                lineStart = Offset(start.x + retraction * cosA, start.y + retraction * sinA)
+                            }
+                            if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") {
+                                lineEnd = Offset(end.x - retraction * cosA, end.y - retraction * sinA)
+                            }
+
                             if (isSelected) {
                                 val highlightColor = if (isDarkTheme) Color(0xFF64B5F6).copy(alpha = 0.5f) else Color.Blue.copy(alpha = 0.2f)
-                                drawLine(color = highlightColor, start = start, end = end, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
+                                drawLine(color = highlightColor, start = lineStart, end = lineEnd, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
                             }
 
                             // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
                             if (!isPerformanceMode && !isDarkTheme) {
-                                drawLine(color = shadowColor.copy(alpha = 0.08f), start = start + shadowOffset, end = end + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
+                                drawLine(color = shadowColor.copy(alpha = 0.08f), start = lineStart + shadowOffset, end = lineEnd + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
                             }
                             
                             // Main Line
-                            drawLine(color = drawColor, start = start, end = end, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
+                            drawLine(color = drawColor, start = lineStart, end = lineEnd, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
 
                             fun drawArrow(tip: Offset, base: Offset) {
                                 val angle = atan2(tip.y - base.y, tip.x - base.x)
@@ -182,7 +203,7 @@ fun CanvasBackgroundDrawPipeline(
                             
                             // Draw Arrows (Main + Shadow in one pass)
                             if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start)
-                            if (connector.arrowDirection == "Both") drawArrow(start, end)
+                            if (connector.arrowDirection == "Start" || connector.arrowDirection == "Both") drawArrow(start, end)
                     }
                 }
             }

@@ -12,28 +12,28 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(private val repository: SettingsRepository) : ViewModel() {
 
     val isDarkMode: StateFlow<Boolean> = repository.getDarkModeFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isDarkMode())
 
     val isPerformanceMode: StateFlow<Boolean> = repository.getPerformanceModeFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isPerformanceMode())
 
     val framerate: StateFlow<Int> = repository.getFramerateFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 60)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getFramerate())
 
     val liquidCurve: StateFlow<Float> = repository.getLiquidCurveFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.5f)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getLiquidCurve())
 
     val liquidRefraction: StateFlow<Float> = repository.getLiquidRefractionFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.5f)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getLiquidRefraction())
 
     val undoHistoryLimit: StateFlow<Int> = repository.getUndoHistoryLimitFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 50)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getUndoHistoryLimit())
 
     val isHapticFeedbackEnabled: StateFlow<Boolean> = repository.getHapticFeedbackFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isHapticFeedbackEnabled())
 
     val isStylusSupportEnabled: StateFlow<Boolean> = repository.getStylusSupportFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isStylusSupportEnabled())
 
     fun toggleDarkMode(enabled: Boolean) = repository.setDarkMode(enabled)
     fun togglePerformanceMode(enabled: Boolean) = repository.setPerformanceMode(enabled)

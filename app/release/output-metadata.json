@@ -4,15 +4,15 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.flash.draft",
+  "applicationId": "com.flash.draft99",
   "variantName": "release",
   "elements": [
     {
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 1,
-      "versionName": "1.0",
+      "versionCode": 3,
+      "versionName": "1.2.0",
       "outputFile": "app-release.apk"
     }
   ],
