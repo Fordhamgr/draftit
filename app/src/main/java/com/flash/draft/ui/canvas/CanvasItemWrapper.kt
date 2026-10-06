@@ -67,6 +67,7 @@ fun CanvasItemWrapper(
     position: Offset, width: Float, height: Float, scale: Float, canvasOffset: Offset,
     isSelected: Boolean, isConnecting: Boolean, isLocked: Boolean = false, onLockedChange: (Boolean) -> Unit = {}, isFullyDraggable: Boolean = true,
     isChildDragging: Boolean = false,
+    isCanvasLocked: Boolean = false,
     isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
     hasDefaultBackground: Boolean = true, backgroundAlpha: Float = 0.65f,
     hyperlinkTarget: String? = null, onLinkUpdate: (String?) -> Unit = {},
@@ -168,16 +169,16 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming) currentOnSelect() }) }
+                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming && !isCanvasLocked) currentOnSelect() }) }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked) { isDragging = true; currentOnSelect(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) } },
+                                onDragStart = { if (!isMultiTouch && !isZooming && !isLocked && !isCanvasLocked) { isDragging = true; currentOnSelect(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) } },
                                 onDragEnd = { isDragging = false; currentOnSaveRequest(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                                 onDragCancel = { isDragging = false; currentOnSaveRequest(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                                 onDrag = { change, dragAmount ->
-                                    if (!isLocked && !isMultiTouch && !isZooming) {
+                                    if (!isLocked && !isCanvasLocked && !isMultiTouch && !isZooming) {
                                         change.consume()
                                         currentOnPositionDelta(dragAmount)
                                     }
@@ -243,14 +244,14 @@ fun CanvasItemWrapper(
                                 detectDragGestures(
                                     onDragEnd = { currentOnSaveRequest() },
                                     onDrag = { change, dragAmount ->
-                                        if (!isLocked && !isMultiTouch && !isZooming) {
+                                        if (!isLocked && !isCanvasLocked && !isMultiTouch && !isZooming) {
                                             change.consume()
                                             currentOnSizeDelta((dragAmount / density) / scale)
                                         }
                                     }
                                 )
                             }
-                            .pointerInput(Unit) { detectTapGestures(onTap = { currentOnSelect() }) },
+                            .pointerInput(Unit) { detectTapGestures(onTap = { if (!isCanvasLocked) currentOnSelect() }) },
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
@@ -441,3 +442,6 @@ fun CanvasItemWrapper(
         }
     }
 }
+
+
+

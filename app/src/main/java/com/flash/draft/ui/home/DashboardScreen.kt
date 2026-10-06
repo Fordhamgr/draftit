@@ -190,13 +190,13 @@ fun DashboardScreen(
 
     // ── Import launcher ─────────────────────────────────────────────────────
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        // Assuming we still handle import outside UDF for now or the prompt didn't specify.
-        // But since we don't have repository anymore, how to import?
-        // Wait, the prompt said to remove `repository` and `onProjectClick`, `onCreateNewProject`.
-        // Let me leave import as is but comment out or use onEvent?
-        // Let's just remove the import logic for now since it needs repository. Or we can just use Toast.
         if (uri != null) {
-            Toast.makeText(context, "Import not implemented in UDF yet.", Toast.LENGTH_SHORT).show()
+            val inputStream = context.contentResolver.openInputStream(uri)
+            if (inputStream != null) {
+                onEvent(DashboardEvent.ImportProject(context, inputStream))
+            } else {
+                Toast.makeText(context, "Could not read file", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -211,7 +211,12 @@ fun DashboardScreen(
 
     val exportArchiveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         if (uri != null && projectToExport != null) {
-            Toast.makeText(context, "Export not implemented in UDF yet.", Toast.LENGTH_SHORT).show()
+            val outputStream = context.contentResolver.openOutputStream(uri)
+            if (outputStream != null) {
+                onEvent(DashboardEvent.ExportProject(context, projectToExport!!.id, outputStream))
+            } else {
+                Toast.makeText(context, "Could not create file", Toast.LENGTH_SHORT).show()
+            }
             projectToExport = null
         }
     }
@@ -891,7 +896,70 @@ fun ProjectCard(
                 .fillMaxWidth()
                 .aspectRatio(thumbnailAspectRatio)
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(Color(0xFFF8F8F8))
+                .background(if (isDark) Color(0xFF18181A) else Color(0xFFF8F8F8))
+                .drawBehind {
+                    val style = project.backgroundStyle
+                    if (style == com.flash.draft.model.BackgroundStyle.Solid) return@drawBehind
+
+                    val patternColor = if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.15f)
+                    val spacing = 12.dp.toPx() // Scaled down spacing for thumbnails
+                    
+                    when (style) {
+                        com.flash.draft.model.BackgroundStyle.DotGrid -> {
+                            var x = 0f
+                            while (x < size.width) {
+                                var y = 0f
+                                while (y < size.height) {
+                                    drawCircle(color = patternColor, radius = 1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+                                    y += spacing
+                                }
+                                x += spacing
+                            }
+                        }
+                        com.flash.draft.model.BackgroundStyle.GraphPaper -> {
+                            var x = 0f
+                            while (x < size.width) {
+                                drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
+                                x += spacing
+                            }
+                            var y = 0f
+                            while (y < size.height) {
+                                drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
+                                y += spacing
+                            }
+                        }
+                        com.flash.draft.model.BackgroundStyle.Blueprint -> {
+                            drawRect(color = Color(0xFF1E3A8A)) // Deep blue base for blueprint
+                            val bpColor = Color.White.copy(alpha = 0.2f)
+                            var x = 0f
+                            while (x < size.width) {
+                                drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
+                                x += spacing
+                            }
+                            var y = 0f
+                            while (y < size.height) {
+                                drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
+                                y += spacing
+                            }
+                        }
+                        com.flash.draft.model.BackgroundStyle.Isometric -> {
+                            val isoSpacing = spacing * 0.866f // sqrt(3)/2
+                            var y = 0f
+                            var row = 0
+                            while (y < size.height) {
+                                val xOffset = if (row % 2 == 0) 0f else spacing / 2f
+                                var x = -xOffset
+                                while (x < size.width + spacing) {
+                                    if (x >= 0) drawCircle(color = patternColor, radius = 1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+                                    x += spacing
+                                }
+                                y += isoSpacing
+                                row++
+                            }
+                        }
+                        else -> {}
+                    }
+                }
                 .border(
                     width = 1.dp,
                     color = Color.Black.copy(alpha = 0.05f),

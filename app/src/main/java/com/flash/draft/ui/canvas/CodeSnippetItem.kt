@@ -30,7 +30,7 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun CodeSnippetItem(
-    codeBlock: CanvasElement.CodeBlock, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    codeBlock: CanvasElement.CodeBlock, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.CodeBlock) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
@@ -39,8 +39,8 @@ fun CodeSnippetItem(
 
     CanvasItemWrapper(
         position = codeBlock.position, width = codeBlock.width, height = codeBlock.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = codeBlock.isLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = codeBlock.isLocked || isCanvasLocked, onLockedChange = { onUpdate(codeBlock.copy(isLocked = it)) },
         isFullyDraggable = false, isChildDragging = isDragging, // Critical so TextField works normally
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
@@ -89,3 +89,5 @@ fun CodeSnippetItem(
         }
     }
 }
+
+

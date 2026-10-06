@@ -32,7 +32,7 @@ import java.util.UUID
 
 @Composable
 fun AudioItem(
-    audioNote: CanvasElement.AudioNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    audioNote: CanvasElement.AudioNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.AudioNote) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
@@ -140,8 +140,8 @@ fun AudioItem(
 
     CanvasItemWrapper(
         position = audioNote.position, width = audioNote.width, height = audioNote.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = audioNote.isLocked, onLockedChange = { onUpdate(audioNote.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = audioNote.isLocked || isCanvasLocked, onLockedChange = { onUpdate(audioNote.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = audioNote.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(audioNote.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
@@ -233,3 +233,5 @@ fun AudioItem(
         }
     }
 }
+
+

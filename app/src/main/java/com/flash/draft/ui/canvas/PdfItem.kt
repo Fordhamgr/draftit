@@ -25,7 +25,7 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun PdfItem(
-    pdfCard: CanvasElement.PdfCard, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    pdfCard: CanvasElement.PdfCard, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.PdfCard) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
@@ -33,8 +33,8 @@ fun PdfItem(
 
     CanvasItemWrapper(
         position = pdfCard.position, width = pdfCard.width, height = pdfCard.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = pdfCard.isLocked, onLockedChange = { onUpdate(pdfCard.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = pdfCard.isLocked || isCanvasLocked, onLockedChange = { onUpdate(pdfCard.copy(isLocked = it)) },
         backgroundAlpha = 1f,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = pdfCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(pdfCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
@@ -74,3 +74,5 @@ fun PdfItem(
         }
     }
 }
+
+

@@ -39,15 +39,15 @@ import com.flash.draft.ui.canvas.item.LocalPerformanceMode
 
 @Composable
 fun ImageItem(
-    imageCard: CanvasElement.ImageCard, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    imageCard: CanvasElement.ImageCard, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.ImageCard) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDuplicate: () -> Unit, onMakeSticker: () -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit
 ) {
     CanvasItemWrapper(
         position = imageCard.position, width = imageCard.width, height = imageCard.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = imageCard.isLocked, onLockedChange = { onUpdate(imageCard.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = imageCard.isLocked || isCanvasLocked, onLockedChange = { onUpdate(imageCard.copy(isLocked = it)) },
         hasDefaultBackground = false, // FIX: Allows PNG transparency to show!
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, hyperlinkTarget = imageCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(imageCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
@@ -159,3 +159,5 @@ fun ImageItem(
         )
     }
 }
+
+

@@ -34,10 +34,13 @@ sealed class DashboardEvent {
     data class RenameProject(val id: String, val newName: String) : DashboardEvent()
     object LoadProjects : DashboardEvent()
     data class OpenProject(val id: String) : DashboardEvent()
+    data class ImportProject(val context: android.content.Context, val inputStream: java.io.InputStream) : DashboardEvent()
+    data class ExportProject(val context: android.content.Context, val projectId: String, val outputStream: java.io.OutputStream) : DashboardEvent()
 }
 
 sealed class DashboardEffect {
     data class NavigateToCanvas(val projectId: String) : DashboardEffect()
+    data class ShowToast(val message: String) : DashboardEffect()
 }
 
 class DashboardViewModel(private val repository: NoteRepository) : ViewModel() {
@@ -82,6 +85,47 @@ class DashboardViewModel(private val repository: NoteRepository) : ViewModel() {
                 viewModelScope.launch {
                     _effect.emit(DashboardEffect.NavigateToCanvas(event.id))
                 }
+            }
+            is DashboardEvent.ImportProject -> {
+                importProject(event.context, event.inputStream)
+            }
+            is DashboardEvent.ExportProject -> {
+                exportProject(event.context, event.projectId, event.outputStream)
+            }
+        }
+    }
+
+    private fun exportProject(context: android.content.Context, projectId: String, outputStream: java.io.OutputStream) {
+        viewModelScope.launch {
+            try {
+                repository.exportProject(context, projectId, outputStream)
+                _effect.emit(DashboardEffect.ShowToast("Project exported successfully"))
+            } catch (e: Exception) {
+                _effect.emit(DashboardEffect.ShowToast("Failed to export project: ${e.message}"))
+            } finally {
+                try {
+                    outputStream.close()
+                } catch (e: Exception) {}
+            }
+        }
+    }
+
+    private fun importProject(context: android.content.Context, inputStream: java.io.InputStream) {
+        viewModelScope.launch {
+            try {
+                val newProjectId = repository.importProjectArchive(context, inputStream)
+                if (newProjectId != null) {
+                    loadProjects()
+                    _effect.emit(DashboardEffect.NavigateToCanvas(newProjectId))
+                } else {
+                    _effect.emit(DashboardEffect.ShowToast("Failed to import project."))
+                }
+            } catch (e: Exception) {
+                _effect.emit(DashboardEffect.ShowToast("Error importing project: ${e.message}"))
+            } finally {
+                try {
+                    inputStream.close()
+                } catch (e: Exception) {}
             }
         }
     }

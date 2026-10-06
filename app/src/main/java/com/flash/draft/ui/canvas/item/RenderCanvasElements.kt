@@ -41,7 +41,8 @@ fun RenderCanvasElements(
     onUpdateScaleAndOffset: (Float, Offset) -> Unit,
     onStartConnection: (String) -> Unit,
     onNavigateToScene: (String) -> Unit,
-    onNavigateToBoard: (String) -> Unit
+    onNavigateToBoard: (String) -> Unit,
+    isCanvasLocked: Boolean
 ) {
     // GPU graphicsLayer natively handles viewport culling, so we don't need CPU-side cull bounds.
     val currentSelectedGroupIds by androidx.compose.runtime.rememberUpdatedState(selectedGroupIds)
@@ -64,6 +65,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -126,6 +128,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -188,6 +191,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onUpdate = remember(element.id, element.hyperlinkTarget) { { updatedImage: CanvasElement.ImageCard ->
                         if (updatedImage.hyperlinkTarget == "TELEPORT") {
@@ -261,6 +265,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -323,6 +328,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -385,6 +391,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -447,6 +454,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -508,6 +516,7 @@ fun RenderCanvasElements(
                     isSelected = selectedNoteId == element.id,
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
+                    isCanvasLocked = isCanvasLocked,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -558,3 +567,4 @@ fun RenderCanvasElements(
         }
     }
 }
+

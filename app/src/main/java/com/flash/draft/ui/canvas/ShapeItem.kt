@@ -26,14 +26,14 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun ShapeItem(
-    shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.ShapeNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = shapeNode.position, width = shapeNode.width, height = shapeNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = shapeNode.isLocked, onLockedChange = { onUpdate(shapeNode.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = shapeNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(shapeNode.copy(isLocked = it)) },
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         hasDefaultBackground = false,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = shapeNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(shapeNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
@@ -80,3 +80,5 @@ fun ShapeItem(
         }
     }
 }
+
+

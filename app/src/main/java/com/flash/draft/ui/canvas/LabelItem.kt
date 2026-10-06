@@ -41,15 +41,15 @@ import com.flash.draft.ui.canvas.item.getAdaptiveColor
 
 @Composable
 fun LabelItem(
-    labelNode: CanvasElement.LabelNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    labelNode: CanvasElement.LabelNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.LabelNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     CanvasItemWrapper(
         position = labelNode.position, width = labelNode.width, height = labelNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = labelNode.isLocked, onLockedChange = { onUpdate(labelNode.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = labelNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(labelNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // <-- Makes it transparent!
         isFullyDraggable = false, isChildDragging = isDragging, // Critical for text editing
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
@@ -285,3 +285,5 @@ fun LabelItem(
         }
     }
 }
+
+

@@ -13,13 +13,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class BackgroundStyle {
-    Solid, DotGrid, GraphPaper, Blueprint, Isometric
-}
+import com.flash.draft.model.BackgroundStyle
 
 data class CanvasUiState(
     val isLoading: Boolean = true,
@@ -47,8 +46,6 @@ class CanvasViewModel(
     private val _uiState = MutableStateFlow(CanvasUiState())
     val uiState: StateFlow<CanvasUiState> = _uiState.asStateFlow()
 
-    private val _elements = MutableStateFlow<List<CanvasElement>>(emptyList())
-    val elements = _elements.asStateFlow()
 
     val isDarkMode: StateFlow<Boolean> = settingsRepo.getDarkModeFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isDarkMode())
@@ -62,8 +59,6 @@ class CanvasViewModel(
     val isStylusSupportEnabled: StateFlow<Boolean> = settingsRepo.getStylusSupportFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isStylusSupportEnabled())
 
-    private val _scenes = MutableStateFlow<List<Scene>>(emptyList())
-    val scenes = _scenes.asStateFlow()
 
     fun onEvent(event: CanvasUiEvent) {
         when (event) {
@@ -85,7 +80,7 @@ class CanvasViewModel(
 
 
     private fun pushToUndoStack() {
-        undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+        undoStack.addLast(CanvasState(_uiState.value.elements.toList(), _uiState.value.scenes.toList()))
         if (maxHistorySize > 0) {
             while (undoStack.size > maxHistorySize) undoStack.removeFirst()
         }
@@ -93,20 +88,19 @@ class CanvasViewModel(
     }
 
     fun updateElements(newElements: List<CanvasElement>) {
-        if (_elements.value.isNotEmpty() || _scenes.value.isNotEmpty()) {
+        if (_uiState.value.elements.isNotEmpty() || _uiState.value.scenes.isNotEmpty()) {
             pushToUndoStack()
         }
-        _elements.value = newElements
+        _uiState.update { it.copy(elements = newElements) }
         triggerAutoSave()
     }
 
     fun undo() {
         if (undoStack.isNotEmpty()) {
             com.flash.draft.utils.DraftLogger.logTrigger("Undo", payload = "Remaining stack: ${undoStack.size - 1}")
-            redoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+            redoStack.addLast(CanvasState(_uiState.value.elements.toList(), _uiState.value.scenes.toList()))
             val prevState = undoStack.removeLast()
-            _elements.value = prevState.elements
-            _scenes.value = prevState.scenes
+            _uiState.update { it.copy(elements = prevState.elements, scenes = prevState.scenes) }
             triggerAutoSave()
         }
     }
@@ -114,10 +108,9 @@ class CanvasViewModel(
     fun redo() {
         if (redoStack.isNotEmpty()) {
             com.flash.draft.utils.DraftLogger.logTrigger("Redo", payload = "Remaining stack: ${redoStack.size - 1}")
-            undoStack.addLast(CanvasState(_elements.value.toList(), _scenes.value.toList()))
+            undoStack.addLast(CanvasState(_uiState.value.elements.toList(), _uiState.value.scenes.toList()))
             val nextState = redoStack.removeLast()
-            _elements.value = nextState.elements
-            _scenes.value = nextState.scenes
+            _uiState.update { it.copy(elements = nextState.elements, scenes = nextState.scenes) }
             triggerAutoSave()
         }
     }
@@ -126,8 +119,8 @@ class CanvasViewModel(
         saveJob?.cancel()
         saveJob = viewModelScope.launch(Dispatchers.IO) {
             // Immediate temp save for crash recovery
-            val elementsSnapshot = _elements.value
-            val scenesSnapshot = _scenes.value
+            val elementsSnapshot = _uiState.value.elements
+            val scenesSnapshot = _uiState.value.scenes
             
             // Fast debounce for the actual file
             delay(500)
@@ -141,7 +134,7 @@ class CanvasViewModel(
         com.flash.draft.utils.DraftLogger.logTrigger("Add Scene", payload = name)
         pushToUndoStack()
         val newScene = Scene(name = name, offsetX = offsetX, offsetY = offsetY, scale = scale)
-        _scenes.value = _scenes.value + newScene
+        _uiState.update { it.copy(scenes = it.scenes + newScene) }
         triggerAutoSave()
         return newScene.id
     }
@@ -149,14 +142,14 @@ class CanvasViewModel(
     fun removeScene(id: String) {
         com.flash.draft.utils.DraftLogger.logTrigger("Remove Scene", payload = id)
         pushToUndoStack()
-        _scenes.value = _scenes.value.filterNot { it.id == id }
+        _uiState.update { it.copy(scenes = it.scenes.filterNot { s -> s.id == id }) }
         triggerAutoSave()
     }
 
     fun renameScene(id: String, newName: String) {
         com.flash.draft.utils.DraftLogger.logTrigger("Rename Scene", payload = "$id -> $newName")
         pushToUndoStack()
-        _scenes.value = _scenes.value.map { if (it.id == id) it.copy(name = newName) else it }
+        _uiState.update { s -> s.copy(scenes = s.scenes.map { if (it.id == id) it.copy(name = newName) else it }) }
         triggerAutoSave()
     }
 
@@ -164,8 +157,8 @@ class CanvasViewModel(
         saveJob?.cancel()
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             com.flash.draft.utils.DraftLogger.logDb("ImmediateSave Triggered", details = "Project: $projectId")
-            repository.saveElements(projectId, _elements.value)
-            repository.saveScenes(projectId, _scenes.value)
+            repository.saveElements(projectId, _uiState.value.elements)
+            repository.saveScenes(projectId, _uiState.value.scenes)
         }
     }
 
@@ -173,8 +166,8 @@ class CanvasViewModel(
         saveJob?.cancel()
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             com.flash.draft.utils.DraftLogger.logDb("ImmediateSaveSync Triggered", details = "Project: $projectId")
-            repository.saveElements(projectId, _elements.value)
-            repository.saveScenes(projectId, _scenes.value)
+            repository.saveElements(projectId, _uiState.value.elements)
+            repository.saveScenes(projectId, _uiState.value.scenes)
         }
     }
 
@@ -193,7 +186,7 @@ class CanvasViewModel(
     fun clearCanvas() {
         com.flash.draft.utils.DraftLogger.logTrigger("Clear Canvas")
         pushToUndoStack()
-        _elements.value = emptyList()
+        _uiState.update { it.copy(elements = emptyList()) }
         triggerAutoSave()
     }
     // --- LIQUID PHYSICS STATE ---
@@ -229,9 +222,7 @@ class CanvasViewModel(
         // Crash Recovery: Instantly load THIS specific project when the Canvas boots
         viewModelScope.launch(Dispatchers.IO) {
             val savedData = repository.loadElements(projectId) // <--- Updated
-            _elements.value = savedData
             val savedScenes = repository.loadScenes(projectId)
-            _scenes.value = savedScenes
             
             val bgStyle = repository.getProjectBackgroundStyle(projectId)
             _uiState.value = _uiState.value.copy(

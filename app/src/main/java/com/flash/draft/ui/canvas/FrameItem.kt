@@ -23,14 +23,14 @@ import com.flash.draft.model.CanvasElement
 
 @Composable
 fun FrameItem(
-    frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.FrameNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = frameNode.position, width = frameNode.width, height = frameNode.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = frameNode.isLocked, onLockedChange = { onUpdate(frameNode.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = frameNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(frameNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // Transparent center!
         isFullyDraggable = true,
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
@@ -84,3 +84,5 @@ fun FrameItem(
         }
     }
 }
+
+

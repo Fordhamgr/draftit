@@ -143,6 +143,9 @@ class MainActivity : ComponentActivity() {
                                             is com.flash.draft.ui.home.DashboardEffect.NavigateToCanvas -> {
                                                 navController.navigate("canvas/${effect.projectId}") { launchSingleTop = true }
                                             }
+                                            is com.flash.draft.ui.home.DashboardEffect.ShowToast -> {
+                                                android.widget.Toast.makeText(this@MainActivity, effect.message, android.widget.Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                 }

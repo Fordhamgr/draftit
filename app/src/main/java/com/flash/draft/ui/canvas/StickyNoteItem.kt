@@ -39,7 +39,7 @@ import com.flash.draft.ui.canvas.item.getAdaptiveColor
 
 @Composable
 fun StickyNoteItem(
-    note: CanvasElement.StickyNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
+    note: CanvasElement.StickyNote, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.StickyNote) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
 ) {
@@ -53,8 +53,8 @@ fun StickyNoteItem(
 
     CanvasItemWrapper(
         position = note.position, width = note.width, height = note.height,
-        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, onConnectRequest = onConnectRequest,
-        isLocked = note.isLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
+        scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
+        isLocked = note.isLocked || isCanvasLocked, onLockedChange = { onUpdate(note.copy(isLocked = it)) },
         isFullyDraggable = false, isChildDragging = isDragging, backgroundAlpha = 1f, // Critical so we don't block the TextField, and 1f to block out arrows behind
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = note.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(note.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
@@ -194,3 +194,5 @@ fun StickyNoteItem(
         }
     }
 }
+
+

@@ -44,18 +44,27 @@ class NoteRepository(context: Context) {
                     return@mapNotNull null
                 }
 
-                val title = if (metaFile.exists()) {
-                    try { JSONObject(metaFile.readText()).getString("title") } catch(e: Exception) { "Untitled Canvas" }
+                var title = "Untitled Canvas"
+                var bgStyle = com.flash.draft.model.BackgroundStyle.Solid
+                if (metaFile.exists()) {
+                    try {
+                        val json = JSONObject(metaFile.readText())
+                        title = json.optString("title", "Untitled Canvas")
+                        if (json.has("backgroundStyle")) {
+                            bgStyle = com.flash.draft.model.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
+                        }
+                    } catch(e: Exception) {}
                 } else {
                     val titleNode = elements.filterIsInstance<CanvasElement.LabelNode>().firstOrNull()
-                    titleNode?.text ?: "Untitled Canvas"
+                    title = titleNode?.text ?: "Untitled Canvas"
                 }
 
                 Project(
                     id = projectId,
                     title = title,
                     lastModifiedMs = file.lastModified(),
-                    previewElements = elements.take(15) // Only load a few for the thumbnail
+                    previewElements = elements.take(15), // Only load a few for the thumbnail
+                    backgroundStyle = bgStyle
                 )
             }.sortedByDescending { it.lastModifiedMs } // Newest first
     }
@@ -117,20 +126,20 @@ class NoteRepository(context: Context) {
         return newId
     }
 
-    fun getProjectBackgroundStyle(projectId: String): com.flash.draft.ui.canvas.BackgroundStyle {
+    fun getProjectBackgroundStyle(projectId: String): com.flash.draft.model.BackgroundStyle {
         val metaFile = File(projectsDir, "${projectId}_meta.json")
         if (metaFile.exists()) {
             try {
                 val json = JSONObject(metaFile.readText())
                 if (json.has("backgroundStyle")) {
-                    return com.flash.draft.ui.canvas.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
+                    return com.flash.draft.model.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
                 }
             } catch (e: Exception) {}
         }
-        return com.flash.draft.ui.canvas.BackgroundStyle.Solid
+        return com.flash.draft.model.BackgroundStyle.Solid
     }
 
-    fun updateProjectBackgroundStyle(projectId: String, style: com.flash.draft.ui.canvas.BackgroundStyle) {
+    fun updateProjectBackgroundStyle(projectId: String, style: com.flash.draft.model.BackgroundStyle) {
         val metaFile = File(projectsDir, "${projectId}_meta.json")
         val json = if (metaFile.exists()) {
             try { JSONObject(metaFile.readText()) } catch(e: Exception) { JSONObject() }
@@ -249,6 +258,7 @@ class NoteRepository(context: Context) {
                     jsonObject.put("color", element.color.value.toULong().toString())
                     jsonObject.put("fontSize", element.fontSize.toDouble())
                     jsonObject.put("fontFamily", element.fontFamily)
+                    jsonObject.put("style", element.style)
                     jsonObject.put("width", element.width.toDouble())
                     jsonObject.put("height", element.height.toDouble())
                 }
@@ -413,7 +423,7 @@ class NoteRepository(context: Context) {
                     when (type) {
                         "pdf" -> elements.add(CanvasElement.PdfCard(id, pos, obj.getString("uriString"), obj.getString("fileName"), obj.getString("fileSize"), obj.optDouble("width", 260.0).toFloat(), obj.optDouble("height", 140.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "code" -> elements.add(CanvasElement.CodeBlock(id, pos, obj.optString("code", ""), obj.optDouble("width", 280.0).toFloat(), obj.optDouble("height", 180.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
-                        "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif"), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "note" -> elements.add(CanvasElement.StickyNote(id, pos, obj.optString("text", ""), Color(obj.optString("color", "4294965700").toULong()), obj.optDouble("width", 200.0).toFloat(), obj.optDouble("height", 200.0).toFloat(), obj.optDouble("fontSize", 16.0).toFloat(), obj.optString("fontFamily", "SansSerif"), obj.optString("style", "Classic"), isLocked = obj.optBoolean("isLocked", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "sketch" -> {
                             val xCoords: FloatArray
                             val yCoords: FloatArray
