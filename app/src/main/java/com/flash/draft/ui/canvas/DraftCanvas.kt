@@ -1,4 +1,7 @@
 package com.flash.draft.ui.canvas
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.CheckCircle
 
 import com.flash.draft.model.BackgroundStyle
 
@@ -25,7 +28,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -219,7 +221,9 @@ fun DraftCanvas(
     var connectingStartNodeId by remember { mutableStateOf<String?>(null) }
 
     var isLassoMode by remember { mutableStateOf(false) }
-    val currentDrawingPath = remember { mutableStateListOf<InkPoint>() }
+    val currentDrawingPath = remember { mutableListOf<InkPoint>() }
+    val persistentBatch = remember { androidx.ink.strokes.MutableStrokeInputBatch() }
+    var inFlightStrokeCount by remember { mutableStateOf(0) }
     val lassoPath = remember { mutableStateListOf<Offset>() }
     var selectedGroupIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -308,6 +312,7 @@ fun DraftCanvas(
 
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val stableElements = remember { mutableStateOf<List<CanvasElement>>(emptyList()) }
     val elements = remember { mutableStateListOf<CanvasElement>() }
 
     var isUiVisible by remember { mutableStateOf(true) }
@@ -377,6 +382,7 @@ fun DraftCanvas(
         if (elements.toList() != uiState.elements) {
             elements.clear()
             elements.addAll(uiState.elements)
+            stableElements.value = uiState.elements
         }
     }
 
@@ -406,7 +412,7 @@ fun DraftCanvas(
             val (fileName, fileSize) = getFileInfo(uri)
             val dropPos = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)
             elements.add(CanvasElement.PdfCard(id = UUID.randomUUID().toString(), position = dropPos, uriString = uri.toString(), fileName = fileName, fileSize = fileSize))
-            viewModel.updateElements(elements.toList())
+            val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
         }
     }
 
@@ -437,7 +443,7 @@ fun DraftCanvas(
             
             elements.add(CanvasElement.ImageCard(id = UUID.randomUUID().toString(), position = dropPos, uriString = uri.toString(), width = scaledW, height = scaledH, originalWidth = origW, originalHeight = origH))
             isDrawingMode = false; isConnectingMode = false; isLassoMode = false
-            viewModel.updateElements(elements.toList())
+            val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
         }
     }
 
@@ -478,7 +484,16 @@ fun DraftCanvas(
     var fullExportW by remember { mutableIntStateOf(0) }
     var fullExportH by remember { mutableIntStateOf(0) }
     val fullExportLayer = rememberGraphicsLayer()
-    val snackbarHostState = remember { SnackbarHostState() }
+    
+    var exportResultMessage by remember { mutableStateOf<String?>(null) }
+    var exportResultIsError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(exportResultMessage) {
+        if (exportResultMessage != null) {
+            delay(2500)
+            exportResultMessage = null
+        }
+    }
     
     LaunchedEffect(isExportingFull) {
         if (isExportingFull && exportUri != null) {
@@ -488,7 +503,11 @@ fun DraftCanvas(
                 val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                 val finalBitmap = androidx.core.graphics.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(finalBitmap)
-                canvas.drawColor(android.graphics.Color.WHITE)
+                val bgColor = when (uiState.backgroundStyle) {
+                    BackgroundStyle.Blueprint -> android.graphics.Color.parseColor("#1E3A8A")
+                    else -> if (isDarkTheme) android.graphics.Color.parseColor("#18181A") else android.graphics.Color.parseColor("#F0F0F0")
+                }
+                canvas.drawColor(bgColor)
                 canvas.drawBitmap(swBitmap, 0f, 0f, null)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     context.contentResolver.openOutputStream(exportUri!!)?.use { stream ->
@@ -505,9 +524,11 @@ fun DraftCanvas(
                         }
                     }
                 }
-                snackbarHostState.showSnackbar("High-Quality Export Successful!")
+                exportResultMessage = "Exported Successfully!"
+                exportResultIsError = false
             } catch (e: Exception) {
-                snackbarHostState.showSnackbar("Export Failed: ${e.message}")
+                exportResultMessage = "Export Failed: ${e.message}"
+                exportResultIsError = true
             } finally {
                 isExportingFull = false
                 exportUri = null
@@ -531,7 +552,8 @@ fun DraftCanvas(
                 exportFormat = "PNG"
                 isExportingFull = true
             } else {
-                coroutineScope.launch { snackbarHostState.showSnackbar("Canvas is empty") }
+                exportResultMessage = "Canvas is empty"
+                exportResultIsError = true
             }
             isExportMenuOpen = false
         }
@@ -620,7 +642,8 @@ fun DraftCanvas(
                 exportFormat = "PDF"
                 isExportingFull = true
             } else {
-                coroutineScope.launch { snackbarHostState.showSnackbar("Canvas is empty") }
+                exportResultMessage = "Canvas is empty"
+                exportResultIsError = true
             }
             sceneToExport = null
         }
@@ -665,7 +688,7 @@ fun DraftCanvas(
     fun finishConnection(endNodeId: String) {
         val startId = connectingStartNodeId ?: return
         elements.add(CanvasElement.Connector(id = UUID.randomUUID().toString(), startId = startId, endId = endNodeId, color = defaultConnectorStyle.color, strokeWidth = defaultConnectorStyle.strokeWidth, lineStyle = defaultConnectorStyle.lineStyle, arrowDirection = defaultConnectorStyle.arrowDirection, arrowShape = defaultConnectorStyle.arrowShape))
-        viewModel.updateElements(elements.toList())
+        val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
         connectingStartNodeId = null; isConnectingMode = false
     }
 
@@ -813,10 +836,10 @@ fun DraftCanvas(
                                 closeAllMenus()
                                 if (isLassoMode) { selectedGroupIds = emptySet(); lassoPath.clear(); lassoPath.add(ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)) }
                                 else { 
-                                    currentDrawingPath.clear()
+                                    currentDrawingPath.clear(); persistentBatch.clear(); inFlightStrokeCount = 0; persistentBatch.clear(); inFlightStrokeCount = 0
                                     val worldPoint = ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)
                                     // Use a default time and pressure for the start point since detectDragGestures doesn't provide them initially
-                                    currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())) 
+                                    currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, worldPoint.x, worldPoint.y, android.os.SystemClock.uptimeMillis(), 1f); inFlightStrokeCount++; persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, worldPoint.x, worldPoint.y, android.os.SystemClock.uptimeMillis(), 1f); inFlightStrokeCount++ 
                                 }
                             },
                             onDrag = { change, _ ->
@@ -836,7 +859,7 @@ fun DraftCanvas(
                                         val lastPoint = currentDrawingPath.lastOrNull()
                                         if (lastPoint == null || (Offset(newPoint.x, newPoint.y) - Offset(lastPoint.x, lastPoint.y)).getDistance() > (3f / scale)) { 
                                             val pressure = if (isStylus) change.pressure else 1f
-                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, pressure, change.uptimeMillis)) 
+                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, pressure, change.uptimeMillis)); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, newPoint.x, newPoint.y, change.uptimeMillis, pressure); inFlightStrokeCount++; persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, newPoint.x, newPoint.y, change.uptimeMillis, pressure); inFlightStrokeCount++ 
                                         }
                                     }
                                 }
@@ -846,8 +869,9 @@ fun DraftCanvas(
                                     val vmElements = uiState.elements
                                     elements.clear()
                                     elements.addAll(vmElements)
+                                    stableElements.value = vmElements
                                 }
-                                currentDrawingPath.clear()
+                                currentDrawingPath.clear(); persistentBatch.clear(); inFlightStrokeCount = 0; persistentBatch.clear(); inFlightStrokeCount = 0
                                 lassoPath.clear()
                             },
                             onDragEnd = {
@@ -886,11 +910,11 @@ fun DraftCanvas(
                                         xArr[i] = p.x; yArr[i] = p.y; pArr[i] = p.pressure; tArr[i] = p.timeMillis
                                     }
                                     elements.add(CanvasElement.Sketch(id = UUID.randomUUID().toString(), xCoords = xArr, yCoords = yArr, pressures = pArr, times = tArr, color = activeDrawColor, strokeWidth = activeStrokeWidth, toolType = activeToolType, alpha = activeAlpha))
-                                    viewModel.updateElements(elements.toList())
-                                    currentDrawingPath.clear()
+                                    val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
+                                    currentDrawingPath.clear(); persistentBatch.clear(); inFlightStrokeCount = 0; persistentBatch.clear(); inFlightStrokeCount = 0
                                 } else if (activeToolType == "Eraser") {
-                                    viewModel.updateElements(elements.toList())
-                                    currentDrawingPath.clear()
+                                    val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
+                                    currentDrawingPath.clear(); persistentBatch.clear(); inFlightStrokeCount = 0; persistentBatch.clear(); inFlightStrokeCount = 0
                                 }
                             }
                         )
@@ -1069,7 +1093,7 @@ fun DraftCanvas(
                             }
                         ) {
                         CanvasBackgroundDrawPipeline(
-                            elements = elements.toList(), scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
+                            elements = stableElements.value, scale = 1f, offset = Offset.Zero, selectedConnectorId = selectedConnectorId,
                             isDarkTheme = isDarkTheme
                         )
 
@@ -1117,7 +1141,7 @@ fun DraftCanvas(
                             cameraScaleProvider = { renderScale },
                             isDarkTheme = isDarkTheme,
                             selectedGroupIds = selectedGroupIds,
-                            currentDrawingPath = currentDrawingPath,
+                            inFlightStrokeBatch = persistentBatch, inFlightStrokeCount = inFlightStrokeCount,
                             activeToolType = activeToolType,
                             activeDrawColor = activeDrawColor,
                             activeAlpha = activeAlpha,
@@ -1462,13 +1486,23 @@ fun DraftCanvas(
                                 drawContent()
                             }
                     ) {
-                        Box(modifier = Modifier.graphicsLayer {
-                            scaleX = fullExportScale
-                            scaleY = fullExportScale
-                            translationX = - (exportBbox!!.minX - 400f) * fullExportScale
-                            translationY = - (exportBbox!!.minY - 400f) * fullExportScale
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                        }) {
+                        Box(modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = fullExportScale
+                                scaleY = fullExportScale
+                                translationX = - (exportBbox!!.minX - 400f) * fullExportScale
+                                translationY = - (exportBbox!!.minY - 400f) * fullExportScale
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                            }
+                            .draftBackground(
+                                style = uiState.backgroundStyle,
+                                isDarkTheme = isDarkTheme,
+                                colorSchemeRec = colorSchemeRec,
+                                scale = 1f,
+                                offsetX = 0f,
+                                offsetY = 0f
+                            )
+                        ) {
                             CanvasBackgroundDrawPipeline(
                                 elements = elements,
                                 scale = 1f,
@@ -1513,7 +1547,7 @@ fun DraftCanvas(
                                 cameraOffsetProvider = { Offset.Zero },
                                 isDarkTheme = isDarkTheme,
                                 selectedGroupIds = emptySet(),
-                                currentDrawingPath = emptyList(),
+                                inFlightStrokeBatch = null, inFlightStrokeCount = 0,
                                 activeToolType = "Pen",
                                 activeDrawColor = Color.Black,
                                 activeAlpha = 1f,
@@ -1548,7 +1582,32 @@ fun DraftCanvas(
                     }
                 }
                 
-                SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp).zIndex(5f))
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = exportResultMessage != null,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(),
+                    modifier = Modifier.align(Alignment.Center).zIndex(5f)
+                ) {
+                    LiquidGlassPill(
+                        shape = RoundedCornerShape(24.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(
+                                imageVector = if (exportResultIsError) Icons.Default.Error else Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = if (exportResultIsError) androidx.compose.material3.MaterialTheme.colorScheme.error else Color(0xFF4CAF50),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = exportResultMessage ?: "",
+                                color = if (isDarkTheme) Color.White else Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
 
                 val showConnectorMenu = selectedConnectorId != null || isConnectingMode
                 val activeConnector = when {
@@ -1579,7 +1638,7 @@ fun DraftCanvas(
                             onUpdate = { updated ->
                                 if (isEditingExisting) {
                                     val connIndex = elements.indexOfFirst { it.id == selectedConnectorId }
-                                    if (connIndex != -1) { elements[connIndex] = updated; viewModel.updateElements(elements.toList()) }
+                                    if (connIndex != -1) { elements[connIndex] = updated; val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap) }
                                 } else {
                                     defaultConnectorStyle = updated
                                 }
@@ -1587,7 +1646,7 @@ fun DraftCanvas(
                             onDelete = {
                                 if (isEditingExisting) {
                                     val connIndex = elements.indexOfFirst { it.id == selectedConnectorId }
-                                    if (connIndex != -1) { elements.removeAt(connIndex); selectedConnectorId = null; viewModel.updateElements(elements.toList()) }
+                                    if (connIndex != -1) { elements.removeAt(connIndex); selectedConnectorId = null; val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap) }
                                 } else {
                                     isConnectingMode = false; connectingStartNodeId = null
                                 }
@@ -1642,7 +1701,7 @@ fun DraftCanvas(
                                         elements.removeAll { it.id in selectedGroupIds }
                                         // Also clean up any connectors attached to them
                                         elements.removeAll { it is CanvasElement.Connector && (it.startId in selectedGroupIds || it.endId in selectedGroupIds) }
-                                        viewModel.updateElements(elements.toList())
+                                        val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                         selectedGroupIds = emptySet()
                                     },
                                     modifier = Modifier.size(32.dp)
@@ -1672,7 +1731,7 @@ fun DraftCanvas(
                                 when (tool) {
                                     "Draw" -> isDrawingMode = true
                                     "Pan" -> { /* Defaults to panning */ }
-                                    "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale))); viewModel.updateElements(elements.toList()) }
+                                    "Text" -> { elements.add(CanvasElement.LabelNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale))); val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap) }
                                 }
                             },
                             isInsertMenuOpen = isInsertMenuOpen,
@@ -1710,27 +1769,27 @@ fun DraftCanvas(
                             onMediaClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)); isInsertMenuOpen = false },
                             onCodeClick = {
                                 elements.add(CanvasElement.CodeBlock(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
-                                viewModel.updateElements(elements.toList())
+                                val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                 isInsertMenuOpen = false
                             },
                             onAudioClick = {
                                 elements.add(CanvasElement.AudioNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
-                                viewModel.updateElements(elements.toList())
+                                val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                 isInsertMenuOpen = false
                             },
                             onTaskClick = {
                                 elements.add(CanvasElement.TaskListNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
-                                viewModel.updateElements(elements.toList())
+                                val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                 isInsertMenuOpen = false
                             },
                             onNoteClick = {
                                 elements.add(CanvasElement.StickyNote(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
-                                viewModel.updateElements(elements.toList())
+                                val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                 isInsertMenuOpen = false
                             },
                             onShapeClick = {
                                 elements.add(CanvasElement.ShapeNode(id = UUID.randomUUID().toString(), position = ViewportMath.screenToWorld(Offset(centerX, centerY), Offset(offsetX, offsetY), scale)))
-                                viewModel.updateElements(elements.toList())
+                                val snap = elements.toList(); stableElements.value = snap; viewModel.updateElements(snap)
                                 isInsertMenuOpen = false
                             },
                             forceCenter = showConnectorMenu && activeConnector != null && !isCanvasLocked,
@@ -1788,4 +1847,90 @@ fun DraftCanvas(
         }
     }
 }
+
+
+
+fun androidx.compose.ui.Modifier.draftBackground(
+    style: com.flash.draft.model.BackgroundStyle,
+    isDarkTheme: Boolean,
+    colorSchemeRec: androidx.compose.material3.ColorScheme,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float
+): androidx.compose.ui.Modifier = this
+    .background(if (isDarkTheme) androidx.compose.ui.graphics.Color(0xFF18181A) else androidx.compose.ui.graphics.Color(0xFFF0F0F0))
+    .drawBehind {
+        if (style == com.flash.draft.model.BackgroundStyle.Solid) return@drawBehind
+
+        val patternColor = colorSchemeRec.onSurfaceVariant.copy(alpha = 0.15f)
+        val spacing = 100f * scale
+        
+        val startX = (offsetX % spacing) - spacing
+        val startY = (offsetY % spacing) - spacing
+        
+        when (style) {
+            com.flash.draft.model.BackgroundStyle.DotGrid -> {
+                var x = startX
+                while (x < size.width + spacing) {
+                    var y = startY
+                    while (y < size.height + spacing) {
+                        drawCircle(color = patternColor, radius = 2f * scale, center = androidx.compose.ui.geometry.Offset(x, y))
+                        y += spacing
+                    }
+                    x += spacing
+                }
+            }
+            com.flash.draft.model.BackgroundStyle.GraphPaper -> {
+                var x = startX
+                while (x < size.width + spacing) {
+                    drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
+                    x += spacing
+                }
+                var y = startY
+                while (y < size.height + spacing) {
+                    drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
+                    y += spacing
+                }
+            }
+            com.flash.draft.model.BackgroundStyle.Blueprint -> {
+                drawRect(color = androidx.compose.ui.graphics.Color(0xFF1E3A8A))
+                val bpColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f)
+                var x = startX
+                while (x < size.width + spacing) {
+                    drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
+                    x += spacing
+                }
+                var y = startY
+                while (y < size.height + spacing) {
+                    drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
+                    y += spacing
+                }
+            }
+            com.flash.draft.model.BackgroundStyle.Isometric -> {
+                val isoSpacing = spacing * 0.866f
+                val startIsoX = (offsetX % spacing) - spacing
+                val startIsoY = (offsetY % isoSpacing) - isoSpacing
+
+                var y = startIsoY
+                var row = 0
+                while (y < size.height + isoSpacing) {
+                    val xOffset = if (row % 2 == 0) 0f else spacing / 2f
+                    var x = startIsoX - xOffset
+                    while (x < size.width + spacing) {
+                        drawCircle(color = patternColor, radius = 2f * scale, center = androidx.compose.ui.geometry.Offset(x, y))
+                        x += spacing
+                    }
+                    y += isoSpacing
+                    row++
+                }
+            }
+            else -> {}
+        }
+    }
+
+
+
+
+
+
 

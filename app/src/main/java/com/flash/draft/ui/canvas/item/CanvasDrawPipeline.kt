@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import android.graphics.Matrix
 import androidx.ink.strokes.*
@@ -25,6 +25,14 @@ import com.flash.draft.model.CanvasElement
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+
+
+fun findElement(elements: List<CanvasElement>, id: String): CanvasElement? {
+    for (i in elements.indices) {
+        if (elements[i].id == id) return elements[i]
+    }
+    return null
+}
 
 object CanvasProfiler {
     /** Set to true to enable per-frame profiling. False = dead-code-eliminated by compiler. */
@@ -46,7 +54,7 @@ fun CanvasBackgroundDrawPipeline(
 ) {
     // DO NOT use remember here. We need the latest elements map every time it recomposes.
     // Building the map takes < 1ms for hundreds of elements.
-    val elementMap = elements.associateBy { it.id }
+    
     val isPerformanceMode = LocalPerformanceMode.current
     // Cache PathEffect objects — scale is always 1f from DraftCanvas, so these are constant.
     // Previously allocated new FloatArray + PathEffect on EVERY draw frame.
@@ -79,11 +87,12 @@ fun CanvasBackgroundDrawPipeline(
         }
 
 
-        elements.forEach { element ->
+        for (i in elements.indices) {
+            val element = elements[i]
             if (element is CanvasElement.Connector) {
                 val connector = element
-                val startEl = elementMap[connector.startId]
-                val endEl = elementMap[connector.endId]
+                val startEl = findElement(elements, connector.startId)
+                val endEl = findElement(elements, connector.endId)
                 if (startEl != null && endEl != null) {
                     val centerStart = getCenterPoint(startEl)
                     val centerEnd = getCenterPoint(endEl)
@@ -159,7 +168,7 @@ fun CanvasBackgroundDrawPipeline(
                                         sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
                                         
                                         if (!isPerformanceMode && !isDarkTheme) {
-                                            withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
+                                            translate(left = shadowOffset.x, top = shadowOffset.y) {
                                                 drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Stroke(width = drawStroke + 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                                             }
                                         }
@@ -185,7 +194,7 @@ fun CanvasBackgroundDrawPipeline(
                                         }
                                         
                                         if (!isPerformanceMode && !isDarkTheme) {
-                                            withTransform({ translate(left = shadowOffset.x, top = shadowOffset.y) }) {
+                                            translate(left = shadowOffset.x, top = shadowOffset.y) {
                                                 drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Fill)
                                             }
                                         }
@@ -230,7 +239,8 @@ fun CanvasForegroundDrawPipeline(
     cameraOffsetProvider: () -> Offset,
     isDarkTheme: Boolean,
     selectedGroupIds: Set<String>,
-    currentDrawingPath: List<com.flash.draft.model.InkPoint>,
+    inFlightStrokeBatch: androidx.ink.strokes.MutableStrokeInputBatch?,
+    inFlightStrokeCount: Int,
     activeToolType: String,
     activeDrawColor: Color,
     activeAlpha: Float,
@@ -253,7 +263,8 @@ fun CanvasForegroundDrawPipeline(
             // (scale=1f, offset=Zero), so the save/restore was pure overhead.
 
             // Render existing sketches (Let GPU handle Viewport Culling)
-            elements.forEach { element ->
+            for (i in elements.indices) {
+            val element = elements[i]
                 if (element is CanvasElement.Sketch && element.xCoords.size > 1) {
                     val sketch = element
                     if (sketch.cachedStroke == null) {
@@ -310,14 +321,8 @@ fun CanvasForegroundDrawPipeline(
             }
 
             // Render current drawing path
-            if (currentDrawingPath.size > 1) {
-                val batch = MutableStrokeInputBatch()
-                var lastTime = -1L
-                currentDrawingPath.forEach { p ->
-                    val safeTime = if (p.timeMillis < lastTime) lastTime else p.timeMillis
-                    lastTime = safeTime
-                    batch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, p.x, p.y, safeTime, p.pressure)
-                }
+            if (inFlightStrokeCount > 1 && inFlightStrokeBatch != null) {
+                val batch = inFlightStrokeBatch
                 
                 val baseColor = getAdaptiveColor(activeDrawColor, isDarkTheme)
                 val family = when (activeToolType) {
