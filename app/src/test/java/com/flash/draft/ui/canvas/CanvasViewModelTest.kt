@@ -44,7 +44,7 @@ class CanvasViewModelTest {
         every { settingsRepo.getFramerateFlow() } returns MutableStateFlow(60)
         every { settingsRepo.getUndoHistoryLimitFlow() } returns MutableStateFlow(50)
 
-        every { noteRepo.getProjectBackgroundStyle("test_project") } returns BackgroundStyle.Solid
+        every { noteRepo.getProjectBackgroundStyle("test_project") } returns com.flash.draft.model.BackgroundStyle.Solid
 
         viewModel = CanvasViewModel(noteRepo, settingsRepo, "test_project")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -59,10 +59,10 @@ class CanvasViewModelTest {
 
     @Test
     fun `test ChangeBackgroundStyle event updates uiState and repository`() {
-        viewModel.onEvent(CanvasUiEvent.ChangeBackgroundStyle(BackgroundStyle.Blueprint))
+        viewModel.onEvent(CanvasUiEvent.ChangeBackgroundStyle(com.flash.draft.model.BackgroundStyle.Blueprint))
         
-        assertEquals(BackgroundStyle.Blueprint, viewModel.uiState.value.backgroundStyle)
-        verify { noteRepo.updateProjectBackgroundStyle("test_project", BackgroundStyle.Blueprint) }
+        assertEquals(com.flash.draft.model.BackgroundStyle.Blueprint, viewModel.uiState.value.backgroundStyle)
+        verify { noteRepo.updateProjectBackgroundStyle("test_project", com.flash.draft.model.BackgroundStyle.Blueprint) }
     }
 
     @Test

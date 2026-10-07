@@ -53,12 +53,12 @@ class NoteRepositoryTest {
         val projectId = "test_project_bg"
 
         // Save
-        repository.updateProjectBackgroundStyle(projectId, com.flash.draft.ui.canvas.BackgroundStyle.GraphPaper)
+        repository.updateProjectBackgroundStyle(projectId, com.flash.draft.model.BackgroundStyle.GraphPaper)
 
         // Retrieve
         val retrievedStyle = repository.getProjectBackgroundStyle(projectId)
         
-        assertEquals(com.flash.draft.ui.canvas.BackgroundStyle.GraphPaper, retrievedStyle)
+        assertEquals(com.flash.draft.model.BackgroundStyle.GraphPaper, retrievedStyle)
     }
 
     @Test
