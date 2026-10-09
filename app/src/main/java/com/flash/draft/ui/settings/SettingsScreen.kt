@@ -37,6 +37,7 @@ fun SettingsScreen(
 
     val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle()
     val liquidRefraction by viewModel.liquidRefraction.collectAsStateWithLifecycle()
+    val liquidFrost by viewModel.liquidFrost.collectAsStateWithLifecycle()
     val undoHistoryLimit by viewModel.undoHistoryLimit.collectAsStateWithLifecycle()
     val isHapticFeedbackEnabled by viewModel.isHapticFeedbackEnabled.collectAsStateWithLifecycle()
     val isStylusSupportEnabled by viewModel.isStylusSupportEnabled.collectAsStateWithLifecycle()
@@ -162,6 +163,17 @@ fun SettingsScreen(
                                     steps = 0,
                                     textColor = textColor,
                                     actionBlue = actionBlue,
+                                    showDivider = true
+                                )
+                                SliderRow(
+                                    label = "Frost (Blur)",
+                                    icon = Icons.Default.BlurOn,
+                                    value = liquidFrost,
+                                    onValueChange = { viewModel.setLiquidFrost(it) },
+                                    valueRange = 0f..1f,
+                                    steps = 0,
+                                    textColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                                    actionBlue = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                                     showDivider = true
                                 )
                             }

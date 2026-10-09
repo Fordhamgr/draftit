@@ -230,7 +230,8 @@ fun DashboardScreen(
     CompositionLocalProvider(
         com.flash.draft.ui.canvas.LocalLiquidState provides liquidState,
         com.flash.draft.ui.canvas.LocalLiquidRefraction provides 0.5f,
-        com.flash.draft.ui.canvas.LocalLiquidCurve provides 0.5f
+        com.flash.draft.ui.canvas.LocalLiquidCurve provides 0.5f,
+        com.flash.draft.ui.canvas.LocalLiquidFrost provides 0.0f
     ) {
         Box(
             modifier = Modifier

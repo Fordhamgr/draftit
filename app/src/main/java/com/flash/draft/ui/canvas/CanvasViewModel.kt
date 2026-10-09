@@ -249,6 +249,11 @@ class CanvasViewModel(
             }
         }
         viewModelScope.launch {
+            settingsRepo.getLiquidFrostFlow().collect { level ->
+                setLiquidFrost(level)
+            }
+        }
+        viewModelScope.launch {
             settingsRepo.getLiquidRefractionFlow().collect { level ->
                 setLiquidRefraction(level)
             }

@@ -157,6 +157,7 @@ fun getElementsBoundingBox(elements: List<CanvasElement>): BoundingBox? {
 val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
 val LocalLiquidRefraction = compositionLocalOf { 0.5f }
 val LocalLiquidCurve = compositionLocalOf { 0.5f }
+val LocalLiquidFrost = compositionLocalOf { 0.0f }
 
 @Composable
 fun DraftCanvas(
@@ -236,6 +237,7 @@ fun DraftCanvas(
     val liquidState = rememberLiquidState()
     val liquidRefraction by viewModel.liquidRefraction.collectAsStateWithLifecycle(initialValue = 0.5f)
     val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle(initialValue = 0.5f)
+    val liquidFrost by viewModel.liquidFrost.collectAsStateWithLifecycle(initialValue = 0.0f)
     var isExportMenuOpen by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var isCapturingThumbnail by remember { mutableStateOf(false) }
@@ -701,7 +703,8 @@ fun DraftCanvas(
 
         LocalLiquidState provides liquidState,
         LocalLiquidRefraction provides liquidRefraction,
-        LocalLiquidCurve provides liquidCurve
+        LocalLiquidCurve provides liquidCurve,
+        LocalLiquidFrost provides liquidFrost
     ) {
         val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
         Box(

@@ -26,6 +26,9 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     val liquidRefraction: StateFlow<Float> = repository.getLiquidRefractionFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getLiquidRefraction())
 
+    val liquidFrost: StateFlow<Float> = repository.getLiquidFrostFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getLiquidFrost())
+
     val undoHistoryLimit: StateFlow<Int> = repository.getUndoHistoryLimitFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getUndoHistoryLimit())
 
@@ -41,6 +44,7 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
 
     fun setLiquidCurve(level: Float) = repository.setLiquidCurve(level)
     fun setLiquidRefraction(level: Float) = repository.setLiquidRefraction(level)
+    fun setLiquidFrost(level: Float) = repository.setLiquidFrost(level)
     fun setUndoHistoryLimit(limit: Int) = repository.setUndoHistoryLimit(limit)
     fun toggleHapticFeedback(enabled: Boolean) = repository.setHapticFeedbackEnabled(enabled)
     fun toggleStylusSupport(enabled: Boolean) = repository.setStylusSupportEnabled(enabled)

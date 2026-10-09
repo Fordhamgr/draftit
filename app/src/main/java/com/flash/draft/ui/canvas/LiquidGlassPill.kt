@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.flash.draft.ui.canvas.item.LocalDarkTheme
@@ -31,6 +32,7 @@ fun LiquidGlassPill(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val liquidFrost = LocalLiquidFrost.current
 
     // Premium Frosted Glass colors
     val glassBg = if (isDark) Color(0x1AFFFFFF) else Color(0xCCFFFFFF)
@@ -41,13 +43,14 @@ fun LiquidGlassPill(
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
+            frost = (liquidFrost * 24f).dp
             this.shape = shape
         }
     } else Modifier
 
     Box(
         modifier = modifier
-            .then(if (isPerformanceMode || isDark) Modifier else Modifier.shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f)))
+            .then(if (isPerformanceMode || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, shape, spotColor = Color.Black.copy(alpha = 0.15f)))
             .then(liquidModifier)
             .background(glassBg, shape)
             .border(1.dp, glassBorder, shape)

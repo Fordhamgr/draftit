@@ -19,6 +19,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_FRAMERATE = "framerate"
         private const val KEY_LIQUID_CURVE = "liquid_curve"
         private const val KEY_LIQUID_REFRACTION = "liquid_refraction"
+        private const val KEY_LIQUID_FROST = "liquid_frost"
         private const val KEY_UNDO_LIMIT = "undo_limit"
         private const val KEY_HAPTIC_FEEDBACK = "haptic_feedback"
         private const val KEY_STYLUS_SUPPORT = "stylus_support"
@@ -30,6 +31,7 @@ class SettingsRepository(context: Context) {
     private val defaultFramerate = 0 // 0 = Unlocked
     private val defaultLiquidCurve = 0.5f
     private val defaultLiquidRefraction = 0.5f
+    private val defaultLiquidFrost = 0.0f
     private val defaultUndoLimit = 0
     private val defaultHapticFeedback = false
     private val defaultStylusSupport = false
@@ -105,6 +107,21 @@ class SettingsRepository(context: Context) {
         activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(prefs.getFloat(KEY_LIQUID_REFRACTION, defaultLiquidRefraction))
+        awaitClose { 
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
+        }
+    }
+
+    fun getLiquidFrost(): Float = prefs.getFloat(KEY_LIQUID_FROST, defaultLiquidFrost)
+    fun setLiquidFrost(level: Float) = prefs.edit().putFloat(KEY_LIQUID_FROST, level).apply()
+    fun getLiquidFrostFlow(): Flow<Float> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_LIQUID_FROST) trySend(prefs.getFloat(KEY_LIQUID_FROST, defaultLiquidFrost))
+        }
+        activeListeners.add(listener)
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(prefs.getFloat(KEY_LIQUID_FROST, defaultLiquidFrost))
         awaitClose { 
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
             activeListeners.remove(listener)
