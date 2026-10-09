@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,11 +58,11 @@ fun LabelItem(
         customMenuContent = {
             var activeColorPicker by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
             val isDark = LocalDarkTheme.current
-            val btnBg = if (isDark) Color(0x33FFFFFF) else Color(0x0D000000)
-            val activeTabBg = if (isDark) Color.White else Color.Black
-            val activeTabText = if (isDark) Color.Black else Color.White
-            val iconColor = if (isDark) Color.White else Color.Black
-            val inactiveIconColor = Color.Gray
+            val btnBg = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+            val activeTabBg = androidx.compose.material3.MaterialTheme.colorScheme.primary
+            val activeTabText = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+            val iconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+            val inactiveIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Row 1: Typography & Alignment & Fonts
@@ -246,16 +247,43 @@ fun LabelItem(
                 )
             )
 
-            // Drag Handle for Text Box (drawn last so it's on top of the text field)
+            // Expanded Drag Handle Stroke for Text Box
             if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = (-32).dp) // Shifts the touch target so the visible handle sits entirely above the box
-                        .size(64.dp, 48.dp) // Massive touch slop area
+                        .align(Alignment.Center)
+                        .layout { measurable, constraints ->
+                            // Expand the hit area by 32dp (16dp on each side)
+                            val paddingPx = 32.dp.roundToPx()
+                            val placeable = measurable.measure(
+                                constraints.copy(
+                                    minWidth = constraints.maxWidth + paddingPx,
+                                    maxWidth = constraints.maxWidth + paddingPx,
+                                    minHeight = constraints.maxHeight + paddingPx,
+                                    maxHeight = constraints.maxHeight + paddingPx
+                                )
+                            )
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                placeable.place(
+                                    (constraints.maxWidth - placeable.width) / 2,
+                                    (constraints.maxHeight - placeable.height) / 2
+                                )
+                            }
+                        }
                         .pointerInput(isLocked) {
                             detectDragGestures(
-                                onDragStart = { if (!isLocked) onSelect() }, onDragEnd = { if (!isLocked) onSaveRequest() },
+                                onDragStart = { 
+                                    isDragging = true
+                                    if (!isLocked) onSelect() 
+                                }, 
+                                onDragEnd = { 
+                                    isDragging = false
+                                    if (!isLocked) onSaveRequest() 
+                                },
+                                onDragCancel = {
+                                    isDragging = false
+                                    if (!isLocked) onSaveRequest()
+                                },
                                 onDrag = { change, dragAmount -> 
                                     if (!isLocked) {
                                         change.consume()
@@ -263,27 +291,14 @@ fun LabelItem(
                                     }
                                 }
                             )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp, 16.dp) // Visible handle
-                            .background(Color.Gray.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(id = com.composables.icons.lucide.R.drawable.lucide_ic_grip_horizontal),
-                            contentDescription = "Drag",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
+                        }
+                        .border(4.dp, androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                )
             }
 
         }
     }
 }
+
 
 

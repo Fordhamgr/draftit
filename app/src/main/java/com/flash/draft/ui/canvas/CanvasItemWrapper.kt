@@ -231,7 +231,10 @@ fun CanvasItemWrapper(
             // Alignment against requiredSize is pixel-accurate at ANY item dimension.
             Box(modifier = Modifier.requiredSize(width.dp, height.dp)) {
                 // Selection border
-                Box(modifier = Modifier.fillMaxSize().border(2.dp, Color(0xFF2196F3), RoundedCornerShape(12.dp)))
+                val bgStyle = com.flash.draft.ui.canvas.item.LocalBackgroundStyle.current
+                val isBgDark = bgStyle == com.flash.draft.model.BackgroundStyle.Greenprint || bgStyle == com.flash.draft.model.BackgroundStyle.Blueprint || ((bgStyle == com.flash.draft.model.BackgroundStyle.Solid || bgStyle == com.flash.draft.model.BackgroundStyle.GraphPaper) && isDark)
+                val outlineColor = if (isBgDark) Color.White.copy(alpha=0.8f) else Color(0xFF2196F3)
+                Box(modifier = Modifier.fillMaxSize().border(2.dp, outlineColor, RoundedCornerShape(12.dp)))
 
                 // Resize handle (bottom-right)
                 if (!isLocked) {

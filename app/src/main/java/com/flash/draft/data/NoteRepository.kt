@@ -51,7 +51,12 @@ class NoteRepository(context: Context) {
                         val json = JSONObject(metaFile.readText())
                         title = json.optString("title", "Untitled Canvas")
                         if (json.has("backgroundStyle")) {
-                            bgStyle = com.flash.draft.model.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
+                            val styleStr = json.getString("backgroundStyle")
+                            bgStyle = if (styleStr == "DotGrid" || styleStr == "Isometric") {
+                                com.flash.draft.model.BackgroundStyle.Blueprint
+                            } else {
+                                com.flash.draft.model.BackgroundStyle.valueOf(styleStr)
+                            }
                         }
                     } catch(e: Exception) {}
                 } else {
@@ -132,7 +137,12 @@ class NoteRepository(context: Context) {
             try {
                 val json = JSONObject(metaFile.readText())
                 if (json.has("backgroundStyle")) {
-                    return com.flash.draft.model.BackgroundStyle.valueOf(json.getString("backgroundStyle"))
+                    val styleStr = json.getString("backgroundStyle")
+                    return if (styleStr == "DotGrid" || styleStr == "Isometric") {
+                        com.flash.draft.model.BackgroundStyle.Blueprint
+                    } else {
+                        com.flash.draft.model.BackgroundStyle.valueOf(styleStr)
+                    }
                 }
             } catch (e: Exception) {}
         }
@@ -261,6 +271,7 @@ class NoteRepository(context: Context) {
                     jsonObject.put("style", element.style)
                     jsonObject.put("width", element.width.toDouble())
                     jsonObject.put("height", element.height.toDouble())
+                    jsonObject.put("isLocked", element.isLocked)
                 }
                 is CanvasElement.ImageCard -> {
                     jsonObject.put("type", "image")
@@ -356,6 +367,12 @@ class NoteRepository(context: Context) {
                     jsonObject.put("color", element.color.value.toULong().toString())
                     jsonObject.put("fontSize", element.fontSize.toDouble())
                     jsonObject.put("isBold", element.isBold)
+                    jsonObject.put("isItalic", element.isItalic)
+                    jsonObject.put("isUnderline", element.isUnderline)
+                    jsonObject.put("fontFamily", element.fontFamily)
+                    jsonObject.put("textAlign", element.textAlign)
+                    jsonObject.put("backgroundColor", element.backgroundColor.value.toULong().toString())
+                    jsonObject.put("isLocked", element.isLocked)
                 }
                 is CanvasElement.FrameNode -> {
                     jsonObject.put("type", "frame")
@@ -467,7 +484,7 @@ class NoteRepository(context: Context) {
                         "audio" -> elements.add(CanvasElement.AudioNote(id, pos, obj.optString("audioPath", ""), obj.optInt("durationMs", 0), false, obj.optDouble("width", 240.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "shape" -> elements.add(CanvasElement.ShapeNode(id, pos, obj.optDouble("width", 150.0).toFloat(), obj.optDouble("height", 150.0).toFloat(), obj.optString("shapeType", "Rectangle"), Color(obj.optString("color", "4280399603").toULong()), obj.optBoolean("isFilled", true), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "connector" -> elements.add(CanvasElement.Connector(id, obj.getString("startId"), obj.getString("endId"), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("strokeWidth", 4.0).toFloat(), obj.optString("lineStyle", "Solid"), obj.optString("arrowDirection", "End"), obj.optString("arrowShape", "Filled"), obj.optString("routing", "Straight"), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
-                        "label" -> elements.add(CanvasElement.LabelNode(id, pos, obj.optString("text", ""), obj.optDouble("width", 250.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("fontSize", 24.0).toFloat(), obj.optBoolean("isBold", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
+                        "label" -> elements.add(CanvasElement.LabelNode(id, pos, obj.optString("text", ""), obj.optDouble("width", 250.0).toFloat(), obj.optDouble("height", 80.0).toFloat(), Color(obj.optString("color", "4278190080").toULong()), obj.optDouble("fontSize", 24.0).toFloat(), obj.optBoolean("isBold", false), obj.optBoolean("isItalic", false), obj.optBoolean("isUnderline", false), obj.optString("fontFamily", "SansSerif"), obj.optString("textAlign", "Left"), Color(obj.optString("backgroundColor", "0").toULong()), obj.optBoolean("isLocked", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "frame" -> elements.add(CanvasElement.FrameNode(id, pos, obj.optDouble("width", 400.0).toFloat(), obj.optDouble("height", 300.0).toFloat(), obj.optString("title", "New Frame"), Color(obj.optString("color", "4288585374").toULong()), obj.optBoolean("isMagnetic", false), hyperlinkTarget = if (obj.has("hyperlinkTarget")) obj.getString("hyperlinkTarget") else null))
                         "tasklist" -> {
                             val tasksList = mutableListOf<CanvasElement.TaskItem>()

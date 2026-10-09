@@ -683,6 +683,8 @@ fun DraftCanvas(
                 if (el is CanvasElement.TaskListNode && !el.isLocked) elements[idx] = el.copy(position = el.position + delta)
             }
         }
+        val snap = elements.toList()
+        stableElements.value = snap
     }
 
     fun finishConnection(endNodeId: String) {
@@ -694,6 +696,7 @@ fun DraftCanvas(
 
     CompositionLocalProvider(
         LocalDarkTheme provides isDarkTheme,
+        com.flash.draft.ui.canvas.item.LocalBackgroundStyle provides uiState.backgroundStyle,
         com.flash.draft.ui.canvas.item.LocalPerformanceMode provides (isPerformanceMode && !isExporting),
 
         LocalLiquidState provides liquidState,
@@ -717,17 +720,6 @@ fun DraftCanvas(
                     val startY = (offsetY % spacing) - spacing
                     
                     when (style) {
-                        BackgroundStyle.DotGrid -> {
-                            var x = startX
-                            while (x < size.width + spacing) {
-                                var y = startY
-                                while (y < size.height + spacing) {
-                                    drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
-                                    y += spacing
-                                }
-                                x += spacing
-                            }
-                        }
                         BackgroundStyle.GraphPaper -> {
                             var x = startX
                             while (x < size.width + spacing) {
@@ -754,23 +746,18 @@ fun DraftCanvas(
                                 y += spacing
                             }
                         }
-                        BackgroundStyle.Isometric -> {
-                            // Triangle grid
-                            val isoSpacing = spacing * 0.866f // sqrt(3)/2
-                            val startIsoX = (offsetX % spacing) - spacing
-                            val startIsoY = (offsetY % isoSpacing) - isoSpacing
-
-                            var y = startIsoY
-                            var row = 0
-                            while (y < size.height + isoSpacing) {
-                                val xOffset = if (row % 2 == 0) 0f else spacing / 2f
-                                var x = startIsoX - xOffset
-                                while (x < size.width + spacing) {
-                                    drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
-                                    x += spacing
-                                }
-                                y += isoSpacing
-                                row++
+                        BackgroundStyle.Greenprint -> {
+                            drawRect(color = Color(0xFF1B5E20)) // Dark green background for greenprint
+                            val gpColor = Color.White.copy(alpha = 0.2f)
+                            var x = startX
+                            while (x < size.width + spacing) {
+                                drawLine(color = gpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                x += spacing
+                            }
+                            var y = startY
+                            while (y < size.height + spacing) {
+                                drawLine(color = gpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                y += spacing
                             }
                         }
                         else -> {}
@@ -839,7 +826,7 @@ fun DraftCanvas(
                                     currentDrawingPath.clear(); persistentBatch.clear(); inFlightStrokeCount = 0; persistentBatch.clear(); inFlightStrokeCount = 0
                                     val worldPoint = ViewportMath.screenToWorld(startPos, Offset(offsetX, offsetY), scale)
                                     // Use a default time and pressure for the start point since detectDragGestures doesn't provide them initially
-                                    currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, worldPoint.x, worldPoint.y, android.os.SystemClock.uptimeMillis(), 1f); inFlightStrokeCount++; persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, worldPoint.x, worldPoint.y, android.os.SystemClock.uptimeMillis(), 1f); inFlightStrokeCount++ 
+                                    currentDrawingPath.add(InkPoint(worldPoint.x, worldPoint.y, 1f, android.os.SystemClock.uptimeMillis())); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, worldPoint.x, worldPoint.y, android.os.SystemClock.uptimeMillis(), 1f); inFlightStrokeCount++
                                 }
                             },
                             onDrag = { change, _ ->
@@ -859,7 +846,7 @@ fun DraftCanvas(
                                         val lastPoint = currentDrawingPath.lastOrNull()
                                         if (lastPoint == null || (Offset(newPoint.x, newPoint.y) - Offset(lastPoint.x, lastPoint.y)).getDistance() > (3f / scale)) { 
                                             val pressure = if (isStylus) change.pressure else 1f
-                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, pressure, change.uptimeMillis)); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, newPoint.x, newPoint.y, change.uptimeMillis, pressure); inFlightStrokeCount++; persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, newPoint.x, newPoint.y, change.uptimeMillis, pressure); inFlightStrokeCount++ 
+                                            currentDrawingPath.add(InkPoint(newPoint.x, newPoint.y, pressure, change.uptimeMillis)); persistentBatch.addOrThrow(androidx.ink.brush.InputToolType.UNKNOWN, newPoint.x, newPoint.y, change.uptimeMillis, pressure); inFlightStrokeCount++ 
                                         }
                                     }
                                 }
@@ -994,17 +981,6 @@ fun DraftCanvas(
                         val startY = (offsetY % spacing) - spacing
                         
                         when (style) {
-                            BackgroundStyle.DotGrid -> {
-                                var x = startX
-                                while (x < size.width + spacing) {
-                                    var y = startY
-                                    while (y < size.height + spacing) {
-                                        drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
-                                        y += spacing
-                                    }
-                                    x += spacing
-                                }
-                            }
                             BackgroundStyle.GraphPaper -> {
                                 var x = startX
                                 while (x < size.width + spacing) {
@@ -1031,22 +1007,18 @@ fun DraftCanvas(
                                     y += spacing
                                 }
                             }
-                            BackgroundStyle.Isometric -> {
-                                val isoSpacing = spacing * 0.866f
-                                val startIsoX = (offsetX % spacing) - spacing
-                                val startIsoY = (offsetY % isoSpacing) - isoSpacing
-
-                                var y = startIsoY
-                                var row = 0
-                                while (y < size.height + isoSpacing) {
-                                    val xOffset = if (row % 2 == 0) 0f else spacing / 2f
-                                    var x = startIsoX - xOffset
-                                    while (x < size.width + spacing) {
-                                        drawCircle(color = patternColor, radius = 2f * scale, center = Offset(x, y))
-                                        x += spacing
-                                    }
-                                    y += isoSpacing
-                                    row++
+                            BackgroundStyle.Greenprint -> {
+                                drawRect(color = Color(0xFF1B5E20))
+                                val gpColor = Color.White.copy(alpha = 0.2f)
+                                var x = startX
+                                while (x < size.width + spacing) {
+                                    drawLine(color = gpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
+                                    x += spacing
+                                }
+                                var y = startY
+                                while (y < size.height + spacing) {
+                                    drawLine(color = gpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
+                                    y += spacing
                                 }
                             }
                             else -> {}
@@ -1165,7 +1137,7 @@ fun DraftCanvas(
                                 contentPadding = PaddingValues(0.dp)
                             ) {
                                 IconButton(onClick = { handleExit() }, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                 }
                             }
                             
@@ -1185,10 +1157,10 @@ fun DraftCanvas(
                                         modifier = Modifier.height(48.dp)
                                     ) {
                                         IconButton(onClick = { viewModel.undo() }, modifier = Modifier.size(28.dp)) {
-                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_undo), contentDescription = "Undo", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                         }
                                         IconButton(onClick = { viewModel.redo() }, modifier = Modifier.size(28.dp)) {
-                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                            Icon(painterResource(id = LucideR.drawable.lucide_ic_redo), contentDescription = "Redo", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                         }
                                     }
                                 }
@@ -1213,7 +1185,7 @@ fun DraftCanvas(
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
                 ) {
                     LiquidGlassPill(shape = CircleShape, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                        Text("${(scale * 100).toInt()}%", color = if (isDarkTheme) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${(scale * 100).toInt()}%", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 
@@ -1258,7 +1230,7 @@ fun DraftCanvas(
                                         onClick = { if (!isExportMenuOpen && !isScenesMenuOpen && !isCanvasLocked) isThreeDotsMenuOpen = true },
                                         modifier = Modifier.size(48.dp)
                                     ) {
-                                        Icon(Icons.Default.MoreHoriz, contentDescription = "More Options", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                        Icon(Icons.Default.MoreHoriz, contentDescription = "More Options", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                     }
                                 } else {
                                     Column(
@@ -1267,12 +1239,12 @@ fun DraftCanvas(
                                         verticalArrangement = Arrangement.SpaceEvenly
                                     ) {
                                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { isCanvasLocked = true; isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Lock Canvas", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
-                                            Icon(Icons.Default.Lock, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                            Text("Lock Canvas", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                                            Icon(Icons.Default.Lock, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                         }
                                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { quickSave(); isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Quick Save", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
-                                            Icon(Icons.Default.SaveAlt, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                            Text("Quick Save", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                                            Icon(Icons.Default.SaveAlt, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                         }
                                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { viewModel.clearCanvas(); isThreeDotsMenuOpen = false }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("Reset Canvas", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE53935))
@@ -1312,14 +1284,14 @@ fun DraftCanvas(
                                     onClick = { isCanvasLocked = false },
                                     modifier = Modifier.size(48.dp)
                                 ) {
-                                    Icon(Icons.Default.LockOpen, "Unlock", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.LockOpen, "Unlock", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                 }
                             } else if (!isExportMenuOpen) {
                                 IconButton(
                                     onClick = { if (!isScenesMenuOpen && !isThreeDotsMenuOpen) isExportMenuOpen = true },
                                     modifier = Modifier.size(48.dp)
                                 ) {
-                                    Icon(Icons.Default.IosShare, "Export", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.IosShare, "Export", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                 }
                             } else {
                                 Column(
@@ -1328,19 +1300,19 @@ fun DraftCanvas(
                                     verticalArrangement = Arrangement.SpaceEvenly
                                 ) {
                                     Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportProjectLauncher.launch("Project.draftit") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("As a Project", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
-                                        Icon(Icons.Default.Folder, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        Text("As a Project", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                                        Icon(Icons.Default.Folder, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                     }
                                     Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { 
                                         sceneToExport = com.flash.draft.model.Scene(id = "current", name = "Current", offsetX = offsetX, offsetY = offsetY, scale = scale)
                                         exportScenePdfLauncher.launch("Board.pdf") 
                                     }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("As PDF", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
-                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        Text("As PDF", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                     }
                                     Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { exportPictureLauncher.launch("Board.png") }.padding(vertical = 14.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("As Picture", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
-                                        Icon(Icons.Default.Image, contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                        Text("As Picture", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                                        Icon(Icons.Default.Image, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }
@@ -1374,7 +1346,7 @@ fun DraftCanvas(
                         Box(modifier = Modifier.animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f))) {
                             if (!isScenesMenuOpen) {
                                 IconButton(onClick = { if (!isExportMenuOpen) isScenesMenuOpen = true }, modifier = Modifier.size(48.dp)) {
-                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_aperture), contentDescription = "Scenes", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_aperture), contentDescription = "Scenes", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                 }
                             } else {
                                 val scenes = uiState.scenes
@@ -1434,7 +1406,7 @@ fun DraftCanvas(
                                     onClick = { isBgMenuOpen = true },
                                     modifier = Modifier.size(48.dp)
                                 ) {
-                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_palette), contentDescription = "Background Style", tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(painterResource(id = LucideR.drawable.lucide_ic_palette), contentDescription = "Background Style", tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                                 }
                             } else {
                                 Column(
@@ -1457,9 +1429,9 @@ fun DraftCanvas(
                                             verticalAlignment = Alignment.CenterVertically, 
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Text(style.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isDarkTheme) Color.White else Color.Black)
+                                            Text(style.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
                                             if (isSelected) {
-                                                Icon(painterResource(id = LucideR.drawable.lucide_ic_check), contentDescription = null, tint = if (isDarkTheme) Color.White else Color.Black, modifier = Modifier.size(20.dp))
+                                                Icon(painterResource(id = LucideR.drawable.lucide_ic_check), contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                     }
@@ -1567,14 +1539,14 @@ fun DraftCanvas(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 androidx.compose.material3.CircularProgressIndicator(
-                                    color = if (isDarkTheme) Color.White else Color.Black,
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(24.dp),
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Text(
                                     "Exporting High-Quality Canvas...", 
-                                    color = if (isDarkTheme) Color.White else Color.Black, 
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, 
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -1601,7 +1573,7 @@ fun DraftCanvas(
                             )
                             Text(
                                 text = exportResultMessage ?: "",
-                                color = if (isDarkTheme) Color.White else Color.Black,
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -1690,7 +1662,7 @@ fun DraftCanvas(
                             ) {
                                 Text(
                                     text = "${selectedGroupIds.size} Items Selected",
-                                    color = if (isDarkTheme) Color.White else Color.Black,
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                                     fontSize = 14.sp,
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
                                 )
@@ -1819,7 +1791,7 @@ fun DraftCanvas(
                                                 else -> Icons.Default.Brush
                                             },
                                             contentDescription = "Draw Menu",
-                                            tint = if (isOpen) (if (isDarkTheme) Color.White else Color.Black) else com.flash.draft.ui.canvas.item.getAdaptiveColor(activeDrawColor, isDarkTheme),
+                                            tint = if (isOpen) (androidx.compose.material3.MaterialTheme.colorScheme.onSurface) else com.flash.draft.ui.canvas.item.getAdaptiveColor(activeDrawColor, isDarkTheme),
                                             modifier = Modifier.size(28.dp)
                                         )
                                     }
@@ -1869,17 +1841,6 @@ fun androidx.compose.ui.Modifier.draftBackground(
         val startY = (offsetY % spacing) - spacing
         
         when (style) {
-            com.flash.draft.model.BackgroundStyle.DotGrid -> {
-                var x = startX
-                while (x < size.width + spacing) {
-                    var y = startY
-                    while (y < size.height + spacing) {
-                        drawCircle(color = patternColor, radius = 2f * scale, center = androidx.compose.ui.geometry.Offset(x, y))
-                        y += spacing
-                    }
-                    x += spacing
-                }
-            }
             com.flash.draft.model.BackgroundStyle.GraphPaper -> {
                 var x = startX
                 while (x < size.width + spacing) {
@@ -1906,22 +1867,18 @@ fun androidx.compose.ui.Modifier.draftBackground(
                     y += spacing
                 }
             }
-            com.flash.draft.model.BackgroundStyle.Isometric -> {
-                val isoSpacing = spacing * 0.866f
-                val startIsoX = (offsetX % spacing) - spacing
-                val startIsoY = (offsetY % isoSpacing) - isoSpacing
-
-                var y = startIsoY
-                var row = 0
-                while (y < size.height + isoSpacing) {
-                    val xOffset = if (row % 2 == 0) 0f else spacing / 2f
-                    var x = startIsoX - xOffset
-                    while (x < size.width + spacing) {
-                        drawCircle(color = patternColor, radius = 2f * scale, center = androidx.compose.ui.geometry.Offset(x, y))
-                        x += spacing
-                    }
-                    y += isoSpacing
-                    row++
+            com.flash.draft.model.BackgroundStyle.Greenprint -> {
+                drawRect(color = androidx.compose.ui.graphics.Color(0xFF314F40))
+                val gpColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f)
+                var x = startX
+                while (x < size.width + spacing) {
+                    drawLine(color = gpColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
+                    x += spacing
+                }
+                var y = startY
+                while (y < size.height + spacing) {
+                    drawLine(color = gpColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
+                    y += spacing
                 }
             }
             else -> {}

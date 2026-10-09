@@ -12,6 +12,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 val LocalDarkTheme = compositionLocalOf { false }
+val LocalBackgroundStyle = compositionLocalOf { com.flash.draft.model.BackgroundStyle.Solid }
 val LocalPerformanceMode = compositionLocalOf { false }
 val LocalCurvedConnectors = compositionLocalOf { false }
 
