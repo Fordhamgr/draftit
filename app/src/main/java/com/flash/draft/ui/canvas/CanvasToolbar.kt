@@ -58,11 +58,13 @@ fun CanvasToolbar(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val liquidFrost = LocalLiquidFrost.current
 
     val menuLiquidModifier = if (liquidState != null) {
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
+            frost = (liquidFrost * 24f).dp
             shape = RoundedCornerShape(24.dp)
         }
     } else Modifier
@@ -71,6 +73,7 @@ fun CanvasToolbar(
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
+            frost = (liquidFrost * 24f).dp
             shape = CircleShape
         }
     } else Modifier
@@ -88,7 +91,7 @@ fun CanvasToolbar(
                         translationY = offsetY.toPx()
                         transformOrigin = TransformOrigin(0.9f, 1f)
                     }
-                    .then(if (isDarkTheme) Modifier else Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isDarkTheme) Modifier.graphicsLayer() else Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(menuLiquidModifier)
                     .background(glassBg, RoundedCornerShape(24.dp))
                     .border(1.dp, glassBorder, RoundedCornerShape(24.dp))
@@ -135,7 +138,7 @@ fun CanvasToolbar(
         Box(
             modifier = Modifier
                 .size(60.dp)
-                .then(if (isDarkTheme) Modifier else Modifier.shadow(16.dp, CircleShape, spotColor = if (isExpanded) activeTint else Color.Black))
+                .then(if (isDarkTheme) Modifier.graphicsLayer() else Modifier.shadow(16.dp, CircleShape, spotColor = if (isExpanded) activeTint else Color.Black))
                 .then(fabLiquidModifier)
                 .background(if (isExpanded) activeTint else glassBg, CircleShape)
                 .border(1.dp, if (isExpanded) Color.Transparent else glassBorder, CircleShape)

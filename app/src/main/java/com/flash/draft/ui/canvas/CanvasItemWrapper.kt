@@ -193,10 +193,12 @@ fun CanvasItemWrapper(
                     if (LocalLiquidState.current != null && !isPerformance) {
                         val currentRefraction = LocalLiquidRefraction.current
                         val currentCurve = LocalLiquidCurve.current
+                                        val currentFrost = LocalLiquidFrost.current
                         // This turns the card into a glass lens!
                         Modifier.liquid(LocalLiquidState.current!!) {
                             refraction = currentRefraction
                             curve = currentCurve
+                                            frost = (currentFrost * 24f).dp
                             shape = RoundedCornerShape(12.dp)
                         }
                     } else Modifier
@@ -293,9 +295,11 @@ fun CanvasItemWrapper(
                                         if (LocalLiquidState.current != null && !isPerformance) {
                                             val currentRefraction = LocalLiquidRefraction.current
                                             val currentCurve = LocalLiquidCurve.current
+                                        val currentFrost = LocalLiquidFrost.current
                                             Modifier.liquid(LocalLiquidState.current!!) {
                                                 refraction = currentRefraction
                                                 curve = currentCurve
+                                            frost = (currentFrost * 24f).dp
                                                 shape = RoundedCornerShape(24.dp)
                                             }
                                         } else Modifier
@@ -339,9 +343,11 @@ fun CanvasItemWrapper(
                                     if (LocalLiquidState.current != null && !isPerformance) {
                                         val currentRefraction = LocalLiquidRefraction.current
                                         val currentCurve = LocalLiquidCurve.current
+                                        val currentFrost = LocalLiquidFrost.current
                                         Modifier.liquid(LocalLiquidState.current!!) {
                                             refraction = currentRefraction
                                             curve = currentCurve
+                                            frost = (currentFrost * 24f).dp
                                             shape = RoundedCornerShape(20.dp)
                                         }
                                     } else Modifier

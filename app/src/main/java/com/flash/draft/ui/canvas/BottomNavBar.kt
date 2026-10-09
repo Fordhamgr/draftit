@@ -70,6 +70,7 @@ fun BottomNavBar(
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
     val liquidCurve = LocalLiquidCurve.current
+    val liquidFrost = LocalLiquidFrost.current
     val isPerformance = com.flash.draft.ui.canvas.item.LocalPerformanceMode.current
 
     // PERFECT SCALE: Lock everything to 68dp
@@ -110,10 +111,10 @@ fun BottomNavBar(
 
             Box(
                 modifier = Modifier
-                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                            refraction = liquidRefraction; curve = liquidCurve; shape = morphShape
+                            refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = morphShape
                         } else Modifier
                     )
                     .background(glassBg, morphShape)
@@ -167,10 +168,10 @@ fun BottomNavBar(
                     .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
                     .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
                     .height(dockHeight)
-                    .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                            refraction = liquidRefraction; curve = liquidCurve; shape = pillShape
+                            refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = pillShape
                         } else Modifier
                     )
                     .background(glassBg, pillShape)
@@ -207,10 +208,10 @@ fun BottomNavBar(
                     scaleY = plusScale
                     transformOrigin = TransformOrigin(1f, 1f)
                 }
-                .then(if (isPerformance || isDark) Modifier else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
+                .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                        refraction = liquidRefraction; curve = liquidCurve; shape = popoverShape
+                        refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = popoverShape
                     } else Modifier
                 )
                 .background(glassBg, popoverShape)
