@@ -43,7 +43,7 @@ fun LiquidGlassPill(
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
-            frost = (liquidFrost * 24f).dp
+            if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp
             this.shape = shape
         }
     } else Modifier

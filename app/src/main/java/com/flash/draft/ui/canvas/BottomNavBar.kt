@@ -114,7 +114,7 @@ fun BottomNavBar(
                     .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                            refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = morphShape
+                            refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = morphShape
                         } else Modifier
                     )
                     .background(glassBg, morphShape)
@@ -171,7 +171,7 @@ fun BottomNavBar(
                     .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
                     .then(
                         if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                            refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = pillShape
+                            refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = pillShape
                         } else Modifier
                     )
                     .background(glassBg, pillShape)
@@ -211,7 +211,7 @@ fun BottomNavBar(
                 .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
                     if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
-                        refraction = liquidRefraction; curve = liquidCurve; frost = (liquidFrost * 24f).dp; shape = popoverShape
+                        refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = popoverShape
                     } else Modifier
                 )
                 .background(glassBg, popoverShape)

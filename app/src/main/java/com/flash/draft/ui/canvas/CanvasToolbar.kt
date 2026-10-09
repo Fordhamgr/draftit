@@ -64,7 +64,7 @@ fun CanvasToolbar(
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
-            frost = (liquidFrost * 24f).dp
+            if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp
             shape = RoundedCornerShape(24.dp)
         }
     } else Modifier
@@ -73,7 +73,7 @@ fun CanvasToolbar(
         Modifier.liquid(liquidState) {
             refraction = liquidRefraction
             curve = liquidCurve
-            frost = (liquidFrost * 24f).dp
+            if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp
             shape = CircleShape
         }
     } else Modifier

@@ -198,7 +198,7 @@ fun CanvasItemWrapper(
                         Modifier.liquid(LocalLiquidState.current!!) {
                             refraction = currentRefraction
                             curve = currentCurve
-                                            frost = (currentFrost * 24f).dp
+                                            if (currentFrost > 0f) frost = (currentFrost * 24f).dp
                             shape = RoundedCornerShape(12.dp)
                         }
                     } else Modifier
@@ -299,7 +299,7 @@ fun CanvasItemWrapper(
                                             Modifier.liquid(LocalLiquidState.current!!) {
                                                 refraction = currentRefraction
                                                 curve = currentCurve
-                                            frost = (currentFrost * 24f).dp
+                                            if (currentFrost > 0f) frost = (currentFrost * 24f).dp
                                                 shape = RoundedCornerShape(24.dp)
                                             }
                                         } else Modifier
@@ -347,7 +347,7 @@ fun CanvasItemWrapper(
                                         Modifier.liquid(LocalLiquidState.current!!) {
                                             refraction = currentRefraction
                                             curve = currentCurve
-                                            frost = (currentFrost * 24f).dp
+                                            if (currentFrost > 0f) frost = (currentFrost * 24f).dp
                                             shape = RoundedCornerShape(20.dp)
                                         }
                                     } else Modifier
