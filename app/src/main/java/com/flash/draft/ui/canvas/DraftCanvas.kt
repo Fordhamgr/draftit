@@ -4,6 +4,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.CheckCircle
 
 import com.flash.draft.model.BackgroundStyle
+import com.flash.draft.ui.canvas.CanvasBackgroundTokens
 
 import android.content.Intent
 import android.net.Uri
@@ -76,6 +77,7 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
@@ -500,29 +502,23 @@ fun DraftCanvas(
     LaunchedEffect(isExportingFull) {
         if (isExportingFull && exportUri != null) {
             delay(300.milliseconds) // wait for recomposition and layout
+            var swBitmap: android.graphics.Bitmap? = null
             try {
                 val hwBitmap = fullExportLayer.toImageBitmap().asAndroidBitmap()
-                val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                val finalBitmap = androidx.core.graphics.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(finalBitmap)
-                val bgColor = when (uiState.backgroundStyle) {
-                    BackgroundStyle.Blueprint -> android.graphics.Color.parseColor("#1E3A8A")
-                    else -> if (isDarkTheme) android.graphics.Color.parseColor("#18181A") else android.graphics.Color.parseColor("#F0F0F0")
-                }
-                canvas.drawColor(bgColor)
-                canvas.drawBitmap(swBitmap, 0f, 0f, null)
+                swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                val bitmapToExport = swBitmap
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     context.contentResolver.openOutputStream(exportUri!!)?.use { stream ->
                         if (exportFormat == "PDF") {
                             val pdfDocument = android.graphics.pdf.PdfDocument()
-                            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(swBitmap.width, swBitmap.height, 1).create()
+                            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(bitmapToExport.width, bitmapToExport.height, 1).create()
                             val page = pdfDocument.startPage(pageInfo)
-                            page.canvas.drawBitmap(finalBitmap, 0f, 0f, null)
+                            page.canvas.drawBitmap(bitmapToExport, 0f, 0f, null)
                             pdfDocument.finishPage(page)
                             pdfDocument.writeTo(stream)
                             pdfDocument.close()
                         } else {
-                            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                            bitmapToExport.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
                         }
                     }
                 }
@@ -532,6 +528,7 @@ fun DraftCanvas(
                 exportResultMessage = "Export Failed: ${e.message}"
                 exportResultIsError = true
             } finally {
+                swBitmap?.recycle()
                 isExportingFull = false
                 exportUri = null
                 exportFormat = null
@@ -595,17 +592,14 @@ fun DraftCanvas(
 
     val quickSave = {
         coroutineScope.launch {
+            var swBitmap: android.graphics.Bitmap? = null
             try {
                 isExporting = true
                 delay(100.milliseconds)
                 val hwBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
                 isExporting = false
                 
-                val swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                val finalBitmap = androidx.core.graphics.createBitmap(swBitmap.width, swBitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(finalBitmap)
-                canvas.drawColor(android.graphics.Color.WHITE)
-                canvas.drawBitmap(swBitmap, 0f, 0f, null)
+                swBitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
 
                 val contentValues = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "Draft_${System.currentTimeMillis()}.png")
@@ -615,16 +609,21 @@ fun DraftCanvas(
                 
                 val uri = context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
                 if (uri != null) {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
-                        finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    val bitmapToSave = swBitmap
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { stream ->
+                            bitmapToSave.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                        }
                     }
                     Toast.makeText(context, "Quick Saved to Gallery!", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Failed to create gallery entry.", Toast.LENGTH_SHORT).show()
                 }
-            } catch(_: Exception) {
+            } catch (_: Exception) {
                 isExporting = false
                 Toast.makeText(context, "Error saving picture.", Toast.LENGTH_SHORT).show()
+            } finally {
+                swBitmap?.recycle()
             }
         }
     }
@@ -972,61 +971,6 @@ fun DraftCanvas(
                 Box(modifier = Modifier
                     .fillMaxSize()
                     .liquefiable(liquidState)
-                    .background(if (isDarkTheme) Color(0xFF18181A) else Color(0xFFF0F0F0))
-                    .drawBehind {
-                        val style = uiState.backgroundStyle
-                        if (style == BackgroundStyle.Solid) return@drawBehind
-
-                        val patternColor = colorSchemeRec.onSurfaceVariant.copy(alpha = 0.15f)
-                        val spacing = 100f * scale
-                        
-                        val startX = (offsetX % spacing) - spacing
-                        val startY = (offsetY % spacing) - spacing
-                        
-                        when (style) {
-                            BackgroundStyle.GraphPaper -> {
-                                var x = startX
-                                while (x < size.width + spacing) {
-                                    drawLine(color = patternColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
-                                    x += spacing
-                                }
-                                var y = startY
-                                while (y < size.height + spacing) {
-                                    drawLine(color = patternColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
-                                    y += spacing
-                                }
-                            }
-                            BackgroundStyle.Blueprint -> {
-                                drawRect(color = Color(0xFF1E3A8A))
-                                val bpColor = Color.White.copy(alpha = 0.2f)
-                                var x = startX
-                                while (x < size.width + spacing) {
-                                    drawLine(color = bpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
-                                    x += spacing
-                                }
-                                var y = startY
-                                while (y < size.height + spacing) {
-                                    drawLine(color = bpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
-                                    y += spacing
-                                }
-                            }
-                            BackgroundStyle.Greenprint -> {
-                                drawRect(color = Color(0xFF1B5E20))
-                                val gpColor = Color.White.copy(alpha = 0.2f)
-                                var x = startX
-                                while (x < size.width + spacing) {
-                                    drawLine(color = gpColor, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 1f)
-                                    x += spacing
-                                }
-                                var y = startY
-                                while (y < size.height + spacing) {
-                                    drawLine(color = gpColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1f)
-                                    y += spacing
-                                }
-                            }
-                            else -> {}
-                        }
-                    }
                     .drawWithContent {
                         if (isExporting || isCapturingThumbnail) {
                             // Only record into graphicsLayer when actually exporting.
@@ -1037,6 +981,14 @@ fun DraftCanvas(
                         }
                         drawContent()
                     }
+                    .draftBackground(
+                        style = uiState.backgroundStyle,
+                        isDarkTheme = isDarkTheme,
+                        colorSchemeRec = colorSchemeRec,
+                        scale = scale,
+                        offsetX = offsetX,
+                        offsetY = offsetY
+                    )
                 ) {
                 // Outer Box: Scales up the inner content
                 Box(modifier = Modifier
@@ -1446,37 +1398,67 @@ fun DraftCanvas(
 
                 // HIGH QUALITY OFF-SCREEN EXPORT
                 if (isExportingFull && exportBbox != null) {
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    val targetWdp = with(density) { fullExportW.toDp() }
-                    val targetHdp = with(density) { fullExportH.toDp() }
-                    
+                    androidx.activity.compose.BackHandler(enabled = isExportingFull) { }
+
                     Box(
                         modifier = Modifier
-                            .offset(x = 10000.dp) // Off-screen!
-                            .size(targetWdp, targetHdp)
+                            .offset(x = 10000.dp)
+                            .wrapContentSize(align = Alignment.TopStart, unbounded = true)
+                            .layout { measurable, _ ->
+                                val placeable = measurable.measure(
+                                    androidx.compose.ui.unit.Constraints.fixed(fullExportW, fullExportH)
+                                )
+                                layout(fullExportW, fullExportH) {
+                                    placeable.place(0, 0)
+                                }
+                            }
                             .drawWithContent {
                                 fullExportLayer.record(size = IntSize(fullExportW, fullExportH)) {
                                     this@drawWithContent.drawContent()
                                 }
-                                drawContent()
                             }
                     ) {
-                        Box(modifier = Modifier
-                            .graphicsLayer {
-                                scaleX = fullExportScale
-                                scaleY = fullExportScale
-                                translationX = - (exportBbox!!.minX - 400f) * fullExportScale
-                                translationY = - (exportBbox!!.minY - 400f) * fullExportScale
-                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                            }
-                            .draftBackground(
-                                style = uiState.backgroundStyle,
-                                isDarkTheme = isDarkTheme,
-                                colorSchemeRec = colorSchemeRec,
-                                scale = 1f,
-                                offsetX = 0f,
-                                offsetY = 0f
-                            )
+                        // Layer 1: Background and grid covering full export target size
+                        Box(
+                            modifier = Modifier
+                                .layout { measurable, _ ->
+                                    val placeable = measurable.measure(
+                                        androidx.compose.ui.unit.Constraints.fixed(fullExportW, fullExportH)
+                                    )
+                                    layout(fullExportW, fullExportH) {
+                                        placeable.place(0, 0)
+                                    }
+                                }
+                                .drawExportBackground(
+                                    style = uiState.backgroundStyle,
+                                    isDarkTheme = isDarkTheme,
+                                    colorScheme = colorSchemeRec,
+                                    exportScale = fullExportScale,
+                                    worldOriginX = exportBbox!!.minX - 400f,
+                                    worldOriginY = exportBbox!!.minY - 400f,
+                                    exportWidth = fullExportW.toFloat(),
+                                    exportHeight = fullExportH.toFloat()
+                                )
+                        )
+
+                        // Layer 2: Transformed content elements
+                        Box(
+                            modifier = Modifier
+                                .layout { measurable, _ ->
+                                    val placeable = measurable.measure(
+                                        androidx.compose.ui.unit.Constraints.fixed(fullExportW, fullExportH)
+                                    )
+                                    layout(fullExportW, fullExportH) {
+                                        placeable.place(0, 0)
+                                    }
+                                }
+                                .graphicsLayer {
+                                    scaleX = fullExportScale
+                                    scaleY = fullExportScale
+                                    translationX = - (exportBbox!!.minX - 400f) * fullExportScale
+                                    translationY = - (exportBbox!!.minY - 400f) * fullExportScale
+                                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                                }
                         ) {
                             CanvasBackgroundDrawPipeline(
                                 elements = elements,
@@ -1533,7 +1515,16 @@ fun DraftCanvas(
                     }
                     
                     Box(
-                        modifier = Modifier.fillMaxSize(), 
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(10f)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent().changes.forEach { it.consume() }
+                                    }
+                                }
+                            }, 
                         contentAlignment = Alignment.Center
                     ) {
                         LiquidGlassPill(
@@ -1832,61 +1823,17 @@ fun androidx.compose.ui.Modifier.draftBackground(
     scale: Float,
     offsetX: Float,
     offsetY: Float
-): androidx.compose.ui.Modifier = this
-    .background(if (isDarkTheme) androidx.compose.ui.graphics.Color(0xFF18181A) else androidx.compose.ui.graphics.Color(0xFFF0F0F0))
-    .drawBehind {
-        if (style == com.flash.draft.model.BackgroundStyle.Solid) return@drawBehind
-
-        val patternColor = colorSchemeRec.onSurfaceVariant.copy(alpha = 0.15f)
-        val spacing = 100f * scale
-        
-        val startX = (offsetX % spacing) - spacing
-        val startY = (offsetY % spacing) - spacing
-        
-        when (style) {
-            com.flash.draft.model.BackgroundStyle.GraphPaper -> {
-                var x = startX
-                while (x < size.width + spacing) {
-                    drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
-                    x += spacing
-                }
-                var y = startY
-                while (y < size.height + spacing) {
-                    drawLine(color = patternColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
-                    y += spacing
-                }
-            }
-            com.flash.draft.model.BackgroundStyle.Blueprint -> {
-                drawRect(color = androidx.compose.ui.graphics.Color(0xFF1E3A8A))
-                val bpColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f)
-                var x = startX
-                while (x < size.width + spacing) {
-                    drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
-                    x += spacing
-                }
-                var y = startY
-                while (y < size.height + spacing) {
-                    drawLine(color = bpColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
-                    y += spacing
-                }
-            }
-            com.flash.draft.model.BackgroundStyle.Greenprint -> {
-                drawRect(color = androidx.compose.ui.graphics.Color(0xFF314F40))
-                val gpColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f)
-                var x = startX
-                while (x < size.width + spacing) {
-                    drawLine(color = gpColor, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1f)
-                    x += spacing
-                }
-                var y = startY
-                while (y < size.height + spacing) {
-                    drawLine(color = gpColor, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1f)
-                    y += spacing
-                }
-            }
-            else -> {}
-        }
-    }
+): androidx.compose.ui.Modifier = this.drawBehind {
+    CanvasBackgroundTokens.drawCanvasBackground(
+        drawScope = this,
+        style = style,
+        isDarkTheme = isDarkTheme,
+        colorScheme = colorSchemeRec,
+        scale = scale,
+        offsetX = offsetX,
+        offsetY = offsetY
+    )
+}
 
 
 
