@@ -24,8 +24,8 @@ android {
         applicationId = "com.flash.draft99"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -119,7 +119,7 @@ dependencies {
     
     // Play Store Production Dependencies
     implementation(libs.androidx.core.splashscreen)
-    // implementation(libs.play.review) // Commented out to speed up build
+    implementation(libs.play.review)
 
     // Firebase (Crashlytics & Analytics)
     // implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Uncomment when google-services.json is added
