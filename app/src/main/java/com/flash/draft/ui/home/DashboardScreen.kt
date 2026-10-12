@@ -147,9 +147,10 @@ fun DashboardScreen(
     var showAllProjects by remember { mutableStateOf(false) }
 
     // ── Responsive breakpoints ──────────────────────────────────────────────
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val isTablet = screenWidth >= 600
-    val isLargeTablet = screenWidth >= 840
+    val windowSizeInfo = com.flash.draft.ui.theme.LocalWindowSizeInfo.current
+    val isTablet = windowSizeInfo.isTablet
+    val isLargeTablet = windowSizeInfo.isLargeTablet
+    val isLandscapePhone = windowSizeInfo.isLandscapePhone
     val columns = when {
         isLargeTablet -> 4
         isTablet -> 3
@@ -161,7 +162,7 @@ fun DashboardScreen(
         else -> 12.dp
     }
     val edgePadding = when {
-        isLargeTablet -> 28.dp
+        isLargeTablet -> 32.dp
         isTablet -> 24.dp
         else -> 16.dp
     }
@@ -236,11 +237,14 @@ fun DashboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(bgColor)
+                .background(bgColor),
+            contentAlignment = Alignment.TopCenter
         ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .widthIn(max = 1100.dp)
                 .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
                 .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier)
         ) {
@@ -256,12 +260,18 @@ fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Title
+                val titleFontSize = when {
+                    isLandscapePhone -> 28.sp
+                    isLargeTablet -> 38.sp
+                    isTablet -> 34.sp
+                    else -> 32.sp
+                }
                 Text(
                     text = "Dashboard",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = textColor,
-                    fontSize = if (isTablet) 42.sp else 34.sp
+                    fontSize = titleFontSize
                 )
 
                 // Actions Group
@@ -316,12 +326,18 @@ fun DashboardScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = edgePadding)
-                    .height(if (isTablet) 48.dp else 40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(searchBarBg),
+                    .padding(horizontal = edgePadding),
                 contentAlignment = Alignment.CenterStart
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 600.dp)
+                        .height(if (isTablet) 48.dp else 40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(searchBarBg),
+                    contentAlignment = Alignment.CenterStart
+                ) {
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -359,6 +375,7 @@ fun DashboardScreen(
                     )
                 }
             }
+        }
 
             Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
 
@@ -520,6 +537,7 @@ fun DashboardScreen(
                     shape = RoundedCornerShape(20.dp),
                     color = menuBg.copy(alpha = 0.95f),
                     modifier = Modifier
+                        .widthIn(max = 420.dp)
                         .fillMaxWidth()
                         .padding(16.dp)
                         .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.5f), RoundedCornerShape(20.dp)),
@@ -1121,16 +1139,18 @@ fun ProjectContextMenuOverlay(
         // Side Pills
         val pillSpacing = 12.dp
         val pillContainerWidth = 180.dp
+        val screenHeight = configuration.screenHeightDp.dp
         
         val pillsXOffset = when {
             xDp + widthDp + pillContainerWidth + 32.dp <= screenWidth -> xDp + widthDp + 16.dp
             xDp - pillContainerWidth - 16.dp >= 0.dp -> xDp - pillContainerWidth - 16.dp
-            else -> screenWidth - pillContainerWidth - 32.dp
+            else -> (screenWidth - pillContainerWidth - 16.dp).coerceAtLeast(16.dp)
         }
+        val pillsYOffset = (yDp + 16.dp).coerceIn(16.dp, (screenHeight - 220.dp).coerceAtLeast(16.dp))
         
         Column(
             modifier = Modifier
-                .offset(x = pillsXOffset, y = yDp + 32.dp)
+                .offset(x = pillsXOffset, y = pillsYOffset)
                 .width(pillContainerWidth),
             verticalArrangement = Arrangement.spacedBy(pillSpacing)
         ) {

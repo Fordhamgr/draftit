@@ -76,6 +76,7 @@ fun DrawToolsContent(
     // a single container that swaps its children and smoothly resizes.
     Column(
         modifier = Modifier
+            .widthIn(max = 520.dp)
             .fillMaxWidth()
             .padding(bottom = 12.dp, start = 16.dp, end = 16.dp, top = 8.dp)
             .animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 600f)),
@@ -414,6 +415,7 @@ fun FloatingDrawTools(
 ) {
     Row(
         modifier = modifier
+            .widthIn(max = 480.dp)
             .fillMaxWidth()
             .height(150.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,

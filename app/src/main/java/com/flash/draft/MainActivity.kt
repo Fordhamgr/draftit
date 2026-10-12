@@ -44,29 +44,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
-@Composable
-fun AdaptiveLayout(content: @Composable () -> Unit) {
-    val configuration = LocalConfiguration.current
-    val currentDensity = LocalDensity.current
-    
-    val customDensity = if (configuration.screenWidthDp >= 600) {
-        // Use native density on tablet to prevent UI from scaling too large
-        currentDensity
-    } else {
-        // 411f is the baseline width (e.g., Pixel phone).
-        val scaleFactor = configuration.screenWidthDp / 411f 
-        val clampedScale = scaleFactor.coerceIn(0.85f, 1.2f) 
-        Density(
-            density = currentDensity.density * clampedScale,
-            fontScale = currentDensity.fontScale * clampedScale
-        )
-    }
-    
-    CompositionLocalProvider(LocalDensity provides customDensity) {
-        content()
-    }
-}
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -83,6 +60,8 @@ class MainActivity : ComponentActivity() {
         val settingsRepo = com.flash.draft.data.SettingsRepository(this)
 
         setContent {
+            val windowSizeInfo = com.flash.draft.ui.theme.rememberWindowSizeInfo()
+
             val initialDarkMode = androidx.compose.runtime.remember { settingsRepo.isDarkMode() }
             val isDarkModeFlow = androidx.compose.runtime.remember { settingsRepo.getDarkModeFlow() }
             val isDarkMode by isDarkModeFlow.collectAsStateWithLifecycle(initialValue = initialDarkMode)
@@ -95,8 +74,6 @@ class MainActivity : ComponentActivity() {
             
             val initialHapticFeedback = androidx.compose.runtime.remember { settingsRepo.isHapticFeedbackEnabled() }
             val isHapticFeedbackEnabled by settingsRepo.getHapticFeedbackFlow().collectAsStateWithLifecycle(initialValue = initialHapticFeedback)
-            
-
 
             val nativeHaptic = LocalHapticFeedback.current
             val customHaptic = remember(isHapticFeedbackEnabled, nativeHaptic) {
@@ -109,9 +86,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            CompositionLocalProvider(LocalHapticFeedback provides customHaptic) {
+            CompositionLocalProvider(
+                com.flash.draft.ui.theme.LocalWindowSizeInfo provides windowSizeInfo,
+                LocalHapticFeedback provides customHaptic
+            ) {
                 com.flash.draft.ui.theme.DraftitTheme(darkTheme = isDarkMode, dynamicColor = false) {
-                AdaptiveLayout {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -206,7 +185,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-            }
             }
         }
     }

@@ -77,6 +77,9 @@ fun BottomNavBar(
     val dockHeight = 68.dp
     val pillShape = RoundedCornerShape(percent = 50)
 
+    val windowSizeInfo = com.flash.draft.ui.theme.LocalWindowSizeInfo.current
+    val isTablet = windowSizeInfo.isTablet
+
     // Smoothly pushes the main dock right when the dynamic pill appears or if forced to center
     val startPadding by animateDpAsState(
         targetValue = if (showDynamicLeft || forceCenter) 84.dp else 0.dp,
@@ -88,8 +91,18 @@ fun BottomNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
-            .pointerInput(Unit) { detectDragGestures { _, _ -> } }
+            .pointerInput(Unit) { detectDragGestures { _, _ -> } },
+        contentAlignment = Alignment.BottomCenter
     ) {
+        Box(
+            modifier = if (isTablet) {
+                Modifier
+                    .widthIn(max = 680.dp)
+                    .fillMaxWidth()
+            } else {
+                Modifier.fillMaxWidth()
+            }
+        ) {
 
         // ----------------------------------------------------
         // 1. DYNAMIC PILL (Bottom Left - Perfect Circle)
@@ -99,7 +112,7 @@ fun BottomNavBar(
             visible = showDynamicLeft,
             enter = scaleIn(tween(250)) + fadeIn(tween(250)),
             exit = scaleOut(tween(200)) + fadeOut(tween(200)),
-            modifier = Modifier.align(Alignment.BottomStart)
+            modifier = Modifier.align(if (isTablet && isDrawToolsExpanded) Alignment.BottomCenter else Alignment.BottomStart)
         ) {
             val morphSpec = spring<androidx.compose.ui.unit.Dp>(dampingRatio = 0.78f, stiffness = 400f)
             val cornerRadius by animateDpAsState(
@@ -271,6 +284,7 @@ fun BottomNavBar(
         }
     }
 }
+}
 
 @Composable
 private fun DockItem(
@@ -310,7 +324,9 @@ private fun DockItem(
             text = label,
             fontSize = 11.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-            color = currentTint
+            color = currentTint,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }
