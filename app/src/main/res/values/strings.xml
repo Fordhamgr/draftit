@@ -1,3 +1,31 @@
 <resources>
     <string name="app_name">draftit</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_btn_get_started">Get started</string>
+    <string name="onboarding_btn_continue">Continue</string>
+    <string name="onboarding_btn_start_creating">Start creating</string>
+
+    <string name="onboarding_welcome_title">Your ideas, on an infinite canvas.</string>
+    <string name="onboarding_welcome_desc">Notes, tasks, code, images and PDFs, connected on one free-form board.</string>
+    <string name="onboarding_welcome_cd">Animated preview of infinite canvas with connected notes, tasks, code, and images</string>
+    <string name="onboarding_tag_note">NOTE</string>
+    <string name="onboarding_tag_tasks">TASKS</string>
+    <string name="onboarding_tag_you">You</string>
+
+    <string name="onboarding_blocks_title">Every kind of content, one board.</string>
+    <string name="onboarding_blocks_desc">Drop in notes, task lists, code, images, PDFs and audio, side by side.</string>
+    <string name="onboarding_blocks_cd">Animated preview of content blocks including notes, tasks, code, images, PDFs, and audio</string>
+    <string name="onboarding_tile_note">Note</string>
+    <string name="onboarding_tile_tasks">Tasks</string>
+    <string name="onboarding_tile_code">Code</string>
+    <string name="onboarding_tile_image">Image</string>
+    <string name="onboarding_tile_pdf">PDF</string>
+    <string name="onboarding_tile_audio">Audio</string>
+
+    <string name="onboarding_scenes_title">Sketch freely, organise in Scenes.</string>
+    <string name="onboarding_scenes_desc">Pan, draw and write anywhere, then switch between Scenes to keep your work tidy.</string>
+    <string name="onboarding_scenes_cd">Animated preview of sketch canvas and organized scenes</string>
+    <string name="onboarding_scene_1">Scene 1</string>
+    <string name="onboarding_scene_2">Scene 2</string>
+    <string name="onboarding_scene_3">Scene 3</string>
 </resources>

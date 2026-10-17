@@ -24,32 +24,16 @@ class OnboardingViewModel(
 
     companion object {
         const val KEY_CURRENT_PAGE = "onboarding_current_page"
+        const val TOTAL_PAGES = 3
     }
 
     private val navigated = AtomicBoolean(false)
-
-    private val initialCards = listOf(
-        OnboardingCardData(
-            id = "infinite_canvas",
-            title = "Infinite Creative Canvas",
-            description = "Draw, sketch, and think without boundaries. Pan and zoom across a vast limitless canvas with responsive precision.",
-            illustrationType = DemoIllustrationType.INFINITE_CANVAS
-        ),
-        OnboardingCardData(
-            id = "fluid_studio",
-            title = "Fluid Studio Dock",
-            description = "Intuitive floating toolsets, expressive brush mechanics, and liquid gestures designed for total focus.",
-            illustrationType = DemoIllustrationType.FLUID_STUDIO
-        )
-    )
-
     private val initialPage: Int = savedStateHandle[KEY_CURRENT_PAGE] ?: 0
 
     private val _uiState = MutableStateFlow(
         OnboardingUiState(
-            currentPage = initialPage.coerceIn(0, initialCards.size - 1),
-            totalPages = initialCards.size,
-            cards = initialCards,
+            currentPage = initialPage.coerceIn(0, TOTAL_PAGES - 1),
+            totalPages = TOTAL_PAGES,
             isActionEnabled = true
         )
     )
@@ -63,15 +47,13 @@ class OnboardingViewModel(
             is OnboardingUiEvent.NextClicked -> {
                 val current = _uiState.value.currentPage
                 if (current < _uiState.value.totalPages - 1) {
-                    setPage(current + 1)
+                    val next = current + 1
+                    setPage(next)
+                    viewModelScope.launch {
+                        _effect.send(OnboardingEffect.ScrollToPage(next))
+                    }
                 } else {
                     completeOnboarding()
-                }
-            }
-            is OnboardingUiEvent.BackClicked -> {
-                val current = _uiState.value.currentPage
-                if (current > 0) {
-                    setPage(current - 1)
                 }
             }
             is OnboardingUiEvent.SkipClicked -> {
@@ -79,6 +61,9 @@ class OnboardingViewModel(
             }
             is OnboardingUiEvent.PageSelected -> {
                 setPage(event.page)
+            }
+            is OnboardingUiEvent.ReducedMotionDetected -> {
+                _uiState.update { it.copy(isReducedMotion = event.isReduced) }
             }
         }
     }
