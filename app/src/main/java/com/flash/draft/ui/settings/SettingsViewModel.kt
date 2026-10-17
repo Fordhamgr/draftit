@@ -1,13 +1,41 @@
 package com.flash.draft.ui.settings
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.flash.draft.data.SettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+
+@Immutable
+data class SettingsUiState(
+    val isDarkMode: Boolean = false,
+    val isLiquidDarkTheme: Boolean = true,
+    val isPerformanceMode: Boolean = false,
+    val framerate: Int = 0,
+    val liquidCurve: Float = 0.5f,
+    val liquidRefraction: Float = 0.5f,
+    val liquidFrost: Float = 0.0f,
+    val undoHistoryLimit: Int = 0,
+    val isHapticFeedbackEnabled: Boolean = false,
+    val isStylusSupportEnabled: Boolean = false
+)
+
+sealed interface SettingsUiEvent {
+    data class ToggleDarkMode(val enabled: Boolean) : SettingsUiEvent
+    data class ToggleLiquidDarkTheme(val enabled: Boolean) : SettingsUiEvent
+    data class TogglePerformanceMode(val enabled: Boolean) : SettingsUiEvent
+    data class SetFramerate(val framerate: Int) : SettingsUiEvent
+    data class SetLiquidCurve(val level: Float) : SettingsUiEvent
+    data class SetLiquidRefraction(val level: Float) : SettingsUiEvent
+    data class SetLiquidFrost(val level: Float) : SettingsUiEvent
+    data class SetUndoHistoryLimit(val limit: Int) : SettingsUiEvent
+    data class ToggleHapticFeedback(val enabled: Boolean) : SettingsUiEvent
+    data class ToggleStylusSupport(val enabled: Boolean) : SettingsUiEvent
+}
 
 class SettingsViewModel(private val repository: SettingsRepository) : ViewModel() {
 
@@ -40,6 +68,64 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
 
     val isStylusSupportEnabled: StateFlow<Boolean> = repository.getStylusSupportFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isStylusSupportEnabled())
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        listOf(
+            repository.getDarkModeFlow(),
+            repository.getLiquidDarkThemeFlow(),
+            repository.getPerformanceModeFlow(),
+            repository.getFramerateFlow(),
+            repository.getLiquidCurveFlow(),
+            repository.getLiquidRefractionFlow(),
+            repository.getLiquidFrostFlow(),
+            repository.getUndoHistoryLimitFlow(),
+            repository.getHapticFeedbackFlow(),
+            repository.getStylusSupportFlow()
+        )
+    ) { array ->
+        SettingsUiState(
+            isDarkMode = array[0] as Boolean,
+            isLiquidDarkTheme = array[1] as Boolean,
+            isPerformanceMode = array[2] as Boolean,
+            framerate = array[3] as Int,
+            liquidCurve = array[4] as Float,
+            liquidRefraction = array[5] as Float,
+            liquidFrost = array[6] as Float,
+            undoHistoryLimit = array[7] as Int,
+            isHapticFeedbackEnabled = array[8] as Boolean,
+            isStylusSupportEnabled = array[9] as Boolean
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SettingsUiState(
+            isDarkMode = repository.isDarkMode(),
+            isLiquidDarkTheme = repository.isLiquidDarkTheme(),
+            isPerformanceMode = repository.isPerformanceMode(),
+            framerate = repository.getFramerate(),
+            liquidCurve = repository.getLiquidCurve(),
+            liquidRefraction = repository.getLiquidRefraction(),
+            liquidFrost = repository.getLiquidFrost(),
+            undoHistoryLimit = repository.getUndoHistoryLimit(),
+            isHapticFeedbackEnabled = repository.isHapticFeedbackEnabled(),
+            isStylusSupportEnabled = repository.isStylusSupportEnabled()
+        )
+    )
+
+    fun onEvent(event: SettingsUiEvent) {
+        when (event) {
+            is SettingsUiEvent.ToggleDarkMode -> toggleDarkMode(event.enabled)
+            is SettingsUiEvent.ToggleLiquidDarkTheme -> toggleLiquidDarkTheme(event.enabled)
+            is SettingsUiEvent.TogglePerformanceMode -> togglePerformanceMode(event.enabled)
+            is SettingsUiEvent.SetFramerate -> setFramerate(event.framerate)
+            is SettingsUiEvent.SetLiquidCurve -> setLiquidCurve(event.level)
+            is SettingsUiEvent.SetLiquidRefraction -> setLiquidRefraction(event.level)
+            is SettingsUiEvent.SetLiquidFrost -> setLiquidFrost(event.level)
+            is SettingsUiEvent.SetUndoHistoryLimit -> setUndoHistoryLimit(event.limit)
+            is SettingsUiEvent.ToggleHapticFeedback -> toggleHapticFeedback(event.enabled)
+            is SettingsUiEvent.ToggleStylusSupport -> toggleStylusSupport(event.enabled)
+        }
+    }
 
     fun toggleDarkMode(enabled: Boolean) = repository.setDarkMode(enabled)
     fun toggleLiquidDarkTheme(enabled: Boolean) = repository.setLiquidDarkTheme(enabled)
