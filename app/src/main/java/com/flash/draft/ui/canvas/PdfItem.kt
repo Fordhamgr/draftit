@@ -1,5 +1,6 @@
 package com.flash.draft.ui.canvas
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -7,7 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Launch
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -77,7 +78,7 @@ internal fun PdfToolStack(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Launch, contentDescription = "Open File", tint = Color.Blue, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Filled.Launch, contentDescription = "Open File", tint = Color.Blue, modifier = Modifier.size(20.dp))
             Text("Open PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Blue)
         }
     }

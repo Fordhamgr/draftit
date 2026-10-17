@@ -584,7 +584,6 @@ fun RenderCanvasElements(
                     scale = scale,
                     isCanvasLocked = isCanvasLocked,
                     context = context,
-                    elements = elements,
                     onUpdateElement = { updated ->
                         val idx = elements.indexOfFirst { it.id == updated.id }
                         if (idx != -1) {
