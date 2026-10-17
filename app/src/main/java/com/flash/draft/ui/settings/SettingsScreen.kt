@@ -8,8 +8,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -345,7 +346,7 @@ fun ToggleRow(
     modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -385,7 +386,7 @@ fun ToggleRow(
                     checkedThumbColor = Color.White,
                     uncheckedThumbColor = Color.White,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    uncheckedTrackColor = if (isDark) Color(0xFF4B5563) else Color(0xFFD1D5DB),
+                    uncheckedTrackColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFD1D5DB),
                     checkedBorderColor = Color.Transparent,
                     uncheckedBorderColor = Color.Transparent
                 )
@@ -408,7 +409,7 @@ fun SegmentedControlRow(
     modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     Column(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -438,7 +439,7 @@ fun SegmentedControlRow(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Bottom line: full-width segmented track (44dp tall, 12dp corners)
-            val trackColor = if (isDark) Color(0xFF27272A) else Color(0xFFF1F5F9)
+            val trackColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -458,7 +459,7 @@ fun SegmentedControlRow(
                             .fillMaxHeight()
                             .then(
                                 if (isSelected) {
-                                    val pillBg = if (isDark) Color(0xFF3F3F46) else Color.White
+                                    val pillBg = if (isDark) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
                                     Modifier
                                         .shadow(2.dp, RoundedCornerShape(10.dp), clip = false)
                                         .background(pillBg, RoundedCornerShape(10.dp))
@@ -471,7 +472,7 @@ fun SegmentedControlRow(
                         contentAlignment = Alignment.Center
                     ) {
                         val textColor = if (isSelected) {
-                            if (isDark) Color.White else Color(0xFF0F172A)
+                            MaterialTheme.colorScheme.onSurface
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
@@ -505,9 +506,9 @@ fun SliderRow(
     steps: Int = 0,
     showDivider: Boolean = false
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val primaryColor = MaterialTheme.colorScheme.primary
-    val inactiveTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
+    val inactiveTrackColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFE2E8F0)
     val percentText = (value * 100).roundToInt().toString()
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -576,5 +577,29 @@ fun SliderRow(
         if (showDivider) {
             SettingsDivider()
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsContentLightPreview() {
+    com.flash.draft.ui.theme.DraftitTheme(darkTheme = false) {
+        SettingsContent(
+            uiState = SettingsUiState(),
+            onEvent = {},
+            onBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsContentDarkPreview() {
+    com.flash.draft.ui.theme.DraftitTheme(darkTheme = true) {
+        SettingsContent(
+            uiState = SettingsUiState(isDarkMode = true),
+            onEvent = {},
+            onBack = {}
+        )
     }
 }
