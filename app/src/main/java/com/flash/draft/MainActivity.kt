@@ -66,6 +66,9 @@ class MainActivity : ComponentActivity() {
             val isDarkModeFlow = androidx.compose.runtime.remember { settingsRepo.getDarkModeFlow() }
             val isDarkMode by isDarkModeFlow.collectAsStateWithLifecycle(initialValue = initialDarkMode)
             
+            val initialLiquidDarkTheme = androidx.compose.runtime.remember { settingsRepo.isLiquidDarkTheme() }
+            val isLiquidDarkTheme by settingsRepo.getLiquidDarkThemeFlow().collectAsStateWithLifecycle(initialValue = initialLiquidDarkTheme)
+
             val initialPerformanceMode = androidx.compose.runtime.remember { settingsRepo.isPerformanceMode() }
             val isPerformanceMode by settingsRepo.getPerformanceModeFlow().collectAsStateWithLifecycle(initialValue = initialPerformanceMode)
             
@@ -88,7 +91,8 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(
                 com.flash.draft.ui.theme.LocalWindowSizeInfo provides windowSizeInfo,
-                LocalHapticFeedback provides customHaptic
+                LocalHapticFeedback provides customHaptic,
+                com.flash.draft.ui.canvas.item.LocalLiquidDarkTheme provides isLiquidDarkTheme
             ) {
                 com.flash.draft.ui.theme.DraftitTheme(darkTheme = isDarkMode, dynamicColor = false) {
                     Surface(

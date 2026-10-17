@@ -46,25 +46,11 @@ fun TaskListItem(
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = taskNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(taskNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // TASK COLOR CUSTOMIZATION
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Theme", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
-                    val colors = listOf(Color.White, Color(0xFFFFF9C4), Color(0xFFE3F2FD), Color(0xFFE8F5E9), Color(0xFFFCE4EC))
-                    colors.forEach { colorOption ->
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(colorOption, CircleShape)
-                                .border(1.dp, Color.LightGray, CircleShape)
-                                .clickable {
-                                    onUpdate(taskNode.copy(color = colorOption))
-                                    onSaveRequest()
-                                }
-                        )
-                    }
-                }
-            }
+            TaskListToolStack(
+                taskNode = taskNode,
+                onUpdate = onUpdate,
+                onSaveRequest = onSaveRequest
+            )
         }
     ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize().background(taskNode.color).padding(12.dp)) {
@@ -141,6 +127,33 @@ fun TaskListItem(
                     Icon(Icons.Default.Add, "Add", tint = Color.Gray, modifier = Modifier.size(20.dp))
                     Text("Add task", color = Color.Gray, fontSize = 14.sp)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun TaskListToolStack(
+    taskNode: CanvasElement.TaskListNode,
+    onUpdate: (CanvasElement.TaskListNode) -> Unit,
+    onSaveRequest: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // TASK COLOR CUSTOMIZATION
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Theme", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(end = 4.dp))
+            val colors = listOf(Color.White, Color(0xFFFFF9C4), Color(0xFFE3F2FD), Color(0xFFE8F5E9), Color(0xFFFCE4EC))
+            colors.forEach { colorOption ->
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(colorOption, CircleShape)
+                        .border(1.dp, Color.LightGray, CircleShape)
+                        .clickable {
+                            onUpdate(taskNode.copy(color = colorOption))
+                            onSaveRequest()
+                        }
+                )
             }
         }
     }

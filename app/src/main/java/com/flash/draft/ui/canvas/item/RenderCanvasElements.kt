@@ -42,7 +42,9 @@ fun RenderCanvasElements(
     onStartConnection: (String) -> Unit,
     onNavigateToScene: (String) -> Unit,
     onNavigateToBoard: (String) -> Unit,
-    isCanvasLocked: Boolean
+    isCanvasLocked: Boolean,
+    highlightedElementId: String? = null,
+    selectedConnectorId: String? = null
 ) {
     // GPU graphicsLayer natively handles viewport culling, so we don't need CPU-side cull bounds.
     val currentSelectedGroupIds by androidx.compose.runtime.rememberUpdatedState(selectedGroupIds)
@@ -50,6 +52,13 @@ fun RenderCanvasElements(
     val currentIsConnectingMode by androidx.compose.runtime.rememberUpdatedState(isConnectingMode)
     val currentIsDrawingMode by androidx.compose.runtime.rememberUpdatedState(isDrawingMode)
     val currentIsLassoMode by androidx.compose.runtime.rememberUpdatedState(isLassoMode)
+
+    // ── 1. BACKSIDE CONNECTORS LAYER (Always in the backside behind all items) ──
+    BacksideConnectorsLayer(
+        elements = elements,
+        selectedConnectorId = selectedConnectorId,
+        isDarkTheme = LocalDarkTheme.current
+    )
 
     elements.forEach { element ->
         if (element is CanvasElement.StickyNote) {
@@ -107,7 +116,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -170,7 +178,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -244,7 +251,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -307,7 +313,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -370,7 +375,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -433,7 +437,6 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
@@ -496,10 +499,11 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
-                    } }
+                    } },
+                    onSendToBack = remember(element.id) { { onSendToBack(element.id) } },
+                    onBringToFront = remember(element.id) { { onBringToFront(element.id) } }
                 )
             }
         }
@@ -517,6 +521,7 @@ fun RenderCanvasElements(
                     isConnecting = isGroupedOrConnecting,
                     isConnectionTarget = isConnectionTarget,
                     isCanvasLocked = isCanvasLocked,
+                    isNewlySpawned = highlightedElementId == element.id,
                     onConnectRequest = remember(element.id) { { onStartConnection(element.id) } },
                     onDuplicate = remember(element.id) { {
                         elements.add(element.copy(id = UUID.randomUUID().toString(), position = element.position + Offset(40f, 40f)))
@@ -558,10 +563,94 @@ fun RenderCanvasElements(
                             if (!currentSelectedGroupIds.contains(element.id)) {
                                 onUpdateSelectedGroupIds(emptySet())
                                 onUpdateSelectedNoteId(element.id)
-                                onBringToFront(element.id)
                             }
                         }
                     } }
+                )
+            }
+        }
+
+    }
+
+    // ── 3. TOP-LEVEL SELECTION CHROME & TOOLSTACK OVERLAY ───────────────────
+    // Rendered on top of all cards & ink strokes so that the toolstack is ALWAYS accessible,
+    // even if the item's layer is in the back.
+    if (selectedNoteId != null && !isCanvasLocked) {
+        val selectedEl = elements.find { it.id == selectedNoteId }
+        if (selectedEl != null) {
+            key(selectedEl.id) {
+                CanvasSelectionChromeLayer(
+                    selectedElement = selectedEl,
+                    scale = scale,
+                    isCanvasLocked = isCanvasLocked,
+                    context = context,
+                    elements = elements,
+                    onUpdateElement = { updated ->
+                        val idx = elements.indexOfFirst { it.id == updated.id }
+                        if (idx != -1) {
+                            elements[idx] = updated
+                            onUpdateElements(elements.toList())
+                        }
+                    },
+                    onDeleteElement = { idToDelete ->
+                        elements.removeAll { it.id == idToDelete }
+                        elements.removeAll { it is CanvasElement.Connector && (it.startId == idToDelete || it.endId == idToDelete) }
+                        onResetSelectedNoteId()
+                        onUpdateElements(elements.toList())
+                    },
+                    onDuplicateElement = { elToDup ->
+                        val dup = when (elToDup) {
+                            is CanvasElement.StickyNote -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.CodeBlock -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.ImageCard -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.TaskListNode -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.PdfCard -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.AudioNote -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.ShapeNode -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            is CanvasElement.LabelNode -> elToDup.copy(id = UUID.randomUUID().toString(), position = elToDup.position + Offset(40f, 40f))
+                            else -> null
+                        }
+                        if (dup != null) {
+                            elements.add(dup)
+                            onUpdateElements(elements.toList())
+                        }
+                    },
+                    onStartConnection = onStartConnection,
+                    onSizeDelta = { delta, id ->
+                        val idx = elements.indexOfFirst { it.id == id }
+                        if (idx != -1) {
+                            val el = elements[idx]
+                            val updated = when (el) {
+                                is CanvasElement.StickyNote -> el.copy(width = (el.width + delta.x).coerceAtLeast(100f), height = (el.height + delta.y).coerceAtLeast(100f))
+                                is CanvasElement.CodeBlock -> el.copy(width = (el.width + delta.x).coerceAtLeast(150f), height = (el.height + delta.y).coerceAtLeast(100f))
+                                is CanvasElement.ImageCard -> el.copy(width = (el.width + delta.x).coerceAtLeast(100f), height = (el.height + delta.y).coerceAtLeast(100f))
+                                is CanvasElement.TaskListNode -> el.copy(width = (el.width + delta.x).coerceAtLeast(150f), height = (el.height + delta.y).coerceAtLeast(150f))
+                                is CanvasElement.PdfCard -> el.copy(width = (el.width + delta.x).coerceAtLeast(100f), height = (el.height + delta.y).coerceAtLeast(80f))
+                                is CanvasElement.AudioNote -> el.copy(width = (el.width + delta.x).coerceAtLeast(160f), height = (el.height + delta.y).coerceAtLeast(60f))
+                                is CanvasElement.ShapeNode -> el.copy(width = (el.width + delta.x).coerceAtLeast(50f), height = (el.height + delta.y).coerceAtLeast(50f))
+                                is CanvasElement.LabelNode -> el.copy(width = (el.width + delta.x).coerceAtLeast(100f), height = (el.height + delta.y).coerceAtLeast(40f))
+                                else -> el
+                            }
+                            elements[idx] = updated
+                            onUpdateElements(elements.toList())
+                        }
+                    },
+                    onSaveRequest = { onUpdateElements(elements.toList()) },
+                    onSendToBack = onSendToBack,
+                    onBringToFront = onBringToFront,
+                    onNavigateToScene = onNavigateToScene,
+                    onNavigateToBoard = onNavigateToBoard,
+                    onMakeSticker = { card ->
+                        Toast.makeText(context, "Extracting subject...", Toast.LENGTH_SHORT).show()
+                        StickerMaker.extractSubject(context, card.uriString) { newUri ->
+                            if (newUri != null) {
+                                elements.add(CanvasElement.ImageCard(id = UUID.randomUUID().toString(), position = card.position + Offset(80f, 80f), uriString = newUri, width = card.width, height = card.height, originalWidth = card.originalWidth, originalHeight = card.originalHeight))
+                                onUpdateElements(elements.toList())
+                            } else {
+                                Toast.makeText(context, "No clear subject found", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
                 )
             }
         }

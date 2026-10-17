@@ -63,7 +63,9 @@ fun DrawToolsContent(
     activeStrokeWidth: Float,
     onStrokeWidthChange: (Float) -> Unit,
     onColorSelect: (Color) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    recentColors: List<Color> = emptyList(),
+    onCommitRecentColor: (Color) -> Unit = {}
 ) {
     val isDark = LocalDarkTheme.current
     val iconTint = if (isDark) Color.White else Color.Black
@@ -87,7 +89,9 @@ fun DrawToolsContent(
             // Only the gradient picker + hue slider, no size slider, no SVG tools
             ColorPickerView(
                 activeColor = activeColor,
-                onColorSelect = onColorSelect
+                onColorSelect = onColorSelect,
+                recentColors = recentColors,
+                onCommitRecentColor = onCommitRecentColor
             )
             Spacer(modifier = Modifier.height(12.dp))
             // Done button to close the picker
@@ -97,7 +101,10 @@ fun DrawToolsContent(
                     .height(44.dp)
                     .clip(RoundedCornerShape(22.dp))
                     .background(if (isDark) Color(0xFF2C2C2E) else Color(0xFFF2F2F7))
-                    .clickable { onToolChange(activeToolType) },
+                    .clickable { 
+                        onCommitRecentColor(activeColor)
+                        onToolChange(activeToolType) 
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.material3.Text(
@@ -157,13 +164,22 @@ fun DrawToolsContent(
 @Composable
 private fun ColorPickerView(
     activeColor: Color,
-    onColorSelect: (Color) -> Unit
+    onColorSelect: (Color) -> Unit,
+    recentColors: List<Color>,
+    onCommitRecentColor: (Color) -> Unit
 ) {
     val hsvState = remember { 
         val array = FloatArray(3)
         android.graphics.Color.colorToHSV(activeColor.toArgb(), array)
         mutableStateOf(array)
     }
+
+    LaunchedEffect(activeColor) {
+        val array = FloatArray(3)
+        android.graphics.Color.colorToHSV(activeColor.toArgb(), array)
+        hsvState.value = array
+    }
+
     val hue = hsvState.value[0]
     val sat = hsvState.value[1]
     val value = hsvState.value[2]
@@ -174,29 +190,37 @@ private fun ColorPickerView(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().height(180.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // 2D SV Box
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(130.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color.hsv(hue, 1f, 1f))
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        val s = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        val v = 1f - (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
-                        updateColor(hsvState.value[0], s, v)
-                    }
+                    detectDragGestures(
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val s = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val v = 1f - (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
+                            updateColor(hsvState.value[0], s, v)
+                        },
+                        onDragEnd = {
+                            val committedColor = Color.hsv(hsvState.value[0], hsvState.value[1], hsvState.value[2])
+                            onCommitRecentColor(committedColor)
+                        }
+                    )
                 }
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
                         val s = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
                         val v = 1f - (offset.y / size.height.toFloat()).coerceIn(0f, 1f)
+                        val newColor = Color.hsv(hsvState.value[0], s, v)
                         updateColor(hsvState.value[0], s, v)
+                        onCommitRecentColor(newColor)
                     }
                 }
         ) {
@@ -223,16 +247,24 @@ private fun ColorPickerView(
                 .height(24.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        val h = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f) * 360f
-                        updateColor(h, hsvState.value[1], hsvState.value[2])
-                    }
+                    detectDragGestures(
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val h = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f) * 360f
+                            updateColor(h, hsvState.value[1], hsvState.value[2])
+                        },
+                        onDragEnd = {
+                            val committedColor = Color.hsv(hsvState.value[0], hsvState.value[1], hsvState.value[2])
+                            onCommitRecentColor(committedColor)
+                        }
+                    )
                 }
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
                         val h = (offset.x / size.width.toFloat()).coerceIn(0f, 1f) * 360f
+                        val newColor = Color.hsv(h, hsvState.value[1], hsvState.value[2])
                         updateColor(h, hsvState.value[1], hsvState.value[2])
+                        onCommitRecentColor(newColor)
                     }
                 }
         ) {
@@ -245,6 +277,49 @@ private fun ColorPickerView(
             val indicatorX = (hue / 360f) * size.width
             drawCircle(color = Color.White, radius = 10.dp.toPx(), center = Offset(indicatorX, size.height / 2f))
             drawCircle(color = Color.Black, radius = 10.dp.toPx(), center = Offset(indicatorX, size.height / 2f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()))
+        }
+
+        // RECENT COLORS row below Hue slider
+        if (recentColors.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                androidx.compose.material3.Text(
+                    text = "RECENT COLORS",
+                    fontSize = 11.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 0.5.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    recentColors.take(8).forEach { color ->
+                        val isSelected = color == activeColor
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) androidx.compose.material3.MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    val array = FloatArray(3)
+                                    android.graphics.Color.colorToHSV(color.toArgb(), array)
+                                    hsvState.value = array
+                                    onColorSelect(color)
+                                    onCommitRecentColor(color)
+                                }
+                        )
+                    }
+                }
+            }
         }
     }
 }

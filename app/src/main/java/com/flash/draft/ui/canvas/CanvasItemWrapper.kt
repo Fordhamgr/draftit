@@ -37,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +76,8 @@ fun CanvasItemWrapper(
     onSelect: () -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDelete: () -> Unit, onSaveRequest: () -> Unit,
     onDuplicate: (() -> Unit)? = null,
+    menuContentPadding: Dp = 16.dp,
+    renderSelectionChrome: Boolean = false,
     customMenuContent: (@Composable () -> Unit)? = null, content: @Composable (isLocked: Boolean) -> Unit
 ) {
     val currentOnSelect by rememberUpdatedState(onSelect)
@@ -205,7 +209,7 @@ fun CanvasItemWrapper(
                 )
                 // -----------------------------------
 
-                .then(if (hasDefaultBackground && !isPerformance && !isDark) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier.graphicsLayer())
+                .then(if (hasDefaultBackground && !isPerformance && !isDark) Modifier.shadow(animatedShadow, RoundedCornerShape(12.dp)) else Modifier)
 
                 // IMPORTANT: The alpha is backgroundAlpha here so you can optionally see the liquid distortion through the card's background color!
                 .then(if (hasDefaultBackground) Modifier.background(if (isDark) Color(0xFF1E1E1E).copy(alpha = backgroundAlpha) else Color.White.copy(alpha = backgroundAlpha), RoundedCornerShape(12.dp)) else Modifier)
@@ -228,13 +232,13 @@ fun CanvasItemWrapper(
             content(isLocked)
         }
 
-        if (isSelected) {
+        if (isSelected && renderSelectionChrome) {
             // All toolbars and overlays live INSIDE this explicitly-sized Box.
             // Alignment against requiredSize is pixel-accurate at ANY item dimension.
             Box(modifier = Modifier.requiredSize(width.dp, height.dp)) {
                 // Selection border
                 val bgStyle = com.flash.draft.ui.canvas.item.LocalBackgroundStyle.current
-                val isBgDark = bgStyle == com.flash.draft.model.BackgroundStyle.Greenprint || bgStyle == com.flash.draft.model.BackgroundStyle.Blueprint || ((bgStyle == com.flash.draft.model.BackgroundStyle.Solid || bgStyle == com.flash.draft.model.BackgroundStyle.GraphPaper) && isDark)
+                val isBgDark = bgStyle == com.flash.draft.model.BackgroundStyle.Greenprint || bgStyle == com.flash.draft.model.BackgroundStyle.Blueprint || bgStyle == com.flash.draft.model.BackgroundStyle.BlackPaper || ((bgStyle == com.flash.draft.model.BackgroundStyle.Solid || bgStyle == com.flash.draft.model.BackgroundStyle.GraphPaper) && isDark)
                 val outlineColor = if (isBgDark) Color.White.copy(alpha=0.8f) else Color(0xFF2196F3)
                 Box(modifier = Modifier.fillMaxSize().border(2.dp, outlineColor, RoundedCornerShape(12.dp)))
 
@@ -287,10 +291,21 @@ fun CanvasItemWrapper(
                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                 }
                         ) {
+                            // Optional 8dp pointer centered at bottom edge behind the panel
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .offset(y = 4.dp)
+                                    .size(10.dp)
+                                    .rotate(45f)
+                                    .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(2.dp))
+                                    .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(2.dp))
+                            )
+
                             Row(
                                 modifier = Modifier
                                     .wrapContentSize()
-                                    .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier.graphicsLayer())
+                                    .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
                                     .then(
                                         if (LocalLiquidState.current != null && !isPerformance) {
                                             val currentRefraction = LocalLiquidRefraction.current
@@ -306,7 +321,7 @@ fun CanvasItemWrapper(
                                     )
                                     .background(if (isDark) Color(0xEB1A1A1A) else Color(0xEBFFFFFF), RoundedCornerShape(24.dp))
                                     .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(24.dp))
-                                    .padding(16.dp),
+                                    .padding(menuContentPadding),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -338,7 +353,7 @@ fun CanvasItemWrapper(
                         Column(
                             modifier = Modifier
                                 .wrapContentSize()
-                                .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier.graphicsLayer())
+                                .then(if (!isPerformance && !isDark) Modifier.shadow(24.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.2f)) else Modifier)
                                 .then(
                                     if (LocalLiquidState.current != null && !isPerformance) {
                                         val currentRefraction = LocalLiquidRefraction.current
@@ -422,7 +437,7 @@ fun CanvasItemWrapper(
                             Box(
                                 modifier = Modifier
                                     .graphicsLayer { translationY = size.height }
-                                    .then(if (!isPerformance && !isDark) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier.graphicsLayer())
+                                    .then(if (!isPerformance && !isDark) Modifier.shadow(16.dp, RoundedCornerShape(12.dp)) else Modifier)
                                     .background(if (isDark) Color(0xCC1A1A1A) else Color(0xCCFFFFFF), RoundedCornerShape(12.dp))
                                     .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x66FFFFFF), RoundedCornerShape(12.dp))
                                     .padding(8.dp)

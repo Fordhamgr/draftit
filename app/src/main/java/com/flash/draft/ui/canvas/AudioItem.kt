@@ -145,33 +145,11 @@ fun AudioItem(
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = audioNote.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(audioNote.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Title editing
-                    androidx.compose.foundation.text.BasicTextField(
-                        value = audioNote.title,
-                        onValueChange = { onUpdate(audioNote.copy(title = it)) },
-                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.Black, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                        modifier = Modifier.background(Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp).width(120.dp)
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Color picking
-                    val colors = listOf(Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFFFFF9C4), Color(0xFFFCE4EC), Color(0xFFF3E5F5))
-                    colors.forEach { colorOption ->
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(colorOption, CircleShape)
-                                .border(if (audioNote.color == colorOption) 2.dp else 1.dp, if (audioNote.color == colorOption) Color.Blue else Color.LightGray, CircleShape)
-                                .clickable {
-                                    onUpdate(audioNote.copy(color = colorOption))
-                                    onSaveRequest()
-                                }
-                        )
-                    }
-                }
-            }
+            AudioToolStack(
+                audioNote = audioNote,
+                onUpdate = onUpdate,
+                onSaveRequest = onSaveRequest
+            )
         }
     ) { isLocked ->
         Row(
@@ -229,6 +207,41 @@ fun AudioItem(
                         Text(text = audioNote.title, fontSize = 10.sp, color = Color.Gray, maxLines = 1, modifier = Modifier.widthIn(max = 100.dp), overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun AudioToolStack(
+    audioNote: CanvasElement.AudioNote,
+    onUpdate: (CanvasElement.AudioNote) -> Unit,
+    onSaveRequest: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Title editing
+            androidx.compose.foundation.text.BasicTextField(
+                value = audioNote.title,
+                onValueChange = { onUpdate(audioNote.copy(title = it)) },
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.Black, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                modifier = Modifier.background(Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp).width(120.dp)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Color picking
+            val colors = listOf(Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFFFFF9C4), Color(0xFFFCE4EC), Color(0xFFF3E5F5))
+            colors.forEach { colorOption ->
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(colorOption, CircleShape)
+                        .border(if (audioNote.color == colorOption) 2.dp else 1.dp, if (audioNote.color == colorOption) Color.Blue else Color.LightGray, CircleShape)
+                        .clickable {
+                            onUpdate(audioNote.copy(color = colorOption))
+                            onSaveRequest()
+                        }
+                )
             }
         }
     }

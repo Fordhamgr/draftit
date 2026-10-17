@@ -2,6 +2,8 @@ package com.flash.draft.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -15,6 +17,7 @@ class SettingsRepository(context: Context) {
 
     companion object {
         private const val KEY_DARK_MODE = "dark_mode"
+        private const val KEY_LIQUID_DARK_THEME = "liquid_dark_theme"
         private const val KEY_PERFORMANCE_MODE = "performance_mode"
         private const val KEY_FRAMERATE = "framerate"
         private const val KEY_LIQUID_CURVE = "liquid_curve"
@@ -23,10 +26,12 @@ class SettingsRepository(context: Context) {
         private const val KEY_UNDO_LIMIT = "undo_limit"
         private const val KEY_HAPTIC_FEEDBACK = "haptic_feedback"
         private const val KEY_STYLUS_SUPPORT = "stylus_support"
+        private const val KEY_RECENT_DRAWING_COLORS = "recent_drawing_colors"
     }
 
     // Default values
     private val defaultDarkMode = false
+    private val defaultLiquidDarkTheme = true
     private val defaultPerformanceMode = false
     private val defaultFramerate = 0 // 0 = Unlocked
     private val defaultLiquidCurve = 0.5f
@@ -45,6 +50,21 @@ class SettingsRepository(context: Context) {
         activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(prefs.getBoolean(KEY_DARK_MODE, defaultDarkMode))
+        awaitClose { 
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
+        }
+    }
+
+    fun isLiquidDarkTheme(): Boolean = prefs.getBoolean(KEY_LIQUID_DARK_THEME, defaultLiquidDarkTheme)
+    fun setLiquidDarkTheme(enabled: Boolean) = prefs.edit().putBoolean(KEY_LIQUID_DARK_THEME, enabled).apply()
+    fun getLiquidDarkThemeFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_LIQUID_DARK_THEME) trySend(prefs.getBoolean(KEY_LIQUID_DARK_THEME, defaultLiquidDarkTheme))
+        }
+        activeListeners.add(listener)
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(prefs.getBoolean(KEY_LIQUID_DARK_THEME, defaultLiquidDarkTheme))
         awaitClose { 
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
             activeListeners.remove(listener)
@@ -80,8 +100,6 @@ class SettingsRepository(context: Context) {
             activeListeners.remove(listener)
         }
     }
-
-
 
     fun getLiquidCurve(): Float = prefs.getFloat(KEY_LIQUID_CURVE, defaultLiquidCurve)
     fun setLiquidCurve(level: Float) = prefs.edit().putFloat(KEY_LIQUID_CURVE, level).apply()
@@ -167,6 +185,36 @@ class SettingsRepository(context: Context) {
         activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(prefs.getBoolean(KEY_STYLUS_SUPPORT, defaultStylusSupport))
+        awaitClose { 
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
+        }
+    }
+
+    fun getRecentColors(): List<Color> {
+        val raw = prefs.getString(KEY_RECENT_DRAWING_COLORS, null) ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .map { Color(it) }
+    }
+
+    fun addRecentColor(color: Color) {
+        val argb = color.toArgb()
+        val current = getRecentColors().map { it.toArgb() }.toMutableList()
+        current.remove(argb)
+        current.add(0, argb)
+        val trimmed = current.take(8)
+        prefs.edit().putString(KEY_RECENT_DRAWING_COLORS, trimmed.joinToString(",")).apply()
+    }
+
+    fun getRecentColorsFlow(): Flow<List<Color>> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_RECENT_DRAWING_COLORS) trySend(getRecentColors())
+        }
+        activeListeners.add(listener)
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(getRecentColors())
         awaitClose { 
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
             activeListeners.remove(listener)

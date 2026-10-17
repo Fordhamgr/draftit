@@ -138,10 +138,14 @@ class NoteRepository(context: Context) {
                 val json = JSONObject(metaFile.readText())
                 if (json.has("backgroundStyle")) {
                     val styleStr = json.getString("backgroundStyle")
-                    return if (styleStr == "DotGrid" || styleStr == "Isometric") {
-                        com.flash.draft.model.BackgroundStyle.Blueprint
-                    } else {
-                        com.flash.draft.model.BackgroundStyle.valueOf(styleStr)
+                    return when {
+                        styleStr == "DotGrid" || styleStr == "Isometric" -> com.flash.draft.model.BackgroundStyle.Blueprint
+                        styleStr.equals("Darkprint", ignoreCase = true) || styleStr.equals("BlackPaper", ignoreCase = true) || styleStr.equals("Black Paper", ignoreCase = true) -> com.flash.draft.model.BackgroundStyle.BlackPaper
+                        else -> try {
+                            com.flash.draft.model.BackgroundStyle.valueOf(styleStr)
+                        } catch (e: Exception) {
+                            com.flash.draft.model.BackgroundStyle.Solid
+                        }
                     }
                 }
             } catch (e: Exception) {}

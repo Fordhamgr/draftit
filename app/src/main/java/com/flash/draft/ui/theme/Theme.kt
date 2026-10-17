@@ -12,31 +12,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = RedPrimaryDark,
-    background = RedBackgroundDark,
-    surface = RedSurfaceDark,
-    onBackground = RedOnBackgroundDark,
-    onSurface = RedOnSurfaceDark,
-    surfaceVariant = RedSurfaceVariantDark,
-    surfaceContainer = RedSurfaceContainerDark,
-    onSurfaceVariant = RedOnSurfaceVariantDark
+    primary = CobaltPrimaryDark,
+    onPrimary = CobaltOnPrimaryDark,
+    background = CobaltBackgroundDark,
+    surface = CobaltSurfaceDark,
+    onBackground = CobaltOnBackgroundDark,
+    onSurface = CobaltOnSurfaceDark,
+    surfaceVariant = CobaltSurfaceVariantDark,
+    surfaceContainer = CobaltSurfaceContainerDark,
+    surfaceContainerHigh = CobaltSurfaceContainerHighDark,
+    onSurfaceVariant = CobaltOnSurfaceVariantDark,
+    outline = CobaltOutlineDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = RedPrimaryLight,
-    background = RedBackgroundLight,
-    surface = RedSurfaceLight,
-    onBackground = RedOnBackgroundLight,
-    onSurface = RedOnSurfaceLight,
-    surfaceVariant = RedSurfaceVariantLight,
-    surfaceContainer = RedSurfaceContainerLight,
-    onSurfaceVariant = RedOnSurfaceVariantLight
+    primary = CobaltPrimaryLight,
+    onPrimary = CobaltOnPrimaryLight,
+    background = CobaltBackgroundLight,
+    surface = CobaltSurfaceLight,
+    onBackground = CobaltOnBackgroundLight,
+    onSurface = CobaltOnSurfaceLight,
+    surfaceVariant = CobaltSurfaceVariantLight,
+    surfaceContainer = CobaltSurfaceContainerLight,
+    surfaceContainerHigh = CobaltSurfaceContainerHighLight,
+    onSurfaceVariant = CobaltOnSurfaceVariantLight,
+    outline = CobaltOutlineLight
 )
 
 @Composable
 fun DraftitTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Disabled dynamic color by default so the red theme applies consistently
+    // Disabled dynamic color by default so the Cobalt & Slate theme applies consistently
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

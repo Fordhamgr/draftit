@@ -75,12 +75,30 @@ fun InsertToolStack(
         modifier = Modifier.padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Section 1: Text & Blocks
+        // Section 1: Media & Files
         Column(
             modifier = Modifier.graphicsLayer {
                 transformOrigin = TransformOrigin(0.5f, 1f)
                 rotationX = 90f * (1f - animatable1.value)
                 alpha = animatable1.value.coerceIn(0f, 1f)
+                cameraDistance = 8f * density
+            },
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Media & Files", fontSize = 12.sp, color = subtitleColor, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                GridItem(Icons.Default.Image, "Image", onMediaClick, textColor)
+                GridItem(Icons.Default.PictureAsPdf, "PDF", onPdfClick, textColor)
+                GridItem(Icons.Default.Mic, "Audio", onAudioClick, textColor)
+            }
+        }
+        
+        // Section 2: Text & Blocks
+        Column(
+            modifier = Modifier.graphicsLayer {
+                transformOrigin = TransformOrigin(0.5f, 1f)
+                rotationX = 90f * (1f - animatable2.value)
+                alpha = animatable2.value.coerceIn(0f, 1f)
                 cameraDistance = 8f * density
             },
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -91,24 +109,6 @@ fun InsertToolStack(
                 GridItem(Icons.AutoMirrored.Filled.List, "Task List", onTaskClick, textColor)
                 GridItem(Icons.Default.Code, "Code", onCodeClick, textColor)
                 GridItem(Icons.Default.Category, "Shape", onShapeClick, textColor)
-            }
-        }
-        
-        // Section 2: Media & Files
-        Column(
-            modifier = Modifier.graphicsLayer {
-                transformOrigin = TransformOrigin(0.5f, 1f)
-                rotationX = 90f * (1f - animatable2.value)
-                alpha = animatable2.value.coerceIn(0f, 1f)
-                cameraDistance = 8f * density
-            },
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("Media & Files", fontSize = 12.sp, color = subtitleColor, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                GridItem(Icons.Default.Image, "Image", onMediaClick, textColor)
-                GridItem(Icons.Default.PictureAsPdf, "PDF", onPdfClick, textColor)
-                GridItem(Icons.Default.Mic, "Audio", onAudioClick, textColor)
             }
         }
     }

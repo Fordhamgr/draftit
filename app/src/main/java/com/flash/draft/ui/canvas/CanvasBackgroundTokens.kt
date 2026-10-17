@@ -14,9 +14,11 @@ object CanvasBackgroundTokens {
     val LightBase: Color = Color(0xFFF0F0F0)
     val BlueprintBase: Color = Color(0xFF1E3A8A)
     val GreenprintBase: Color = Color(0xFF314F40)
+    val BlackPaperBase: Color = Color(0xFF0D0D0D)
 
     val BlueprintLine: Color = Color.White.copy(alpha = 0.20f)
     val GreenprintLine: Color = Color.White.copy(alpha = 0.15f)
+    val BlackPaperLine: Color = Color.White.copy(alpha = 0.15f)
 
     const val BASE_GRID_SPACING: Float = 100f
     const val GRID_STROKE_WIDTH: Float = 1f
@@ -25,6 +27,7 @@ object CanvasBackgroundTokens {
         return when (style) {
             BackgroundStyle.Blueprint -> BlueprintBase
             BackgroundStyle.Greenprint -> GreenprintBase
+            BackgroundStyle.BlackPaper -> BlackPaperBase
             BackgroundStyle.Solid,
             BackgroundStyle.GraphPaper -> if (isDarkTheme) DarkBase else LightBase
         }
@@ -35,6 +38,7 @@ object CanvasBackgroundTokens {
         return when (style) {
             BackgroundStyle.Blueprint -> android.graphics.Color.parseColor("#1E3A8A")
             BackgroundStyle.Greenprint -> android.graphics.Color.parseColor("#314F40")
+            BackgroundStyle.BlackPaper -> android.graphics.Color.parseColor("#0D0D0D")
             BackgroundStyle.Solid,
             BackgroundStyle.GraphPaper -> if (isDarkTheme) {
                 android.graphics.Color.parseColor("#18181A")
@@ -49,6 +53,7 @@ object CanvasBackgroundTokens {
             BackgroundStyle.GraphPaper -> colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
             BackgroundStyle.Blueprint -> BlueprintLine
             BackgroundStyle.Greenprint -> GreenprintLine
+            BackgroundStyle.BlackPaper -> BlackPaperLine
             BackgroundStyle.Solid -> Color.Transparent
         }
     }
@@ -74,8 +79,15 @@ object CanvasBackgroundTokens {
             val patternColor = getPatternLineColor(style, colorScheme)
             if (patternColor == Color.Transparent || patternColor.alpha <= 0f) return
 
-            val spacing = BASE_GRID_SPACING * scale
+            var spacing = BASE_GRID_SPACING * scale
             if (spacing <= 0f) return
+
+            while (spacing < 40f) {
+                spacing *= 2f
+            }
+            while (spacing > 160f) {
+                spacing /= 2f
+            }
 
             val startX = (offsetX.rem(spacing) + spacing).rem(spacing)
             val startY = (offsetY.rem(spacing) + spacing).rem(spacing)
@@ -107,6 +119,26 @@ object CanvasBackgroundTokens {
             }
         }
     }
+}
+
+fun Modifier.draftBackground(
+    style: BackgroundStyle,
+    isDarkTheme: Boolean,
+    colorScheme: ColorScheme,
+    scaleProvider: () -> Float,
+    offsetProvider: () -> Offset
+): Modifier = this.drawBehind {
+    val scale = scaleProvider()
+    val offset = offsetProvider()
+    CanvasBackgroundTokens.drawCanvasBackground(
+        drawScope = this,
+        style = style,
+        isDarkTheme = isDarkTheme,
+        colorScheme = colorScheme,
+        scale = scale,
+        offsetX = offset.x,
+        offsetY = offset.y
+    )
 }
 
 fun Modifier.drawExportBackground(

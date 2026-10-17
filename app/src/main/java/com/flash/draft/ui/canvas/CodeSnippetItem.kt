@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -45,9 +46,7 @@ fun CodeSnippetItem(
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = codeBlock.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(codeBlock.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Icon(Icons.Default.ContentCopy, "Copy Code", modifier = Modifier.size(24.dp).clickable {
-                clipboardManager.setText(AnnotatedString(codeBlock.code))
-            })
+            CodeSnippetToolStack(codeBlock = codeBlock)
         }
     ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1E1E1E))) {
@@ -84,10 +83,19 @@ fun CodeSnippetItem(
                 modifier = Modifier.fillMaxSize().padding(12.dp).onFocusChanged { if (it.isFocused) onSelect() },
                 textStyle = LocalTextStyle.current.merge(
                     TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFD4D4D4))
-                )
+                ),
+                cursorBrush = SolidColor(Color.White)
             )
         }
     }
+}
+
+@Composable
+internal fun CodeSnippetToolStack(codeBlock: CanvasElement.CodeBlock) {
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    Icon(Icons.Default.ContentCopy, "Copy Code", modifier = Modifier.size(24.dp).clickable {
+        clipboardManager.setText(AnnotatedString(codeBlock.code))
+    })
 }
 
 

@@ -64,8 +64,20 @@ fun BottomNavBar(
     forceCenter: Boolean = false
 ) {
     val isDark = LocalDarkTheme.current
-    val glassBg = if (isDark) Color(0x1AFFFFFF) else Color(0xCCFFFFFF)
-    val glassBorder = if (isDark) Color(0x4DFFFFFF) else Color(0x66FFFFFF)
+    val isLiquidDarkTheme = com.flash.draft.ui.canvas.item.LocalLiquidDarkTheme.current
+    val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val isLiquidActive = !isDark || isLiquidDarkTheme
+
+    val glassBg = when {
+        !isDark -> Color(0xCCFFFFFF)
+        isLiquidDarkTheme -> Color(0x1AFFFFFF)
+        else -> colorScheme.surfaceContainerHigh
+    }
+    val glassBorder = when {
+        !isDark -> Color(0x66FFFFFF)
+        isLiquidDarkTheme -> Color(0x4DFFFFFF)
+        else -> colorScheme.outlineVariant.copy(alpha = 0.5f)
+    }
 
     val liquidState = LocalLiquidState.current
     val liquidRefraction = LocalLiquidRefraction.current
@@ -124,9 +136,9 @@ fun BottomNavBar(
 
             Box(
                 modifier = Modifier
-                    .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || (isDark && isLiquidDarkTheme)) Modifier.graphicsLayer() else Modifier.shadow(16.dp, morphShape, clip = false, spotColor = Color.Black.copy(alpha = 0.2f)))
                     .then(
-                        if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
+                        if (liquidState != null && !isPerformance && isLiquidActive) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = morphShape
                         } else Modifier
                     )
@@ -181,9 +193,9 @@ fun BottomNavBar(
                     .widthIn(max = 400.dp) // Stops it from getting excessively wide on tablets
                     .fillMaxWidth() // Automatically shrinks and expands to fill available padded space
                     .height(dockHeight)
-                    .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.15f)))
+                    .then(if (isPerformance || (isDark && isLiquidDarkTheme)) Modifier.graphicsLayer() else Modifier.shadow(16.dp, pillShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                     .then(
-                        if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
+                        if (liquidState != null && !isPerformance && isLiquidActive) Modifier.liquid(liquidState) {
                             refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = pillShape
                         } else Modifier
                     )
@@ -221,9 +233,9 @@ fun BottomNavBar(
                     scaleY = plusScale
                     transformOrigin = TransformOrigin(1f, 1f)
                 }
-                .then(if (isPerformance || isDark) Modifier.graphicsLayer() else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
+                .then(if (isPerformance || (isDark && isLiquidDarkTheme)) Modifier.graphicsLayer() else Modifier.shadow(16.dp, popoverShape, spotColor = Color.Black.copy(alpha = 0.2f)))
                 .then(
-                    if (liquidState != null && !isPerformance) Modifier.liquid(liquidState) {
+                    if (liquidState != null && !isPerformance && isLiquidActive) Modifier.liquid(liquidState) {
                         refraction = liquidRefraction; curve = liquidCurve; if (liquidFrost > 0f) frost = (liquidFrost * 24f).dp; shape = popoverShape
                     } else Modifier
                 )

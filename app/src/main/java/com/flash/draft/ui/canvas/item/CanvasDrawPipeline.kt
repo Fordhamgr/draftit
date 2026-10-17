@@ -44,190 +44,275 @@ object CanvasProfiler {
     var fgDrawCount = 0
     var recomposeCount = 0
 }
-@Composable
-fun CanvasBackgroundDrawPipeline(
+private val CONNECTOR_SHADOW_OFFSET = Offset(4f, 8f)
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSingleConnector(
+    connector: CanvasElement.Connector,
     elements: List<CanvasElement>,
-    scale: Float,
-    offset: Offset,
+    isSelected: Boolean,
+    isDarkTheme: Boolean,
+    isPerformanceMode: Boolean,
+    dashedEffect: PathEffect?,
+    dottedEffect: PathEffect?,
+    sharedPath: Path = Path()
+) {
+    val startEl = findElement(elements, connector.startId) ?: return
+    val endEl = findElement(elements, connector.endId) ?: return
+    val centerStart = getCenterPoint(startEl)
+    val centerEnd = getCenterPoint(endEl)
+    if (centerStart == Offset.Unspecified || centerEnd == Offset.Unspecified) return
+
+    val startDim = getElementDimensions(startEl)
+    val endDim = getElementDimensions(endEl)
+    val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 0f)
+    val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 0f)
+
+    val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
+    val drawStroke = connector.strokeWidth
+    val shadowOffset = CONNECTOR_SHADOW_OFFSET
+    val shadowColor = Color.Black
+
+    val effect = when (connector.lineStyle) {
+        "Dashed" -> dashedEffect
+        "Dotted" -> dottedEffect
+        else -> null
+    }
+
+    val angleLine = atan2(end.y - start.y, end.x - start.x)
+    val cosA = cos(angleLine).toFloat()
+    val sinA = sin(angleLine).toFloat()
+    val arrowLen = (16f + drawStroke * 1.5f).coerceAtLeast(15f)
+    val arrowHalfWidth = arrowLen * 0.55f
+    val distance = kotlin.math.hypot(end.x - start.x, end.y - start.y)
+    if (distance < 10f) return // Prevent rendering / inverted arrows when nodes overlap
+
+    val hasStartArrow = connector.arrowDirection == "Start" || connector.arrowDirection == "Both"
+    val hasEndArrow = connector.arrowDirection == "End" || connector.arrowDirection == "Both"
+
+    val startRetraction = if (hasStartArrow) {
+        when (connector.arrowShape) {
+            "Filled", "Diamond" -> arrowLen * 0.90f
+            "Circle" -> arrowLen * 0.5f
+            "Open" -> drawStroke * 0.5f
+            else -> 0f
+        }
+    } else 0f
+
+    val endRetraction = if (hasEndArrow) {
+        when (connector.arrowShape) {
+            "Filled", "Diamond" -> arrowLen * 0.90f
+            "Circle" -> arrowLen * 0.5f
+            "Open" -> drawStroke * 0.5f
+            else -> 0f
+        }
+    } else 0f
+
+    // Clamp retraction so arrows never cross over when nodes are close
+    val maxRetract = distance * 0.45f
+    val effectiveStartRetract = minOf(startRetraction, maxRetract)
+    val effectiveEndRetract = minOf(endRetraction, maxRetract)
+
+    val lineStart = Offset(start.x + effectiveStartRetract * cosA, start.y + effectiveStartRetract * sinA)
+    val lineEnd = Offset(end.x - effectiveEndRetract * cosA, end.y - effectiveEndRetract * sinA)
+
+    if (isSelected) {
+        val capsulePad = (drawStroke * 0.8f + 8f).coerceAtLeast(10f)
+        val capsuleRadius = (drawStroke * 1.5f + 10f).coerceAtLeast(13f)
+        val capsuleStart = Offset(start.x - cosA * capsulePad, start.y - sinA * capsulePad)
+        val capsuleEnd = Offset(end.x + cosA * capsulePad, end.y + sinA * capsulePad)
+
+        val capsuleFill = if (isDarkTheme) Color(0xFF60A5FA).copy(alpha = 0.32f) else Color(0xFF8EB8FF).copy(alpha = 0.38f)
+        val capsuleBorder = if (isDarkTheme) Color(0xFF93C5FD).copy(alpha = 0.85f) else Color(0xFF8EB8FF).copy(alpha = 0.90f)
+
+        // Draw capsule background fill
+        drawLine(
+            color = capsuleFill,
+            start = capsuleStart,
+            end = capsuleEnd,
+            strokeWidth = capsuleRadius * 2f,
+            cap = StrokeCap.Round
+        )
+
+        // Draw capsule perimeter border
+        val nx = -sinA * capsuleRadius
+        val ny = cosA * capsuleRadius
+        val angleDeg = (angleLine * 180f / Math.PI.toFloat())
+
+        sharedPath.rewind()
+        sharedPath.moveTo(capsuleStart.x + nx, capsuleStart.y + ny)
+        sharedPath.lineTo(capsuleEnd.x + nx, capsuleEnd.y + ny)
+        sharedPath.arcTo(
+            rect = androidx.compose.ui.geometry.Rect(
+                center = capsuleEnd,
+                radius = capsuleRadius
+            ),
+            startAngleDegrees = angleDeg - 90f,
+            sweepAngleDegrees = 180f,
+            forceMoveTo = false
+        )
+        sharedPath.lineTo(capsuleStart.x - nx, capsuleStart.y - ny)
+        sharedPath.arcTo(
+            rect = androidx.compose.ui.geometry.Rect(
+                center = capsuleStart,
+                radius = capsuleRadius
+            ),
+            startAngleDegrees = angleDeg + 90f,
+            sweepAngleDegrees = 180f,
+            forceMoveTo = false
+        )
+        sharedPath.close()
+
+        drawPath(
+            path = sharedPath,
+            color = capsuleBorder,
+            style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+
+    // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
+    if (!isPerformanceMode && !isDarkTheme && !isSelected) {
+        drawLine(color = shadowColor.copy(alpha = 0.08f), start = lineStart + shadowOffset, end = lineEnd + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
+    }
+
+    // Main Line
+    drawLine(color = drawColor, start = lineStart, end = lineEnd, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
+
+    fun drawArrow(tip: Offset, base: Offset) {
+        val angle = atan2(tip.y - base.y, tip.x - base.x)
+        val cosT = cos(angle).toFloat()
+        val sinT = sin(angle).toFloat()
+        val normalX = -sinT * arrowHalfWidth
+        val normalY = cosT * arrowHalfWidth
+        val baseX = tip.x - cosT * arrowLen
+        val baseY = tip.y - sinT * arrowLen
+
+        when (connector.arrowShape) {
+            "Open" -> {
+                sharedPath.rewind()
+                sharedPath.moveTo(baseX + normalX, baseY + normalY)
+                sharedPath.lineTo(tip.x, tip.y)
+                sharedPath.lineTo(baseX - normalX, baseY - normalY)
+
+                if (!isPerformanceMode && !isDarkTheme && !isSelected) {
+                    translate(left = shadowOffset.x, top = shadowOffset.y) {
+                        drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Stroke(width = drawStroke + 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    }
+                }
+                drawPath(sharedPath, drawColor, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            "Filled", "Diamond" -> {
+                sharedPath.rewind()
+                if (connector.arrowShape == "Filled") {
+                    sharedPath.moveTo(tip.x, tip.y)
+                    sharedPath.lineTo(baseX + normalX, baseY + normalY)
+                    sharedPath.lineTo(baseX - normalX, baseY - normalY)
+                    sharedPath.close()
+                } else {
+                    val midX = tip.x - (arrowLen / 1.5f) * cosT
+                    val midY = tip.y - (arrowLen / 1.5f) * sinT
+                    val endX = tip.x - (arrowLen * 1.3f) * cosT
+                    val endY = tip.y - (arrowLen * 1.3f) * sinT
+                    sharedPath.moveTo(tip.x, tip.y)
+                    sharedPath.lineTo(midX + normalX, midY + normalY)
+                    sharedPath.lineTo(endX, endY)
+                    sharedPath.lineTo(midX - normalX, midY - normalY)
+                    sharedPath.close()
+                }
+
+                if (!isPerformanceMode && !isDarkTheme && !isSelected) {
+                    translate(left = shadowOffset.x, top = shadowOffset.y) {
+                        drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Fill)
+                    }
+                }
+                drawPath(sharedPath, drawColor, style = Fill)
+            }
+            "Circle" -> {
+                val center = Offset(tip.x - (arrowLen / 2) * cosT, tip.y - (arrowLen / 2) * sinT)
+                if (!isPerformanceMode && !isDarkTheme && !isSelected) {
+                    drawCircle(color = shadowColor.copy(alpha = 0.08f), radius = (arrowLen / 2) + 4f, center = center + shadowOffset)
+                }
+                drawCircle(color = drawColor, radius = arrowLen / 2, center = center)
+            }
+        }
+    }
+
+    if (hasEndArrow) drawArrow(end, start)
+    if (hasStartArrow) drawArrow(start, end)
+}
+
+@Composable
+fun ConnectorItem(
+    connector: CanvasElement.Connector,
+    elements: List<CanvasElement>,
+    isSelected: Boolean,
+    isDarkTheme: Boolean
+) {
+    val isPerformanceMode = LocalPerformanceMode.current
+    val dashedEffect = remember { PathEffect.dashPathEffect(floatArrayOf(40f, 20f), 0f) }
+    val dottedEffect = remember { PathEffect.dashPathEffect(floatArrayOf(1f, 24f), 0f) }
+    val sharedPath = remember { Path() }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawSingleConnector(
+            connector = connector,
+            elements = elements,
+            isSelected = isSelected,
+            isDarkTheme = isDarkTheme,
+            isPerformanceMode = isPerformanceMode,
+            dashedEffect = dashedEffect,
+            dottedEffect = dottedEffect,
+            sharedPath = sharedPath
+        )
+    }
+}
+
+@Composable
+fun BacksideConnectorsLayer(
+    elements: List<CanvasElement>,
     selectedConnectorId: String?,
     isDarkTheme: Boolean
 ) {
-    // DO NOT use remember here. We need the latest elements map every time it recomposes.
-    // Building the map takes < 1ms for hundreds of elements.
-    
     val isPerformanceMode = LocalPerformanceMode.current
-    // Cache PathEffect objects — scale is always 1f from DraftCanvas, so these are constant.
-    // Previously allocated new FloatArray + PathEffect on EVERY draw frame.
-    val dashedEffect = remember(scale) { PathEffect.dashPathEffect(floatArrayOf(40f / scale, 20f / scale), 0f) }
-    val dottedEffect = remember(scale) { PathEffect.dashPathEffect(floatArrayOf(1f / scale, 24f / scale), 0f) }
+    val dashedEffect = remember { PathEffect.dashPathEffect(floatArrayOf(40f, 20f), 0f) }
+    val dottedEffect = remember { PathEffect.dashPathEffect(floatArrayOf(1f, 24f), 0f) }
+    val sharedPath = remember { Path() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val drawStart = if (CanvasProfiler.ENABLED) System.nanoTime() else 0L
-
-        // HW-Accelerated Fake Blur Configuration
-        val shadowOffset = Offset(4f, 8f)
-        val shadowColor = Color.Black
-
-        // Shared Path object to avoid allocating memory for every arrow/curve
-        val sharedPath = Path()
-        // Second shared path for curved connector lines (avoid rewind conflicts with arrow paths)
-        val curvePath = Path()
-
-        // Since scale=1f and offset=Offset.Zero are passed from DraftCanvas,
-        // the withTransform was a no-op (translate(0,0) + scale(1,1)) adding GPU state overhead.
-        // Now we skip the transform entirely when it's identity, and only apply when non-trivial.
-        val needsTransform = offset != Offset.Zero || scale != 1f
-        if (needsTransform) {
-            // Non-identity transform: apply it (future-proofing for if scale/offset change)
-            drawIntoCanvas { canvas ->
-                canvas.nativeCanvas.save()
-                canvas.nativeCanvas.translate(offset.x, offset.y)
-                canvas.nativeCanvas.scale(scale, scale)
+        // Pass 1: Draw all non-selected connectors
+        for (i in elements.indices) {
+            val el = elements[i]
+            if (el is CanvasElement.Connector && el.id != selectedConnectorId) {
+                drawSingleConnector(
+                    connector = el,
+                    elements = elements,
+                    isSelected = false,
+                    isDarkTheme = isDarkTheme,
+                    isPerformanceMode = isPerformanceMode,
+                    dashedEffect = dashedEffect,
+                    dottedEffect = dottedEffect,
+                    sharedPath = sharedPath
+                )
             }
         }
 
-
-        for (i in elements.indices) {
-            val element = elements[i]
-            if (element is CanvasElement.Connector) {
-                val connector = element
-                val startEl = findElement(elements, connector.startId)
-                val endEl = findElement(elements, connector.endId)
-                if (startEl != null && endEl != null) {
-                    val centerStart = getCenterPoint(startEl)
-                    val centerEnd = getCenterPoint(endEl)
-                    if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
-                        val startDim = getElementDimensions(startEl)
-                        val endDim = getElementDimensions(endEl)
-                        val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 25f)
-                        val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 25f)
-                        val isSelected = selectedConnectorId == connector.id
-                        val drawColor = getAdaptiveColor(connector.color, isDarkTheme)
-                        val drawStroke = connector.strokeWidth
-
-                        val effect = when (connector.lineStyle) {
-                            "Dashed" -> dashedEffect
-                            "Dotted" -> dottedEffect
-                            else -> null
-                        }
-
-                        // ── STRAIGHT LINE RENDERING (original, unchanged) ──
-
-                            var lineStart = start
-                            var lineEnd = end
-                            val angleLine = atan2(end.y - start.y, end.x - start.x)
-                            val cosA = cos(angleLine).toFloat()
-                            val sinA = sin(angleLine).toFloat()
-                            val arrowLenForRetraction = 20f + (drawStroke * 1.5f)
-                            val distance = kotlin.math.hypot(end.x - start.x, end.y - start.y)
-                            val retraction = when (connector.arrowShape) {
-                                "Filled", "Diamond" -> arrowLenForRetraction * 0.8f
-                                "Circle" -> arrowLenForRetraction * 0.5f
-                                "Open" -> drawStroke * 0.5f
-                                else -> 0f
-                            }.coerceAtMost(distance / 2.5f)
-
-                            if (connector.arrowDirection == "Start" || connector.arrowDirection == "Both") {
-                                lineStart = Offset(start.x + retraction * cosA, start.y + retraction * sinA)
-                            }
-                            if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") {
-                                lineEnd = Offset(end.x - retraction * cosA, end.y - retraction * sinA)
-                            }
-
-                            if (isSelected) {
-                                val highlightColor = if (isDarkTheme) Color(0xFF64B5F6).copy(alpha = 0.5f) else Color.Blue.copy(alpha = 0.2f)
-                                drawLine(color = highlightColor, start = lineStart, end = lineEnd, strokeWidth = drawStroke + 24f, cap = StrokeCap.Round)
-                            }
-
-                            // Native Hardware Accelerated "Fake Blur" (Collapsed single pass)
-                            if (!isPerformanceMode && !isDarkTheme) {
-                                drawLine(color = shadowColor.copy(alpha = 0.08f), start = lineStart + shadowOffset, end = lineEnd + shadowOffset, strokeWidth = drawStroke + 8f, pathEffect = effect, cap = StrokeCap.Round)
-                            }
-                            
-                            // Main Line
-                            drawLine(color = drawColor, start = lineStart, end = lineEnd, strokeWidth = drawStroke, pathEffect = effect, cap = StrokeCap.Round)
-
-                            fun drawArrow(tip: Offset, base: Offset) {
-                                val angle = atan2(tip.y - base.y, tip.x - base.x)
-                                val arrowLen = 20f + (drawStroke * 1.5f)
-                                val arrowAng = Math.PI / 6
-                                
-                                // Cache trigonometric calls
-                                val cosAng = cos(angle).toFloat()
-                                val sinAng = sin(angle).toFloat()
-                                val cosMinus = cos(angle - arrowAng).toFloat()
-                                val sinMinus = sin(angle - arrowAng).toFloat()
-                                val cosPlus = cos(angle + arrowAng).toFloat()
-                                val sinPlus = sin(angle + arrowAng).toFloat()
-
-                                when (connector.arrowShape) {
-                                    "Open" -> {
-                                        sharedPath.rewind()
-                                        sharedPath.moveTo(tip.x - arrowLen * cosMinus, tip.y - arrowLen * sinMinus)
-                                        sharedPath.lineTo(tip.x, tip.y)
-                                        sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
-                                        
-                                        if (!isPerformanceMode && !isDarkTheme) {
-                                            translate(left = shadowOffset.x, top = shadowOffset.y) {
-                                                drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Stroke(width = drawStroke + 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                            }
-                                        }
-                                        drawPath(sharedPath, drawColor, style = Stroke(width = drawStroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                                    }
-                                    "Filled", "Diamond" -> {
-                                        sharedPath.rewind()
-                                        if (connector.arrowShape == "Filled") {
-                                            sharedPath.moveTo(tip.x, tip.y)
-                                            sharedPath.lineTo(tip.x - arrowLen * cosMinus, tip.y - arrowLen * sinMinus)
-                                            sharedPath.lineTo(tip.x - arrowLen * cosPlus, tip.y - arrowLen * sinPlus)
-                                            sharedPath.close()
-                                        } else {
-                                            val midX = tip.x - (arrowLen / 1.5f) * cosAng
-                                            val midY = tip.y - (arrowLen / 1.5f) * sinAng
-                                            val endX = tip.x - (arrowLen * 1.3f) * cosAng
-                                            val endY = tip.y - (arrowLen * 1.3f) * sinAng
-                                            sharedPath.moveTo(tip.x, tip.y)
-                                            sharedPath.lineTo(midX - (arrowLen / 2) * sinAng, midY + (arrowLen / 2) * cosAng)
-                                            sharedPath.lineTo(endX, endY)
-                                            sharedPath.lineTo(midX + (arrowLen / 2) * sinAng, midY - (arrowLen / 2) * cosAng)
-                                            sharedPath.close()
-                                        }
-                                        
-                                        if (!isPerformanceMode && !isDarkTheme) {
-                                            translate(left = shadowOffset.x, top = shadowOffset.y) {
-                                                drawPath(sharedPath, shadowColor.copy(alpha = 0.08f), style = Fill)
-                                            }
-                                        }
-                                        drawPath(sharedPath, drawColor, style = Fill)
-                                    }
-                                    "Circle" -> {
-                                        val center = Offset(tip.x - (arrowLen / 2) * cosAng, tip.y - (arrowLen / 2) * sinAng)
-                                        if (!isPerformanceMode && !isDarkTheme) {
-                                            drawCircle(color = shadowColor.copy(alpha = 0.08f), radius = (arrowLen / 2) + 4f, center = center + shadowOffset)
-                                        }
-                                        drawCircle(color = drawColor, radius = arrowLen / 2, center = center)
-                                    }
-                                }
-                            }
-                            
-                            // Draw Arrows (Main + Shadow in one pass)
-                            if (connector.arrowDirection == "End" || connector.arrowDirection == "Both") drawArrow(end, start)
-                            if (connector.arrowDirection == "Start" || connector.arrowDirection == "Both") drawArrow(start, end)
-                    }
+        // Pass 2: Draw the selected connector (if any) on top with its halo capsule
+        if (selectedConnectorId != null) {
+            for (i in elements.indices) {
+                val el = elements[i]
+                if (el is CanvasElement.Connector && el.id == selectedConnectorId) {
+                    drawSingleConnector(
+                        connector = el,
+                        elements = elements,
+                        isSelected = true,
+                        isDarkTheme = isDarkTheme,
+                        isPerformanceMode = isPerformanceMode,
+                        dashedEffect = dashedEffect,
+                        dottedEffect = dottedEffect,
+                        sharedPath = sharedPath
+                    )
+                    break
                 }
             }
-        }
-
-        if (needsTransform) {
-            drawIntoCanvas { canvas ->
-                canvas.nativeCanvas.restore()
-            }
-        }
-
-        if (CanvasProfiler.ENABLED) {
-            val elapsed = (System.nanoTime() - drawStart) / 1_000_000f
-            CanvasProfiler.bgDrawTimeSum += elapsed
-            CanvasProfiler.bgDrawCount++
         }
     }
 }

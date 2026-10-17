@@ -1,6 +1,7 @@
 package com.flash.draft.ui.canvas
 
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.Color
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,6 +51,9 @@ class CanvasViewModel(
     val isDarkMode: StateFlow<Boolean> = settingsRepo.getDarkModeFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isDarkMode())
 
+    val isLiquidDarkTheme: StateFlow<Boolean> = settingsRepo.getLiquidDarkThemeFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isLiquidDarkTheme())
+
     val isPerformanceMode: StateFlow<Boolean> = settingsRepo.getPerformanceModeFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isPerformanceMode())
 
@@ -58,6 +62,13 @@ class CanvasViewModel(
 
     val isStylusSupportEnabled: StateFlow<Boolean> = settingsRepo.getStylusSupportFlow()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.isStylusSupportEnabled())
+
+    val recentColors: StateFlow<List<Color>> = settingsRepo.getRecentColorsFlow()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), settingsRepo.getRecentColors())
+
+    fun addRecentColor(color: Color) {
+        settingsRepo.addRecentColor(color)
+    }
 
 
     fun onEvent(event: CanvasUiEvent) {

@@ -39,27 +39,7 @@ fun PdfItem(
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = pdfCard.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(pdfCard.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                // Context menu toggle to view full PDF
-                Row(
-                    modifier = Modifier.clickable {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(Uri.parse(pdfCard.uriString), "application/pdf")
-                                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "No PDF app found", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Launch, contentDescription = "Open File", tint = Color.Blue, modifier = Modifier.size(20.dp))
-                    Text("Open PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Blue)
-                }
-            }
+            PdfToolStack(pdfCard = pdfCard, context = context)
         }
     ) { isLocked ->
         Column(modifier = Modifier.fillMaxSize()) {
@@ -71,6 +51,34 @@ fun PdfItem(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(text = "${pdfCard.fileSize} • PDF", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
+        }
+    }
+}
+
+@Composable
+internal fun PdfToolStack(
+    pdfCard: CanvasElement.PdfCard,
+    context: Context
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Context menu toggle to view full PDF
+        Row(
+            modifier = Modifier.clickable {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.parse(pdfCard.uriString), "application/pdf")
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "No PDF app found", Toast.LENGTH_SHORT).show()
+                }
+            },
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Launch, contentDescription = "Open File", tint = Color.Blue, modifier = Modifier.size(20.dp))
+            Text("Open PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Blue)
         }
     }
 }

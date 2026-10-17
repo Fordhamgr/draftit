@@ -32,6 +32,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val isLiquidDarkTheme by viewModel.isLiquidDarkTheme.collectAsStateWithLifecycle()
     val isPerformanceMode by viewModel.isPerformanceMode.collectAsStateWithLifecycle()
     val framerate by viewModel.framerate.collectAsStateWithLifecycle()
 
@@ -42,11 +43,12 @@ fun SettingsScreen(
     val isHapticFeedbackEnabled by viewModel.isHapticFeedbackEnabled.collectAsStateWithLifecycle()
     val isStylusSupportEnabled by viewModel.isStylusSupportEnabled.collectAsStateWithLifecycle()
 
-    val backgroundColor = if (isDarkMode) Color(0xFF1C1C1E) else Color(0xFFF2F2F7)
-    val surfaceColor = if (isDarkMode) Color(0xFF2C2C2E) else Color.White
-    val textColor = if (isDarkMode) Color.White else Color.Black
-    val secondaryTextColor = if (isDarkMode) Color(0xFFEBEBF5).copy(alpha = 0.6f) else Color(0xFF3C3C43).copy(alpha = 0.6f)
-    val actionBlue = Color(0xFF007AFF)
+    val colorScheme = MaterialTheme.colorScheme
+    val backgroundColor = colorScheme.background
+    val surfaceColor = colorScheme.surfaceContainer
+    val textColor = colorScheme.onSurface
+    val secondaryTextColor = colorScheme.onSurfaceVariant
+    val actionBlue = colorScheme.primary
 
     val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
 
@@ -106,7 +108,16 @@ fun SettingsScreen(
                             icon = Icons.Default.DarkMode,
                             checked = isDarkMode,
                             onCheckedChange = { viewModel.toggleDarkMode(it) },
-                            textColor = textColor
+                            textColor = textColor,
+                            showDivider = true
+                        )
+                        ToggleRow(
+                            label = "Fluid Dark Theme",
+                            icon = Icons.Default.WaterDrop,
+                            checked = isLiquidDarkTheme,
+                            onCheckedChange = { viewModel.toggleLiquidDarkTheme(it) },
+                            textColor = textColor,
+                            showDivider = false
                         )
                     }
                 }
@@ -172,8 +183,8 @@ fun SettingsScreen(
                                     onValueChange = { viewModel.setLiquidFrost(it) },
                                     valueRange = 0f..1f,
                                     steps = 0,
-                                    textColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                                    actionBlue = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                                    textColor = textColor,
+                                    actionBlue = actionBlue,
                                     showDivider = true
                                 )
                             }
@@ -257,6 +268,7 @@ fun ToggleRow(
     textColor: Color,
     showDivider: Boolean = false
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column {
         Row(
             modifier = Modifier
@@ -280,8 +292,8 @@ fun ToggleRow(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = Color(0xFF34C759) // Green
+                    checkedThumbColor = colorScheme.onPrimary,
+                    checkedTrackColor = colorScheme.primary
                 )
             )
         }
@@ -289,7 +301,7 @@ fun ToggleRow(
             HorizontalDivider(
                 modifier = Modifier.padding(start = 56.dp), // align with text
                 thickness = 0.5.dp,
-                color = Color.Gray.copy(alpha = 0.3f)
+                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
             )
         }
     }
@@ -307,6 +319,7 @@ fun SegmentedControlRow(
     actionBlue: Color,
     showDivider: Boolean = false
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column {
         Row(
             modifier = Modifier
@@ -329,7 +342,7 @@ fun SegmentedControlRow(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Gray.copy(alpha = 0.1f))
+                    .background(colorScheme.onSurface.copy(alpha = 0.08f))
                     .padding(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -345,7 +358,7 @@ fun SegmentedControlRow(
                     ) {
                         Text(
                             text = optionLabels[index],
-                            color = if (isSelected) Color.White else textColor.copy(alpha = 0.8f),
+                            color = if (isSelected) colorScheme.onPrimary else textColor.copy(alpha = 0.8f),
                             fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                             textAlign = TextAlign.Center
@@ -358,7 +371,7 @@ fun SegmentedControlRow(
             HorizontalDivider(
                 modifier = Modifier.padding(start = 56.dp),
                 thickness = 0.5.dp,
-                color = Color.Gray.copy(alpha = 0.3f)
+                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
             )
         }
     }
@@ -376,6 +389,7 @@ fun SliderRow(
     actionBlue: Color,
     showDivider: Boolean = false
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column {
         Row(
             modifier = Modifier
@@ -406,9 +420,9 @@ fun SliderRow(
                     valueRange = valueRange,
                     steps = steps,
                     colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
+                        thumbColor = colorScheme.onPrimary,
                         activeTrackColor = actionBlue,
-                        inactiveTrackColor = Color.Gray.copy(alpha = 0.2f),
+                        inactiveTrackColor = colorScheme.surfaceVariant,
                         inactiveTickColor = Color.Transparent,
                         activeTickColor = Color.Transparent
                     ),
@@ -417,14 +431,14 @@ fun SliderRow(
                             modifier = Modifier
                                 .size(24.dp)
                                 .shadow(2.dp, CircleShape, clip = false)
-                                .background(Color.White, CircleShape)
+                                .background(colorScheme.onPrimary, CircleShape)
                         )
                     },
                     track = { sliderState ->
                         SliderDefaults.Track(
                             colors = SliderDefaults.colors(
                                 activeTrackColor = actionBlue,
-                                inactiveTrackColor = Color.Gray.copy(alpha = 0.2f)
+                                inactiveTrackColor = colorScheme.surfaceVariant
                             ),
                             sliderState = sliderState,
                             modifier = Modifier.height(4.dp)
@@ -438,7 +452,7 @@ fun SliderRow(
             HorizontalDivider(
                 modifier = Modifier.padding(start = 56.dp),
                 thickness = 0.5.dp,
-                color = Color.Gray.copy(alpha = 0.3f)
+                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
             )
         }
     }

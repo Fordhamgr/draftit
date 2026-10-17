@@ -12,6 +12,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 val LocalDarkTheme = compositionLocalOf { false }
+val LocalLiquidDarkTheme = compositionLocalOf { true }
 val LocalBackgroundStyle = compositionLocalOf { com.flash.draft.model.BackgroundStyle.Solid }
 val LocalPerformanceMode = compositionLocalOf { false }
 val LocalCurvedConnectors = compositionLocalOf { false }
@@ -90,7 +91,7 @@ fun getElementDimensions(elementId: String, elements: List<CanvasElement>): Size
     return getElementDimensions(el)
 }
 
-fun getRectangleIntersection(centerStart: Offset, centerEnd: Offset, width: Float, height: Float, padding: Float = 25f): Offset {
+fun getRectangleIntersection(centerStart: Offset, centerEnd: Offset, width: Float, height: Float, padding: Float = 0f): Offset {
     val dx = centerEnd.x - centerStart.x
     val dy = centerEnd.y - centerStart.y
     if (dx == 0f && dy == 0f) return centerStart
@@ -101,4 +102,23 @@ fun getRectangleIntersection(centerStart: Offset, centerEnd: Offset, width: Floa
     val intersectScale = min(scaleX, scaleY); val finalScale = min(intersectScale, 1f)
     return Offset(centerStart.x + dx * finalScale, centerStart.y + dy * finalScale)
 }
+
+fun isPointInElementBounds(point: Offset, element: CanvasElement): Boolean {
+    val pos = when (element) {
+        is CanvasElement.StickyNote -> element.position
+        is CanvasElement.ImageCard -> element.position
+        is CanvasElement.PdfCard -> element.position
+        is CanvasElement.CodeBlock -> element.position
+        is CanvasElement.AudioNote -> element.position
+        is CanvasElement.ShapeNode -> element.position
+        is CanvasElement.LabelNode -> element.position
+        is CanvasElement.FrameNode -> element.position
+        is CanvasElement.TaskListNode -> element.position
+        else -> return false
+    }
+    val dim = getElementDimensions(element)
+    return point.x >= pos.x && point.x <= pos.x + dim.width &&
+           point.y >= pos.y && point.y <= pos.y + dim.height
+}
+
 

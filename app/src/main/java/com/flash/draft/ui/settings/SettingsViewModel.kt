@@ -14,6 +14,9 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     val isDarkMode: StateFlow<Boolean> = repository.getDarkModeFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isDarkMode())
 
+    val isLiquidDarkTheme: StateFlow<Boolean> = repository.getLiquidDarkThemeFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isLiquidDarkTheme())
+
     val isPerformanceMode: StateFlow<Boolean> = repository.getPerformanceModeFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isPerformanceMode())
 
@@ -39,6 +42,7 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isStylusSupportEnabled())
 
     fun toggleDarkMode(enabled: Boolean) = repository.setDarkMode(enabled)
+    fun toggleLiquidDarkTheme(enabled: Boolean) = repository.setLiquidDarkTheme(enabled)
     fun togglePerformanceMode(enabled: Boolean) = repository.setPerformanceMode(enabled)
     fun setFramerate(framerate: Int) = repository.setFramerate(framerate)
 
