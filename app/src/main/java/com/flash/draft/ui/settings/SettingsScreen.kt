@@ -1,262 +1,339 @@
 package com.flash.draft.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LensBlur
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.flash.draft.ui.theme.LocalWindowSizeInfo
+import com.flash.draft.ui.theme.WindowWidthClass
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
-    val isLiquidDarkTheme by viewModel.isLiquidDarkTheme.collectAsStateWithLifecycle()
-    val isPerformanceMode by viewModel.isPerformanceMode.collectAsStateWithLifecycle()
-    val framerate by viewModel.framerate.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    SettingsContent(
+        uiState = uiState,
+        onEvent = viewModel::onEvent,
+        onBack = onBack,
+        modifier = modifier
+    )
+}
 
-    val liquidCurve by viewModel.liquidCurve.collectAsStateWithLifecycle()
-    val liquidRefraction by viewModel.liquidRefraction.collectAsStateWithLifecycle()
-    val liquidFrost by viewModel.liquidFrost.collectAsStateWithLifecycle()
-    val undoHistoryLimit by viewModel.undoHistoryLimit.collectAsStateWithLifecycle()
-    val isHapticFeedbackEnabled by viewModel.isHapticFeedbackEnabled.collectAsStateWithLifecycle()
-    val isStylusSupportEnabled by viewModel.isStylusSupportEnabled.collectAsStateWithLifecycle()
-
-    val colorScheme = MaterialTheme.colorScheme
-    val backgroundColor = colorScheme.background
-    val surfaceColor = colorScheme.surfaceContainer
-    val textColor = colorScheme.onSurface
-    val secondaryTextColor = colorScheme.onSurfaceVariant
-    val actionBlue = colorScheme.primary
-
-    val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
-
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsContent(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = if (isTablet) 24.dp else 16.dp)
-                    .padding(top = if (isTablet) 24.dp else 16.dp, bottom = if (isTablet) 16.dp else 8.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onBack,
-                    modifier = Modifier
-                        .size(if (isTablet) 48.dp else 40.dp)
-                        .border(1.dp, textColor.copy(alpha = 0.15f), CircleShape)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBackIos, 
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
                         contentDescription = "Back",
-                        modifier = Modifier
-                            .size(if (isTablet) 20.dp else 16.dp)
-                            .offset(x = 2.dp),
-                        tint = textColor
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Settings",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (isTablet) 28.sp else 22.sp,
-                    color = textColor
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
-        },
-        containerColor = backgroundColor
-    ) { padding ->
-        Box(
+        }
+    ) { paddingValues ->
+        val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val windowSizeInfo = LocalWindowSizeInfo.current
+        val isExpanded = windowSizeInfo.widthClass == WindowWidthClass.EXPANDED
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.TopCenter
+                .padding(paddingValues),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = 32.dp + navBarsBottom
+            ),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = 600.dp)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
-            ) {
-                item {
-                    SettingsGroup(title = "APPEARANCE", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        ToggleRow(
-                            label = "Dark Mode",
-                            icon = Icons.Default.DarkMode,
-                            checked = isDarkMode,
-                            onCheckedChange = { viewModel.toggleDarkMode(it) },
-                            textColor = textColor,
-                            showDivider = true
-                        )
-                        ToggleRow(
-                            label = "Fluid Dark Theme",
-                            icon = Icons.Default.WaterDrop,
-                            checked = isLiquidDarkTheme,
-                            onCheckedChange = { viewModel.toggleLiquidDarkTheme(it) },
-                            textColor = textColor,
-                            showDivider = false
-                        )
-                    }
-                }
-
-                item {
-                    SettingsGroup(title = "PERFORMANCE", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        ToggleRow(
-                            label = "Performance Mode",
-                            icon = Icons.Default.Speed,
-                            checked = isPerformanceMode,
-                            onCheckedChange = { viewModel.togglePerformanceMode(it) },
-                            textColor = textColor,
-                            showDivider = true
-                        )
-                        SegmentedControlRow(
-                            label = "Set framerate",
-                            icon = Icons.Default.Timer,
-                            options = listOf(30, 60, 120, 0),
-                            optionLabels = listOf("30", "60", "120", "Unlocked"),
-                            selectedOption = framerate,
-                            onOptionSelected = { viewModel.setFramerate(it) },
-                            textColor = textColor,
-                            actionBlue = actionBlue,
-                            showDivider = false
-                        )
-                    }
-                }
-
-                item {
-                    SettingsGroup(title = "DRAWING & PHYSICS", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = !isPerformanceMode,
-                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+            item {
+                if (isExpanded) {
+                    Row(
+                        modifier = Modifier
+                            .widthIn(max = 1040.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
-                            Column {
-                                SliderRow(
-                                    label = "Liquid Curve",
-                                    icon = Icons.Default.Timeline,
-                                    value = liquidCurve,
-                                    onValueChange = { viewModel.setLiquidCurve(it) },
-                                    valueRange = 0f..1f,
-                                    steps = 0,
-                                    textColor = textColor,
-                                    actionBlue = actionBlue,
-                                    showDivider = true
-                                )
-                                SliderRow(
-                                    label = "Refraction",
-                                    icon = Icons.Default.LensBlur,
-                                    value = liquidRefraction,
-                                    onValueChange = { viewModel.setLiquidRefraction(it) },
-                                    valueRange = 0f..1f,
-                                    steps = 0,
-                                    textColor = textColor,
-                                    actionBlue = actionBlue,
-                                    showDivider = true
-                                )
-                                SliderRow(
-                                    label = "Frost (Blur)",
-                                    icon = Icons.Default.BlurOn,
-                                    value = liquidFrost,
-                                    onValueChange = { viewModel.setLiquidFrost(it) },
-                                    valueRange = 0f..1f,
-                                    steps = 0,
-                                    textColor = textColor,
-                                    actionBlue = actionBlue,
-                                    showDivider = true
-                                )
-                            }
+                            AppearanceSection(uiState = uiState, onEvent = onEvent)
+                            PerformanceSection(uiState = uiState, onEvent = onEvent)
                         }
-                        SegmentedControlRow(
-                            label = "Undo Limit",
-                            icon = Icons.Default.History,
-                            options = listOf(20, 50, 100, 0),
-                            optionLabels = listOf("20", "50", "100", "No Limit"),
-                            selectedOption = undoHistoryLimit,
-                            onOptionSelected = { viewModel.setUndoHistoryLimit(it) },
-                            textColor = textColor,
-                            actionBlue = actionBlue,
-                            showDivider = false
-                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            DrawingPhysicsSection(uiState = uiState, onEvent = onEvent)
+                            FeedbackSection(uiState = uiState, onEvent = onEvent)
+                            ExperimentalSection(uiState = uiState, onEvent = onEvent)
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 640.dp)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        AppearanceSection(uiState = uiState, onEvent = onEvent)
+                        PerformanceSection(uiState = uiState, onEvent = onEvent)
+                        DrawingPhysicsSection(uiState = uiState, onEvent = onEvent)
+                        FeedbackSection(uiState = uiState, onEvent = onEvent)
+                        ExperimentalSection(uiState = uiState, onEvent = onEvent)
                     }
                 }
-
-                item {
-                    SettingsGroup(title = "FEEDBACK", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        ToggleRow(
-                            label = "Haptic Feedback",
-                            icon = Icons.Default.Vibration,
-                            checked = isHapticFeedbackEnabled,
-                            onCheckedChange = { viewModel.toggleHapticFeedback(it) },
-                            textColor = textColor
-                        )
-                    }
-                }
-
-                item {
-                    SettingsGroup(title = "EXPERIMENTAL", surfaceColor = surfaceColor, secondaryTextColor = secondaryTextColor) {
-                        ToggleRow(
-                            label = "Stylus Support",
-                            icon = Icons.Default.Create,
-                            checked = isStylusSupportEnabled,
-                            onCheckedChange = { viewModel.toggleStylusSupport(it) },
-                            textColor = textColor
-                        )
-                    }
-                }
-
-                item { Spacer(modifier = Modifier.height(32.dp)) }
             }
         }
     }
 }
 
 @Composable
+private fun AppearanceSection(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsGroup(title = "Appearance", modifier = modifier) {
+        ToggleRow(
+            label = "Dark Mode",
+            icon = Icons.Default.DarkMode,
+            checked = uiState.isDarkMode,
+            onCheckedChange = { onEvent(SettingsUiEvent.ToggleDarkMode(it)) },
+            showDivider = true
+        )
+        ToggleRow(
+            label = "Fluid Dark Theme",
+            icon = Icons.Default.WaterDrop,
+            checked = uiState.isLiquidDarkTheme,
+            onCheckedChange = { onEvent(SettingsUiEvent.ToggleLiquidDarkTheme(it)) },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun PerformanceSection(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsGroup(title = "Performance", modifier = modifier) {
+        ToggleRow(
+            label = "Performance Mode",
+            icon = Icons.Default.Speed,
+            checked = uiState.isPerformanceMode,
+            onCheckedChange = { onEvent(SettingsUiEvent.TogglePerformanceMode(it)) },
+            showDivider = true
+        )
+        SegmentedControlRow(
+            label = "Set framerate",
+            icon = Icons.Default.Timer,
+            options = listOf(30, 60, 120, 0),
+            optionLabels = listOf("30", "60", "120", "Unlocked"),
+            selectedOption = uiState.framerate,
+            onOptionSelected = { onEvent(SettingsUiEvent.SetFramerate(it)) },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun DrawingPhysicsSection(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsGroup(title = "Drawing & physics", modifier = modifier) {
+        AnimatedVisibility(
+            visible = !uiState.isPerformanceMode,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column {
+                SliderRow(
+                    label = "Liquid Curve",
+                    icon = Icons.Default.Timeline,
+                    value = uiState.liquidCurve,
+                    onValueChange = { onEvent(SettingsUiEvent.SetLiquidCurve(it)) },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    showDivider = true
+                )
+                SliderRow(
+                    label = "Refraction",
+                    icon = Icons.Default.LensBlur,
+                    value = uiState.liquidRefraction,
+                    onValueChange = { onEvent(SettingsUiEvent.SetLiquidRefraction(it)) },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    showDivider = true
+                )
+                SliderRow(
+                    label = "Frost (Blur)",
+                    icon = Icons.Default.BlurOn,
+                    value = uiState.liquidFrost,
+                    onValueChange = { onEvent(SettingsUiEvent.SetLiquidFrost(it)) },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    showDivider = true
+                )
+            }
+        }
+        SegmentedControlRow(
+            label = "Undo Limit",
+            icon = Icons.Default.History,
+            options = listOf(20, 50, 100, 0),
+            optionLabels = listOf("20", "50", "100", "No limit"),
+            selectedOption = uiState.undoHistoryLimit,
+            onOptionSelected = { onEvent(SettingsUiEvent.SetUndoHistoryLimit(it)) },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun FeedbackSection(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsGroup(title = "Feedback", modifier = modifier) {
+        ToggleRow(
+            label = "Haptic Feedback",
+            icon = Icons.Default.Vibration,
+            checked = uiState.isHapticFeedbackEnabled,
+            onCheckedChange = { onEvent(SettingsUiEvent.ToggleHapticFeedback(it)) },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun ExperimentalSection(
+    uiState: SettingsUiState,
+    onEvent: (SettingsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsGroup(title = "Experimental", modifier = modifier) {
+        ToggleRow(
+            label = "Stylus Support",
+            icon = Icons.Default.Create,
+            checked = uiState.isStylusSupportEnabled,
+            onCheckedChange = { onEvent(SettingsUiEvent.ToggleStylusSupport(it)) },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
 fun SettingsGroup(
     title: String,
-    surfaceColor: Color,
-    secondaryTextColor: Color,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(
             text = title,
             fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = secondaryTextColor,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(surfaceColor)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
-            content()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                content()
+            }
         }
     }
+}
+
+@Composable
+fun SettingsDivider(modifier: Modifier = Modifier) {
+    HorizontalDivider(
+        modifier = modifier.padding(start = 52.dp, end = 16.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    )
 }
 
 @Composable
@@ -265,44 +342,57 @@ fun ToggleRow(
     icon: ImageVector,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    textColor: Color,
+    modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    Column {
+    val isDark = isSystemInDarkTheme()
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onCheckedChange(!checked) }
+                .defaultMinSize(minHeight = 56.dp)
+                .toggleable(
+                    value = checked,
+                    onValueChange = onCheckedChange,
+                    role = Role.Switch
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = textColor.copy(alpha = 0.8f),
-                    modifier = Modifier.size(24.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
-                Text(text = label, color = textColor, fontSize = 17.sp)
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal
+                )
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = null,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = colorScheme.onPrimary,
-                    checkedTrackColor = colorScheme.primary
+                    checkedThumbColor = Color.White,
+                    uncheckedThumbColor = Color.White,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedTrackColor = if (isDark) Color(0xFF4B5563) else Color(0xFFD1D5DB),
+                    checkedBorderColor = Color.Transparent,
+                    uncheckedBorderColor = Color.Transparent
                 )
             )
         }
         if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 56.dp), // align with text
-                thickness = 0.5.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
+            SettingsDivider()
         }
     }
 }
@@ -315,145 +405,174 @@ fun SegmentedControlRow(
     optionLabels: List<String>,
     selectedOption: Int,
     onOptionSelected: (Int) -> Unit,
-    textColor: Color,
-    actionBlue: Color,
+    modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    Column {
-        Row(
+    val isDark = isSystemInDarkTheme()
+    Column(modifier = modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            // Top line: icon (20dp) + label (16sp, onSurface)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = textColor.copy(alpha = 0.8f),
-                    modifier = Modifier.size(24.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
-                Text(text = label, color = textColor, fontSize = 17.sp)
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal
+                )
             }
-            
-            // Segmented Control Boxes
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Bottom line: full-width segmented track (44dp tall, 12dp corners)
+            val trackColor = if (isDark) Color(0xFF27272A) else Color(0xFFF1F5F9)
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(colorScheme.onSurface.copy(alpha = 0.08f))
-                    .padding(2.dp),
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(trackColor)
+                    .padding(3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 options.forEachIndexed { index, option ->
                     val isSelected = selectedOption == option
+                    val optionLabel = optionLabels.getOrNull(index) ?: option.toString()
+
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isSelected) actionBlue else Color.Transparent)
-                            .clickable { onOptionSelected(option) }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .then(
+                                if (isSelected) {
+                                    Modifier
+                                        .shadow(2.dp, RoundedCornerShape(10.dp), clip = false)
+                                        .background(Color.White, RoundedCornerShape(10.dp))
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onOptionSelected(option) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = optionLabels[index],
-                            color = if (isSelected) colorScheme.onPrimary else textColor.copy(alpha = 0.8f),
+                            text = optionLabel,
+                            color = if (isSelected) {
+                                Color(0xFF0F172A)
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                             fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
             }
         }
+
         if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 56.dp),
-                thickness = 0.5.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
+            SettingsDivider()
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SliderRow(
     label: String,
     icon: ImageVector,
     value: Float,
     onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    textColor: Color,
-    actionBlue: Color,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    steps: Int = 0,
     showDivider: Boolean = false
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    Column {
-        Row(
+    val isDark = isSystemInDarkTheme()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val inactiveTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0)
+    val percentText = (value * 100).roundToInt().toString()
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            // Top line: icon + label on left, integer percentage value ("55", "0") on right
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = textColor.copy(alpha = 0.8f),
-                    modifier = Modifier.size(24.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
-                Text(text = label, color = textColor, fontSize = 17.sp)
-            }
-            
-            // Constrained slider
-            Box(
-                modifier = Modifier.width(140.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                @OptIn(ExperimentalMaterial3Api::class)
-                Slider(
-                    value = value,
-                    onValueChange = onValueChange,
-                    valueRange = valueRange,
-                    steps = steps,
-                    colors = SliderDefaults.colors(
-                        thumbColor = colorScheme.onPrimary,
-                        activeTrackColor = actionBlue,
-                        inactiveTrackColor = colorScheme.surfaceVariant,
-                        inactiveTickColor = Color.Transparent,
-                        activeTickColor = Color.Transparent
-                    ),
-                    thumb = {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .shadow(2.dp, CircleShape, clip = false)
-                                .background(colorScheme.onPrimary, CircleShape)
-                        )
-                    },
-                    track = { sliderState ->
-                        SliderDefaults.Track(
-                            colors = SliderDefaults.colors(
-                                activeTrackColor = actionBlue,
-                                inactiveTrackColor = colorScheme.surfaceVariant
-                            ),
-                            sliderState = sliderState,
-                            modifier = Modifier.height(4.dp)
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = percentText,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 56.dp),
-                thickness = 0.5.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Bottom line: full-width slider, primary blue active track, light gray inactive track, solid blue circular thumb
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps,
+                modifier = Modifier.fillMaxWidth(),
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .shadow(2.dp, CircleShape, clip = false)
+                            .background(primaryColor, CircleShape)
+                    )
+                },
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = primaryColor,
+                            inactiveTrackColor = inactiveTrackColor
+                        ),
+                        sliderState = sliderState,
+                        modifier = Modifier.height(4.dp)
+                    )
+                }
             )
+        }
+
+        if (showDivider) {
+            SettingsDivider()
         }
     }
 }
