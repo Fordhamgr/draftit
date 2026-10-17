@@ -39,7 +39,8 @@ fun ShapeItem(
     shapeNode: CanvasElement.ShapeNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.ShapeNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null,
-    onSendToBack: (() -> Unit)? = null, onBringToFront: (() -> Unit)? = null
+    onSendToBack: (() -> Unit)? = null, onBringToFront: (() -> Unit)? = null,
+    onSelectWithOffset: ((Offset) -> Unit)? = null
 ) {
     var isDragging by remember { mutableStateOf(false) }
 
@@ -48,7 +49,7 @@ fun ShapeItem(
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
         isLocked = shapeNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(shapeNode.copy(isLocked = it)) },
         isFullyDraggable = false, isChildDragging = isDragging,
-        onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
+        onSelect = onSelect, onSelectWithOffset = onSelectWithOffset, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         hasDefaultBackground = false,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = shapeNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(shapeNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
