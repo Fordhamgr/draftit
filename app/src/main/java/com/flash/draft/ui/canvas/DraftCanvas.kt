@@ -102,6 +102,7 @@ import com.flash.draft.ui.canvas.item.getCenterPoint
 import com.flash.draft.ui.canvas.item.getElementDimensions
 import com.flash.draft.ui.canvas.item.getRectangleIntersection
 import com.flash.draft.ui.canvas.item.isPointInElementBounds
+import com.flash.draft.ui.canvas.item.findHitConnector
 
 // --- LIQUID PLUGIN IMPORTS ---
 import io.github.fletchmckee.liquid.LiquidState
@@ -920,30 +921,23 @@ fun DraftCanvas(
                     detectTapGestures(
                         onTap = { tapPos ->
                             val worldTap = ViewportMath.screenToWorld(tapPos, Offset(offsetX, offsetY), scale)
-                            var tappedConnector: CanvasElement.Connector? = null
-                            val isTappingCard = elements.any { el ->
-                                el !is CanvasElement.Connector && el !is CanvasElement.Sketch && isPointInElementBounds(worldTap, el)
-                            }
-                            if (!isTappingCard) {
-                                for (el in elements) {
-                                    if (el is CanvasElement.Connector) {
-                                        val centerStart = getCenterPoint(el.startId, elements); val centerEnd = getCenterPoint(el.endId, elements)
-                                        if (centerStart != Offset.Unspecified && centerEnd != Offset.Unspecified) {
-                                            val startDim = getElementDimensions(el.startId, elements); val endDim = getElementDimensions(el.endId, elements)
-                                            val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 0f); val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 0f)
-                                            val hitDist = distancePointToSegment(worldTap, start, end)
-                                            if (hitDist < (40f / scale)) {
-                                                tappedConnector = el
-                                                break
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if (tappedConnector != null) {
-                                selectedConnectorId = tappedConnector.id; selectedNoteId = null; selectedGroupIds = emptySet()
+                            val hitConnector = findHitConnector(worldTap, elements, (24f / scale).coerceIn(12f, 120f))
+                            if (hitConnector != null) {
+                                selectedConnectorId = hitConnector.id
+                                selectedNoteId = null
+                                selectedGroupIds = emptySet()
                             } else {
-                                selectedConnectorId = null; selectedNoteId = null; connectingStartNodeId = null; isConnectingMode = false; selectedGroupIds = emptySet(); focusManager.clearFocus()
+                                val isTappingCard = elements.any { el ->
+                                    el !is CanvasElement.Connector && el !is CanvasElement.Sketch && isPointInElementBounds(worldTap, el)
+                                }
+                                if (!isTappingCard) {
+                                    selectedConnectorId = null
+                                    selectedNoteId = null
+                                    connectingStartNodeId = null
+                                    isConnectingMode = false
+                                    selectedGroupIds = emptySet()
+                                    focusManager.clearFocus()
+                                }
                             }
                         }
                     )
@@ -1030,7 +1024,10 @@ fun DraftCanvas(
                     onResetConnectingStartNodeId = { connectingStartNodeId = null },
                     onResetIsConnectingMode = { isConnectingMode = false },
                     onUpdateSelectedGroupIds = { updatedGroupIds: Set<String> -> selectedGroupIds = updatedGroupIds },
-                    onUpdateSelectedNoteId = { updatedSelectedNoteId: String? -> selectedNoteId = updatedSelectedNoteId },
+                    onUpdateSelectedNoteId = { updatedSelectedNoteId: String? ->
+                        selectedNoteId = updatedSelectedNoteId
+                        if (updatedSelectedNoteId != null) selectedConnectorId = null
+                    },
                     onUpdateConnectingStartNodeId = { updatedConnectingStartNodeId: String? -> connectingStartNodeId = updatedConnectingStartNodeId },
                     onUpdateScaleAndOffset = { newScale: Float, newOffset: Offset -> scale = newScale; offsetX = newOffset.x; offsetY = newOffset.y },
                     onStartConnection = { startNodeId: String -> 
@@ -1044,7 +1041,8 @@ fun DraftCanvas(
                     onNavigateToBoard = onNavigateToBoard,
                     isCanvasLocked = isCanvasLocked,
                     highlightedElementId = newlySpawnedElementId,
-                    selectedConnectorId = selectedConnectorId
+                    selectedConnectorId = selectedConnectorId,
+                    onUpdateSelectedConnectorId = { selectedConnectorId = it }
                 )
 
                         CanvasForegroundDrawPipeline(

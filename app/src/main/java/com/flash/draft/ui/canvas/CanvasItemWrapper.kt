@@ -76,11 +76,13 @@ fun CanvasItemWrapper(
     onSelect: () -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
     onDelete: () -> Unit, onSaveRequest: () -> Unit,
     onDuplicate: (() -> Unit)? = null,
+    onSelectWithOffset: ((Offset) -> Unit)? = null,
     menuContentPadding: Dp = 16.dp,
     renderSelectionChrome: Boolean = false,
     customMenuContent: (@Composable () -> Unit)? = null, content: @Composable (isLocked: Boolean) -> Unit
 ) {
     val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnSelectWithOffset by rememberUpdatedState(onSelectWithOffset)
     val currentOnPositionDelta by rememberUpdatedState(onPositionDelta)
     val currentOnSizeDelta by rememberUpdatedState(onSizeDelta)
     val currentOnSaveRequest by rememberUpdatedState(onSaveRequest)
@@ -173,7 +175,19 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming && !isCanvasLocked) currentOnSelect() }) }
+                .pointerInput(isLocked) {
+                    detectTapGestures(
+                        onTap = { localOffset ->
+                            if (!isMultiTouch && !isZooming && !isCanvasLocked) {
+                                if (currentOnSelectWithOffset != null) {
+                                    currentOnSelectWithOffset?.invoke(localOffset)
+                                } else {
+                                    currentOnSelect()
+                                }
+                            }
+                        }
+                    )
+                }
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {

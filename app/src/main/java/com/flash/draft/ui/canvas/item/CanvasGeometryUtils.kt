@@ -121,4 +121,37 @@ fun isPointInElementBounds(point: Offset, element: CanvasElement): Boolean {
            point.y >= pos.y && point.y <= pos.y + dim.height
 }
 
+fun findHitConnector(
+    worldPoint: Offset,
+    elements: List<CanvasElement>,
+    thresholdPx: Float
+): CanvasElement.Connector? {
+    for (i in elements.indices.reversed()) {
+        val el = elements[i]
+        if (el is CanvasElement.Connector) {
+            val startEl = elements.find { it.id == el.startId } ?: continue
+            val endEl = elements.find { it.id == el.endId } ?: continue
+            val centerStart = getCenterPoint(startEl)
+            val centerEnd = getCenterPoint(endEl)
+            if (centerStart == Offset.Unspecified || centerEnd == Offset.Unspecified) continue
+
+            val startDim = getElementDimensions(startEl)
+            val endDim = getElementDimensions(endEl)
+            val start = getRectangleIntersection(centerStart, centerEnd, startDim.width, startDim.height, 0f)
+            val end = getRectangleIntersection(centerEnd, centerStart, endDim.width, endDim.height, 0f)
+
+            val dist = distancePointToSegment(worldPoint, start, end)
+            val arrowLen = (16f + el.strokeWidth * 1.5f).coerceAtLeast(15f)
+            val distToStart = (worldPoint - start).getDistance()
+            val distToEnd = (worldPoint - end).getDistance()
+
+            if (dist <= thresholdPx || distToStart <= arrowLen || distToEnd <= arrowLen) {
+                return el
+            }
+        }
+    }
+    return null
+}
+
+
 

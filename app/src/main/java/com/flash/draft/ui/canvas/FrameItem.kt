@@ -25,7 +25,8 @@ import com.flash.draft.model.CanvasElement
 fun FrameItem(
     frameNode: CanvasElement.FrameNode, scale: Float, offset: Offset, isSelected: Boolean, isConnecting: Boolean, isConnectionTarget: Boolean = false, isCanvasLocked: Boolean = false, onConnectRequest: () -> Unit = {},
     onUpdate: (CanvasElement.FrameNode) -> Unit, onPositionDelta: (Offset) -> Unit, onSizeDelta: (Offset) -> Unit,
-    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null
+    onSaveRequest: () -> Unit, onDelete: () -> Unit, onSelect: () -> Unit, onDuplicate: (() -> Unit)? = null,
+    onSelectWithOffset: ((Offset) -> Unit)? = null
 ) {
     CanvasItemWrapper(
         position = frameNode.position, width = frameNode.width, height = frameNode.height,
@@ -33,7 +34,7 @@ fun FrameItem(
         isLocked = frameNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(frameNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // Transparent center!
         isFullyDraggable = true,
-        onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
+        onSelect = onSelect, onSelectWithOffset = onSelectWithOffset, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = frameNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(frameNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         customMenuContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
