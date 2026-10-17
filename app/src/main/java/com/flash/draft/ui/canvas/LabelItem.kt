@@ -35,9 +35,11 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,6 +60,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -65,7 +68,10 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -104,22 +110,67 @@ fun LabelItem(
         }
     }
 
-    var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val focusRequester = androidx.compose.runtime.remember { FocusRequester() }
+    var isDragging by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(false) }
+    var lastTapTimestamp by remember { mutableLongStateOf(0L) }
+    var textFieldValue by remember(labelNode.id) {
+        mutableStateOf(TextFieldValue(labelNode.text, TextRange(labelNode.text.length)))
+    }
+    val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
-            focusRequester.requestFocus()
-            keyboardController?.show()
+    // Sync external changes to labelNode.text (e.g. undo/redo)
+    LaunchedEffect(labelNode.text) {
+        if (labelNode.text != textFieldValue.text) {
+            textFieldValue = textFieldValue.copy(
+                text = labelNode.text,
+                selection = TextRange(labelNode.text.length)
+            )
         }
     }
+
+    // Dismiss edit mode on system back
+    BackHandler(enabled = isEditing) {
+        isEditing = false
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        onSaveRequest()
+    }
+
+    // Handle deselection, canvas lock, or item lock
+    LaunchedEffect(isSelected, isCanvasLocked, labelNode.isLocked) {
+        if (!isSelected || isCanvasLocked || labelNode.isLocked) {
+            if (isEditing) {
+                isEditing = false
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                onSaveRequest()
+            }
+        }
+    }
+
+    // Handle isEditing focus and keyboard
+    LaunchedEffect(isEditing) {
+        if (isEditing) {
+            textFieldValue = textFieldValue.copy(selection = TextRange(textFieldValue.text.length))
+            delay(50)
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+
     CanvasItemWrapper(
         position = labelNode.position, width = labelNode.width, height = labelNode.height,
         scale = scale, canvasOffset = offset, isSelected = isSelected, isConnecting = isConnecting, isConnectionTarget = isConnectionTarget, isCanvasLocked = isCanvasLocked, onConnectRequest = onConnectRequest,
         isLocked = labelNode.isLocked || isCanvasLocked, onLockedChange = { onUpdate(labelNode.copy(isLocked = it)) },
         hasDefaultBackground = false, // <-- Makes it transparent!
-        isFullyDraggable = false, isChildDragging = isDragging, // Critical for text editing
+        isFullyDraggable = false,
+        isFullyTappable = false,
+        isChildDragging = isDragging, // Critical for text editing
         onSelect = onSelect, onPositionDelta = onPositionDelta, onSizeDelta = onSizeDelta,
         onDelete = onDelete, onSaveRequest = onSaveRequest, onDuplicate = onDuplicate, hyperlinkTarget = labelNode.hyperlinkTarget, onLinkUpdate = { newTarget -> onUpdate(labelNode.copy(hyperlinkTarget = newTarget)); onSaveRequest() },
         menuContentPadding = 14.dp,
@@ -174,27 +225,57 @@ fun LabelItem(
                     } else Modifier
                 )
                 .background(getAdaptiveColor(labelNode.backgroundColor, isDark), cornerShape)
-                .pointerInput(isSelected, isLocked) {
-                    if (!isSelected) {
-                        detectDragGestures(
-                            onDragStart = { isDragging = true; onSelect() },
-                            onDragEnd = { if (!isLocked) onSaveRequest(); isDragging = false },
-                            onDragCancel = { if (!isLocked) onSaveRequest(); isDragging = false },
-                            onDrag = { change, dragAmount -> 
-                                if (!isLocked) {
-                                    change.consume()
-                                    onPositionDelta(dragAmount)
-                                }
+                .then(
+                    if (!isEditing && !isLocked) {
+                        Modifier
+                            .pointerInput(isSelected, isLocked) {
+                                detectTapGestures(
+                                    onTap = {
+                                        val now = System.currentTimeMillis()
+                                        if (isSelected || (now - lastTapTimestamp < 350L)) {
+                                            lastTapTimestamp = 0L
+                                            isEditing = true
+                                        } else {
+                                            lastTapTimestamp = now
+                                            onSelect()
+                                        }
+                                    }
+                                )
                             }
-                        )
-                    }
-                }
+                            .pointerInput(isLocked) {
+                                detectDragGestures(
+                                    onDragStart = { 
+                                        lastTapTimestamp = 0L
+                                        isDragging = true
+                                        if (!isSelected) onSelect() 
+                                    },
+                                    onDragEnd = { 
+                                        if (!isLocked) onSaveRequest()
+                                        isDragging = false 
+                                    },
+                                    onDragCancel = { 
+                                        if (!isLocked) onSaveRequest()
+                                        isDragging = false 
+                                    },
+                                    onDrag = { change, dragAmount -> 
+                                        if (!isLocked) {
+                                            change.consume()
+                                            onPositionDelta(dragAmount)
+                                        }
+                                    }
+                                )
+                            }
+                    } else Modifier
+                )
         ) {
             // The Text Field
             BasicTextField(
-                value = labelNode.text,
-                onValueChange = { onUpdate(labelNode.copy(text = it)) },
-                enabled = isSelected,
+                value = textFieldValue,
+                onValueChange = { newValue ->
+                    textFieldValue = newValue
+                    onUpdate(labelNode.copy(text = newValue.text))
+                },
+                enabled = isEditing,
                 cursorBrush = SolidColor(resolvedColor),
                 modifier = Modifier
                     .fillMaxSize()
