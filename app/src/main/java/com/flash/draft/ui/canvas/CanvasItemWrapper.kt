@@ -68,6 +68,7 @@ import kotlin.math.roundToInt
 fun CanvasItemWrapper(
     position: Offset, width: Float, height: Float, scale: Float, canvasOffset: Offset,
     isSelected: Boolean, isConnecting: Boolean, isLocked: Boolean = false, onLockedChange: (Boolean) -> Unit = {}, isFullyDraggable: Boolean = true,
+    isFullyTappable: Boolean = true,
     isChildDragging: Boolean = false,
     isCanvasLocked: Boolean = false,
     isConnectionTarget: Boolean = false, onConnectRequest: () -> Unit = {},
@@ -173,7 +174,11 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-                .pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming && !isCanvasLocked) currentOnSelect() }) }
+                .then(
+                    if (isFullyTappable) {
+                        Modifier.pointerInput(isLocked) { detectTapGestures(onTap = { if (!isMultiTouch && !isZooming && !isCanvasLocked) currentOnSelect() }) }
+                    } else Modifier
+                )
                 .then(
                     if (isFullyDraggable) {
                         Modifier.pointerInput(isLocked) {
