@@ -101,6 +101,7 @@ fun WelcomeHero(
     isActive: Boolean,
     modifier: Modifier = Modifier,
     isReducedMotion: Boolean = false,
+    isLandscape: Boolean = false,
     previewProgress: Float? = if (LocalInspectionMode.current) 1f else null
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -197,6 +198,7 @@ fun WelcomeHero(
 
     OnboardingHeroContainer(
         contentDescriptionText = stringResource(R.string.onboarding_welcome_cd),
+        isLandscape = isLandscape,
         modifier = modifier
     ) {
         // --- 1. CONNECTORS CANVAS (Under blocks) ---

@@ -92,6 +92,7 @@ fun BlocksHero(
     isActive: Boolean,
     modifier: Modifier = Modifier,
     isReducedMotion: Boolean = false,
+    isLandscape: Boolean = false,
     previewProgress: Float? = if (LocalInspectionMode.current) 1f else null
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -159,6 +160,7 @@ fun BlocksHero(
 
     OnboardingHeroContainer(
         contentDescriptionText = stringResource(R.string.onboarding_blocks_cd),
+        isLandscape = isLandscape,
         modifier = modifier
     ) {
         // Render each of the 6 tiles

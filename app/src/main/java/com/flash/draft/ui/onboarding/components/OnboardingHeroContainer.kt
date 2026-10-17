@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -38,7 +37,10 @@ val HeroDotColor = Color(0xFFD3D8E1)
  * Responsive Hero Container:
  * Maintains the exact 358:340 aspect ratio, renders the background dot grid,
  * applies a 28dp rounded corner clip and 1dp border, and scales child contents
- * proportionally to fit any screen width without clipping.
+ * proportionally in 2D to fit any screen dimensions without clipping.
+ *
+ * In landscape, `matchHeightConstraintsFirst = true` bounds container height
+ * to prevent viewport overflow.
  *
  * NOTE: To replace Compose illustrations with Lottie in the future,
  * render the LottieAnimation composable directly inside [content].
@@ -47,19 +49,23 @@ val HeroDotColor = Color(0xFFD3D8E1)
 fun OnboardingHeroContainer(
     contentDescriptionText: String,
     modifier: Modifier = Modifier,
+    isLandscape: Boolean = false,
     content: @Composable BoxScope.(scale: Float) -> Unit
 ) {
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(HERO_DESIGN_WIDTH / HERO_DESIGN_HEIGHT, matchHeightConstraintsFirst = false)
+            .aspectRatio(HERO_DESIGN_WIDTH / HERO_DESIGN_HEIGHT, matchHeightConstraintsFirst = isLandscape)
             .clip(RoundedCornerShape(HERO_CORNER_RADIUS.dp))
             .border(1.dp, HeroBorder, RoundedCornerShape(HERO_CORNER_RADIUS.dp))
             .semantics { contentDescription = contentDescriptionText },
         contentAlignment = Alignment.Center
     ) {
         val containerWidth = maxWidth.value
-        val scale = (containerWidth / HERO_DESIGN_WIDTH).coerceAtMost(1f)
+        val containerHeight = maxHeight.value
+        val scale = minOf(
+            containerWidth / HERO_DESIGN_WIDTH,
+            containerHeight / HERO_DESIGN_HEIGHT
+        ).coerceAtMost(1f)
 
         // 1. Dot Grid Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
