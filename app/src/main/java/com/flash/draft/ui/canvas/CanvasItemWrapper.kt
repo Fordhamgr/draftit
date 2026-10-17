@@ -176,7 +176,6 @@ fun CanvasItemWrapper(
             modifier = Modifier
                 .requiredSize(width.dp, height.dp)
                 .background(Color.Transparent)
-<<<<<<< HEAD
                 .then(
                     if (isFullyTappable) {
                         Modifier.pointerInput(isLocked) {
