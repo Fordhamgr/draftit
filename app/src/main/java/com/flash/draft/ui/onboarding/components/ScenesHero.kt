@@ -91,6 +91,7 @@ fun ScenesHero(
     isActive: Boolean,
     modifier: Modifier = Modifier,
     isReducedMotion: Boolean = false,
+    isLandscape: Boolean = false,
     previewProgress: Float? = if (LocalInspectionMode.current) 1f else null
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -189,7 +190,8 @@ fun ScenesHero(
 
     OnboardingHeroContainer(
         contentDescriptionText = stringResource(R.string.onboarding_scenes_cd),
-        modifier = modifier
+        modifier = modifier,
+        isLandscape = isLandscape
     ) {
         // --- 1. DRAWING CARD (24, 24, 310x196) ---
         val cProgress = if (previewProgress != null || isReducedMotion) 1f else cardProgress.value

@@ -12,19 +12,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -65,6 +71,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -145,7 +152,7 @@ fun OnboardingScreen(
 
 /**
  * Pure stateless Onboarding UI content.
- * Contains ZERO ViewModel references. Hoists state and event lambdas.
+ * Contains ZERO ViewModel references. Adapts across Phones, Portrait Tablets, and Landscape Two-Pane displays.
  */
 @Composable
 fun OnboardingContent(
@@ -157,174 +164,214 @@ fun OnboardingContent(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val primaryColor = MaterialTheme.colorScheme.primary
+    val layoutConfig = rememberOnboardingLayoutConfig()
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = layoutConfig.horizontalPadding)
+                .padding(bottom = layoutConfig.bottomPadding),
+            contentAlignment = Alignment.Center
         ) {
-            // --- 1. SHARED HEADER (Height 44dp) ---
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxSize()
+                    .then(
+                        if (layoutConfig.maxContainerWidth != Dp.Unspecified) {
+                            Modifier.widthIn(max = layoutConfig.maxContainerWidth)
+                        } else {
+                            Modifier
+                        }
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Left: App Icon (34dp, 10dp radius) + "Draft It" Wordmark (19sp bold)
+                // --- 1. PERSISTENT HEADER (Height 44dp) ---
                 Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.applogo),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                    )
-                    Text(
-                        text = "Draft It",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
-                }
-
-                // Right: "Skip" button (Pages 0 & 1 only; invisible & non-clickable on Page 2)
-                val isSkipVisible = pagerState.currentPage < 2
-                Box(
-                    modifier = Modifier.size(width = 60.dp, height = 44.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    TextButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onEvent(OnboardingUiEvent.SkipClicked)
-                        },
-                        enabled = isSkipVisible && uiState.isActionEnabled,
-                        modifier = Modifier
-                            .graphicsLayer { alpha = if (isSkipVisible) 1f else 0f }
-                            .then(
-                                if (!isSkipVisible) Modifier.clearAndSetSemantics { } else Modifier
-                            )
+                    // Left: App Icon (34dp, 10dp radius) + "Draft It" Wordmark (19sp bold)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.applogo),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                        )
                         Text(
-                            text = stringResource(R.string.onboarding_skip),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = primaryColor
+                            text = "Draft It",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
                             )
                         )
                     }
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- 2. HORIZONTAL PAGER (Hero + Copy per page) ---
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) { page ->
-                OnboardingPageBody(
-                    page = page,
-                    isActive = pagerState.currentPage == page,
-                    isReducedMotion = uiState.isReducedMotion
-                )
-            }
-
-            // --- 3. PAGE INDICATOR (3 dots: 8dp inactive, 24dp active theme pill) ---
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 24.dp)
-            ) {
-                repeat(uiState.totalPages) { index ->
-                    val isSelected = index == pagerState.currentPage
-                    val dotWidth by animateDpAsState(
-                        targetValue = if (isSelected) 24.dp else 8.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        label = "indicator_dot_width"
-                    )
-                    val dotColor by animateColorAsState(
-                        targetValue = if (isSelected) primaryColor else IndicatorInactive,
-                        label = "indicator_dot_color"
-                    )
-
+                    // Right: "Skip" button (Pages 0 & 1 only; invisible & non-clickable on Page 2)
+                    val isSkipVisible = pagerState.currentPage < 2
                     Box(
-                        modifier = Modifier
-                            .height(8.dp)
-                            .width(dotWidth)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                            .clickable {
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        TextButton(
+                            onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(index)
-                                }
-                            }
-                    )
+                                onEvent(OnboardingUiEvent.SkipClicked)
+                            },
+                            enabled = isSkipVisible && uiState.isActionEnabled,
+                            modifier = Modifier
+                                .graphicsLayer { alpha = if (isSkipVisible) 1f else 0f }
+                                .then(
+                                    if (!isSkipVisible) Modifier.clearAndSetSemantics { } else Modifier
+                                )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.onboarding_skip),
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = primaryColor
+                                )
+                            )
+                        }
+                    }
                 }
-            }
 
-            // --- 4. PRIMARY BOTTOM CTA BUTTON (56dp tall, 18dp corner radius) ---
-            val buttonText = when (pagerState.currentPage) {
-                0 -> stringResource(R.string.onboarding_btn_get_started)
-                1 -> stringResource(R.string.onboarding_btn_continue)
-                else -> stringResource(R.string.onboarding_btn_start_creating)
-            }
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Button(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEvent(OnboardingUiEvent.NextClicked)
-                },
-                enabled = uiState.isActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .shadow(8.dp, RoundedCornerShape(18.dp), spotColor = primaryColor.copy(alpha = 0.35f)),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor,
-                    contentColor = Color.White
-                )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = buttonText,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                // --- 2. HORIZONTAL PAGER (Swiping Content Only) ---
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) { page ->
+                    if (layoutConfig.isTwoPane) {
+                        TwoPaneOnboardingPage(
+                            page = page,
+                            isActive = pagerState.currentPage == page,
+                            isReducedMotion = uiState.isReducedMotion
                         )
+                    } else {
+                        SingleColumnOnboardingPage(
+                            page = page,
+                            isActive = pagerState.currentPage == page,
+                            isReducedMotion = uiState.isReducedMotion,
+                            config = layoutConfig
+                        )
+                    }
+                }
+
+                // --- 3. PERSISTENT PAGE INDICATOR (48dp Accessible Hit Targets) ---
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    repeat(uiState.totalPages) { index ->
+                        val isSelected = index == pagerState.currentPage
+                        val dotWidth by animateDpAsState(
+                            targetValue = if (isSelected) 24.dp else 8.dp,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "indicator_dot_width"
+                        )
+                        val dotColor by animateColorAsState(
+                            targetValue = if (isSelected) primaryColor else IndicatorInactive,
+                            label = "indicator_dot_color"
+                        )
+
+                        // 48dp Minimum Touch Target Container
+                        Box(
+                            modifier = Modifier
+                                .size(width = maxOf(44.dp, dotWidth + 16.dp), height = 44.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .height(8.dp)
+                                    .width(dotWidth)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // --- 4. PERSISTENT PRIMARY BOTTOM CTA BUTTON ---
+                val buttonText = when (pagerState.currentPage) {
+                    0 -> stringResource(R.string.onboarding_btn_get_started)
+                    1 -> stringResource(R.string.onboarding_btn_continue)
+                    else -> stringResource(R.string.onboarding_btn_start_creating)
+                }
+
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onEvent(OnboardingUiEvent.NextClicked)
+                    },
+                    enabled = uiState.isActionEnabled,
+                    modifier = Modifier
+                        .then(
+                            if (layoutConfig.maxButtonWidth != Dp.Unspecified) {
+                                Modifier.width(layoutConfig.maxButtonWidth)
+                            } else {
+                                Modifier.fillMaxWidth()
+                            }
+                        )
+                        .height(56.dp)
+                        .shadow(8.dp, RoundedCornerShape(18.dp), spotColor = primaryColor.copy(alpha = 0.35f)),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = primaryColor,
+                        contentColor = Color.White
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = buttonText,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -332,19 +379,19 @@ fun OnboardingContent(
 }
 
 /**
- * Individual Page layout containing the Hero and animated typography.
- * Supports smooth scroll on compact/short devices so content is never clipped.
+ * Single-column layout for Phones and Portrait Tablets.
+ * Proportional flexible vertical spacers center content optically and eliminate bottom void.
  */
 @Composable
-private fun OnboardingPageBody(
+private fun SingleColumnOnboardingPage(
     page: Int,
     isActive: Boolean,
     isReducedMotion: Boolean,
+    config: OnboardingLayoutConfig,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
 
-    // Upward fade-in animation: 700ms ease-out, 14dp translation
     val headlineAnim = remember { Animatable(0f) }
     val subtitleAnim = remember { Animatable(0f) }
 
@@ -360,14 +407,14 @@ private fun OnboardingPageBody(
             subtitleAnim.snapTo(0f)
 
             launch {
-                delay(200L) // 200ms delay for headline
+                delay(200L)
                 headlineAnim.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
                 )
             }
             launch {
-                delay(350L) // 350ms delay for supporting text
+                delay(350L)
                 subtitleAnim.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
@@ -392,30 +439,39 @@ private fun OnboardingPageBody(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
+        // Top flexible spacer absorbs void on tall screens
+        Spacer(modifier = Modifier.weight(0.35f, fill = false))
+
         // Hero Graphic
-        when (page) {
-            0 -> WelcomeHero(isActive = isActive, isReducedMotion = isReducedMotion)
-            1 -> BlocksHero(isActive = isActive, isReducedMotion = isReducedMotion)
-            else -> ScenesHero(isActive = isActive, isReducedMotion = isReducedMotion)
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            when (page) {
+                0 -> WelcomeHero(isActive = isActive, isReducedMotion = isReducedMotion)
+                1 -> BlocksHero(isActive = isActive, isReducedMotion = isReducedMotion)
+                else -> ScenesHero(isActive = isActive, isReducedMotion = isReducedMotion)
+            }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(config.heroSpacingToText))
 
-        // Headline: 34sp, line height 1.1, bold, letter spacing -0.025em
+        // Headline
         Text(
             text = headlineText,
             style = MaterialTheme.typography.headlineLarge.copy(
-                fontSize = 34.sp,
-                lineHeight = 37.4.sp,
+                fontSize = if (config.isTabletPortrait) 36.sp else 34.sp,
+                lineHeight = if (config.isTabletPortrait) 40.sp else 37.4.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.025).em,
                 color = TextPrimary
             ),
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(max = config.maxContentWidth)
                 .padding(horizontal = 8.dp)
                 .graphicsLayer {
                     alpha = headlineAnim.value
@@ -424,20 +480,20 @@ private fun OnboardingPageBody(
                 .semantics { heading() }
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(config.textSpacingToSubtitle))
 
-        // Supporting text: 16sp, line height 1.5, #6B7280
+        // Supporting text
         Text(
             text = supportingText,
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
+                fontSize = if (config.isTabletPortrait) 17.sp else 16.sp,
+                lineHeight = if (config.isTabletPortrait) 26.sp else 24.sp,
                 fontWeight = FontWeight.Normal,
                 color = TextSecondary
             ),
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(max = config.maxContentWidth)
                 .padding(horizontal = 12.dp)
                 .graphicsLayer {
                     alpha = subtitleAnim.value
@@ -445,7 +501,149 @@ private fun OnboardingPageBody(
                 }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Bottom flexible spacer balances layout optically
+        Spacer(modifier = Modifier.weight(1f, fill = false))
+    }
+}
+
+/**
+ * Two-pane layout for Landscape Tablets and Foldables.
+ * Left Pane: Hero illustration (height-first constraint to prevent overflow).
+ * Right Pane: Vertically centered typography.
+ */
+@Composable
+private fun TwoPaneOnboardingPage(
+    page: Int,
+    isActive: Boolean,
+    isReducedMotion: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+
+    val headlineAnim = remember { Animatable(0f) }
+    val subtitleAnim = remember { Animatable(0f) }
+
+    LaunchedEffect(isActive, isReducedMotion) {
+        if (isReducedMotion) {
+            headlineAnim.snapTo(1f)
+            subtitleAnim.snapTo(1f)
+            return@LaunchedEffect
+        }
+
+        if (isActive) {
+            headlineAnim.snapTo(0f)
+            subtitleAnim.snapTo(0f)
+
+            launch {
+                delay(200L)
+                headlineAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
+                )
+            }
+            launch {
+                delay(350L)
+                subtitleAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
+                )
+            }
+        }
+    }
+
+    val headlineText = when (page) {
+        0 -> stringResource(R.string.onboarding_welcome_title)
+        1 -> stringResource(R.string.onboarding_blocks_title)
+        else -> stringResource(R.string.onboarding_scenes_title)
+    }
+
+    val supportingText = when (page) {
+        0 -> stringResource(R.string.onboarding_welcome_desc)
+        1 -> stringResource(R.string.onboarding_blocks_desc)
+        else -> stringResource(R.string.onboarding_scenes_desc)
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(36.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left Pane: Hero Illustration (Height-first constraint)
+        Box(
+            modifier = Modifier
+                .weight(1.1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            when (page) {
+                0 -> WelcomeHero(
+                    isActive = isActive,
+                    isReducedMotion = isReducedMotion,
+                    isLandscape = true,
+                    modifier = Modifier.fillMaxHeight(0.88f)
+                )
+                1 -> BlocksHero(
+                    isActive = isActive,
+                    isReducedMotion = isReducedMotion,
+                    isLandscape = true,
+                    modifier = Modifier.fillMaxHeight(0.88f)
+                )
+                else -> ScenesHero(
+                    isActive = isActive,
+                    isReducedMotion = isReducedMotion,
+                    isLandscape = true,
+                    modifier = Modifier.fillMaxHeight(0.88f)
+                )
+            }
+        }
+
+        // Right Pane: Vertically Centered Copy
+        Column(
+            modifier = Modifier
+                .weight(0.9f)
+                .fillMaxHeight()
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = headlineText,
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 36.sp,
+                    lineHeight = 42.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.025).em,
+                    color = TextPrimary
+                ),
+                textAlign = TextAlign.Start,
+                modifier = Modifier
+                    .graphicsLayer {
+                        alpha = headlineAnim.value
+                        translationY = (14.dp * (1f - headlineAnim.value)).toPx()
+                    }
+                    .semantics { heading() }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = supportingText,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 17.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = TextSecondary
+                ),
+                textAlign = TextAlign.Start,
+                modifier = Modifier
+                    .graphicsLayer {
+                        alpha = subtitleAnim.value
+                        translationY = (14.dp * (1f - subtitleAnim.value)).toPx()
+                    }
+            )
+        }
     }
 }
 
