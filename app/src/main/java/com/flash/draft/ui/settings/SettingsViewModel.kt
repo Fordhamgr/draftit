@@ -70,7 +70,7 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.isStylusSupportEnabled())
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        listOf(
+        listOf<kotlinx.coroutines.flow.Flow<Any>>(
             repository.getDarkModeFlow(),
             repository.getLiquidDarkThemeFlow(),
             repository.getPerformanceModeFlow(),
