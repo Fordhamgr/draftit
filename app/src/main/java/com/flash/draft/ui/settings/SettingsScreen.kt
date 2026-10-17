@@ -170,14 +170,14 @@ private fun AppearanceSection(
 ) {
     SettingsGroup(title = "Appearance", modifier = modifier) {
         ToggleRow(
-            label = "Dark Mode",
+            label = "Dark mode",
             icon = Icons.Default.DarkMode,
             checked = uiState.isDarkMode,
             onCheckedChange = { onEvent(SettingsUiEvent.ToggleDarkMode(it)) },
             showDivider = true
         )
         ToggleRow(
-            label = "Fluid Dark Theme",
+            label = "Fluid dark theme",
             icon = Icons.Default.WaterDrop,
             checked = uiState.isLiquidDarkTheme,
             onCheckedChange = { onEvent(SettingsUiEvent.ToggleLiquidDarkTheme(it)) },
@@ -194,14 +194,14 @@ private fun PerformanceSection(
 ) {
     SettingsGroup(title = "Performance", modifier = modifier) {
         ToggleRow(
-            label = "Performance Mode",
+            label = "Performance mode",
             icon = Icons.Default.Speed,
             checked = uiState.isPerformanceMode,
             onCheckedChange = { onEvent(SettingsUiEvent.TogglePerformanceMode(it)) },
             showDivider = true
         )
         SegmentedControlRow(
-            label = "Set framerate",
+            label = "Framerate",
             icon = Icons.Default.Timer,
             options = listOf(30, 60, 120, 0),
             optionLabels = listOf("30", "60", "120", "Unlocked"),
@@ -226,7 +226,7 @@ private fun DrawingPhysicsSection(
         ) {
             Column {
                 SliderRow(
-                    label = "Liquid Curve",
+                    label = "Liquid curve",
                     icon = Icons.Default.Timeline,
                     value = uiState.liquidCurve,
                     onValueChange = { onEvent(SettingsUiEvent.SetLiquidCurve(it)) },
@@ -244,7 +244,7 @@ private fun DrawingPhysicsSection(
                     showDivider = true
                 )
                 SliderRow(
-                    label = "Frost (Blur)",
+                    label = "Frost (blur)",
                     icon = Icons.Default.BlurOn,
                     value = uiState.liquidFrost,
                     onValueChange = { onEvent(SettingsUiEvent.SetLiquidFrost(it)) },
@@ -255,7 +255,7 @@ private fun DrawingPhysicsSection(
             }
         }
         SegmentedControlRow(
-            label = "Undo Limit",
+            label = "Undo limit",
             icon = Icons.Default.History,
             options = listOf(20, 50, 100, 0),
             optionLabels = listOf("20", "50", "100", "No limit"),
@@ -274,7 +274,7 @@ private fun FeedbackSection(
 ) {
     SettingsGroup(title = "Feedback", modifier = modifier) {
         ToggleRow(
-            label = "Haptic Feedback",
+            label = "Haptic feedback",
             icon = Icons.Default.Vibration,
             checked = uiState.isHapticFeedbackEnabled,
             onCheckedChange = { onEvent(SettingsUiEvent.ToggleHapticFeedback(it)) },
@@ -291,7 +291,7 @@ private fun ExperimentalSection(
 ) {
     SettingsGroup(title = "Experimental", modifier = modifier) {
         ToggleRow(
-            label = "Stylus Support",
+            label = "Stylus support",
             icon = Icons.Default.Create,
             checked = uiState.isStylusSupportEnabled,
             onCheckedChange = { onEvent(SettingsUiEvent.ToggleStylusSupport(it)) },
@@ -458,9 +458,10 @@ fun SegmentedControlRow(
                             .fillMaxHeight()
                             .then(
                                 if (isSelected) {
+                                    val pillBg = if (isDark) Color(0xFF3F3F46) else Color.White
                                     Modifier
                                         .shadow(2.dp, RoundedCornerShape(10.dp), clip = false)
-                                        .background(Color.White, RoundedCornerShape(10.dp))
+                                        .background(pillBg, RoundedCornerShape(10.dp))
                                 } else {
                                     Modifier
                                 }
@@ -469,13 +470,14 @@ fun SegmentedControlRow(
                             .clickable { onOptionSelected(option) },
                         contentAlignment = Alignment.Center
                     ) {
+                        val textColor = if (isSelected) {
+                            if (isDark) Color.White else Color(0xFF0F172A)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                         Text(
                             text = optionLabel,
-                            color = if (isSelected) {
-                                Color(0xFF0F172A)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            color = textColor,
                             fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             textAlign = TextAlign.Center
