@@ -4,11 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import java.io.File
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-class SettingsRepository(context: Context) {
+class SettingsRepository(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("draftit_settings", Context.MODE_PRIVATE)
 
     // Keep strong references to listeners to prevent them from being garbage collected
@@ -16,6 +17,7 @@ class SettingsRepository(context: Context) {
     private val activeListeners = java.util.concurrent.CopyOnWriteArrayList<SharedPreferences.OnSharedPreferenceChangeListener>()
 
     companion object {
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_DARK_MODE = "dark_mode"
         private const val KEY_LIQUID_DARK_THEME = "liquid_dark_theme"
         private const val KEY_PERFORMANCE_MODE = "performance_mode"
@@ -30,6 +32,7 @@ class SettingsRepository(context: Context) {
     }
 
     // Default values
+    private val defaultOnboardingCompleted = false
     private val defaultDarkMode = false
     private val defaultLiquidDarkTheme = true
     private val defaultPerformanceMode = false
@@ -40,6 +43,49 @@ class SettingsRepository(context: Context) {
     private val defaultUndoLimit = 0
     private val defaultHapticFeedback = false
     private val defaultStylusSupport = false
+
+    fun isOnboardingCompleted(): Boolean {
+        if (prefs.contains(KEY_ONBOARDING_COMPLETED)) {
+            return prefs.getBoolean(KEY_ONBOARDING_COMPLETED, defaultOnboardingCompleted)
+        }
+        // Returning-user safety check:
+        // If the user already has legacy settings or existing projects, treat onboarding as completed.
+        val hasLegacySettings = prefs.contains(KEY_DARK_MODE) ||
+                prefs.contains(KEY_PERFORMANCE_MODE) ||
+                prefs.contains(KEY_FRAMERATE) ||
+                prefs.contains(KEY_LIQUID_CURVE) ||
+                prefs.contains(KEY_LIQUID_REFRACTION) ||
+                prefs.contains(KEY_LIQUID_FROST) ||
+                prefs.contains(KEY_UNDO_LIMIT) ||
+                prefs.contains(KEY_HAPTIC_FEEDBACK) ||
+                prefs.contains(KEY_STYLUS_SUPPORT) ||
+                prefs.contains(KEY_RECENT_DRAWING_COLORS)
+
+        val projectsDir = File(context.filesDir, "projects")
+        val hasExistingProjects = projectsDir.exists() && (projectsDir.listFiles()?.any { it.extension == "json" } == true)
+
+        if (hasLegacySettings || hasExistingProjects) {
+            setOnboardingCompleted(true)
+            return true
+        }
+
+        return defaultOnboardingCompleted
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) = prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
+
+    fun getOnboardingCompletedFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_ONBOARDING_COMPLETED) trySend(isOnboardingCompleted())
+        }
+        activeListeners.add(listener)
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(isOnboardingCompleted())
+        awaitClose { 
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
+        }
+    }
 
     fun isDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, defaultDarkMode)
     fun setDarkMode(enabled: Boolean) = prefs.edit().putBoolean(KEY_DARK_MODE, enabled).apply()

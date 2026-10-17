@@ -31,6 +31,9 @@ import com.flash.draft.ui.canvas.CanvasViewModel
 import com.flash.draft.ui.canvas.DraftCanvas
 import com.flash.draft.ui.home. DashboardScreen // We are about to build this!
 import com.flash.draft.ui.home.AboutScreen
+import com.flash.draft.ui.onboarding.OnboardingScreen
+import com.flash.draft.ui.onboarding.OnboardingViewModel
+import com.flash.draft.ui.onboarding.OnboardingViewModelFactory
 
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -112,7 +115,28 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        NavHost(navController = navController, startDestination = "dashboard") {
+                        val startDestination = remember {
+                            if (settingsRepo.isOnboardingCompleted()) "dashboard" else "onboarding"
+                        }
+
+                        NavHost(navController = navController, startDestination = startDestination) {
+
+                            composable("onboarding") {
+                                val onboardingViewModel: OnboardingViewModel = viewModel(
+                                    factory = OnboardingViewModelFactory(settingsRepo)
+                                )
+                                OnboardingScreen(
+                                    onNavigateToDashboard = {
+                                        navController.navigate("dashboard") {
+                                            popUpTo("onboarding") {
+                                                inclusive = true
+                                            }
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    viewModel = onboardingViewModel
+                                )
+                            }
 
                             composable("dashboard") {
                                 val dashboardViewModel: com.flash.draft.ui.home.DashboardViewModel = viewModel(
