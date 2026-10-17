@@ -1,21 +1,15 @@
 package com.flash.draft.ui.onboarding
 
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,17 +25,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,28 +44,46 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.flash.draft99.R
+import com.flash.draft.ui.onboarding.components.BlocksHero
+import com.flash.draft.ui.onboarding.components.ScenesHero
+import com.flash.draft.ui.onboarding.components.WelcomeHero
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+private val TextSecondary = Color(0xFF6B7280)
+private val TextPrimary = Color(0xFF111827)
+private val IndicatorInactive = Color(0xFFD3D8E1)
+
+/**
+ * Stateful entry point for Onboarding.
+ * Collects state from OnboardingViewModel, handles system navigation and effects.
+ */
 @Composable
 fun OnboardingScreen(
     onNavigateToDashboard: () -> Unit,
@@ -78,499 +91,394 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pagerState = rememberPagerState(initialPage = uiState.currentPage) { uiState.totalPages }
+    val coroutineScope = rememberCoroutineScope()
+    val isReducedMotion = rememberReducedMotionEnabled()
 
-    LaunchedEffect(viewModel.effect) {
-        viewModel.effect.collect { effect ->
-            when (effect) {
-                is OnboardingEffect.NavigateToDashboard -> onNavigateToDashboard()
+    LaunchedEffect(isReducedMotion) {
+        viewModel.onEvent(OnboardingUiEvent.ReducedMotionDetected(isReducedMotion))
+    }
+
+    // Keep ViewModel in sync with pager scroll settle
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { settledPage ->
+            if (settledPage != uiState.currentPage) {
+                viewModel.onEvent(OnboardingUiEvent.PageSelected(settledPage))
             }
         }
     }
 
-    BackHandler(enabled = uiState.currentPage > 0) {
-        viewModel.onEvent(OnboardingUiEvent.BackClicked)
+    // Handle single-shot ViewModel effects
+    LaunchedEffect(viewModel.effect) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is OnboardingEffect.NavigateToDashboard -> {
+                    onNavigateToDashboard()
+                }
+                is OnboardingEffect.ScrollToPage -> {
+                    pagerState.animateScrollToPage(
+                        page = effect.page,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    // Intercept back button to navigate backwards in pager
+    BackHandler(enabled = pagerState.currentPage > 0) {
+        coroutineScope.launch {
+            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+        }
     }
 
     OnboardingContent(
         uiState = uiState,
+        pagerState = pagerState,
         onEvent = viewModel::onEvent,
         modifier = modifier
     )
 }
 
+/**
+ * Pure stateless Onboarding UI content.
+ * Contains ZERO ViewModel references. Hoists state and event lambdas.
+ */
 @Composable
 fun OnboardingContent(
     uiState: OnboardingUiState,
+    pagerState: PagerState,
     onEvent: (OnboardingUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    var isVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
+    val coroutineScope = rememberCoroutineScope()
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = slideInVertically(
-                initialOffsetY = { it / 6 },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            ) + fadeIn(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
+            // --- 1. SHARED HEADER (Height 44dp) ---
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .height(44.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Top Navigation Bar (Back + Skip)
+                // Left: App Icon (34dp, 10dp radius) + "Draft It" Wordmark (19sp bold)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (uiState.currentPage > 0) {
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onEvent(OnboardingUiEvent.BackClicked)
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.size(48.dp))
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.applogo),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Text(
+                        text = "Draft It",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                }
 
+                // Right: "Skip" button (Pages 0 & 1 only; invisible & non-clickable on Page 2)
+                val isSkipVisible = pagerState.currentPage < 2
+                Box(
+                    modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
                     TextButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onEvent(OnboardingUiEvent.SkipClicked)
                         },
-                        enabled = uiState.isActionEnabled
+                        enabled = isSkipVisible && uiState.isActionEnabled,
+                        modifier = Modifier
+                            .graphicsLayer { alpha = if (isSkipVisible) 1f else 0f }
+                            .then(
+                                if (!isSkipVisible) Modifier.clearAndSetSemantics { } else Modifier
+                            )
                     ) {
                         Text(
-                            text = "Skip",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            text = stringResource(R.string.onboarding_skip),
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = primaryColor
+                            )
                         )
                     }
                 }
+            }
 
-                // Middle Content Area: Animated Card Stack
-                AnimatedContent(
-                    targetState = uiState.currentPage,
-                    transitionSpec = {
-                        if (targetState > initialState) {
-                            (slideInHorizontally(
-                                initialOffsetX = { fullWidth -> (fullWidth * 0.45f).toInt() },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) + fadeIn(
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            )).togetherWith(
-                                slideOutHorizontally(
-                                    targetOffsetX = { fullWidth -> -(fullWidth * 0.45f).toInt() },
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                ) + fadeOut(
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                            )
-                        } else {
-                            (slideInHorizontally(
-                                initialOffsetX = { fullWidth -> -(fullWidth * 0.45f).toInt() },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) + fadeIn(
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            )).togetherWith(
-                                slideOutHorizontally(
-                                    targetOffsetX = { fullWidth -> (fullWidth * 0.45f).toInt() },
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                ) + fadeOut(
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                            )
-                        }.using(SizeTransform(clip = false))
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    label = "onboarding_card_transition"
-                ) { targetPage ->
-                    val card = uiState.cards.getOrNull(targetPage)
-                    if (card != null) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState()),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            // Demo Vector Illustration Card
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(280.dp),
-                                shape = RoundedCornerShape(28.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                border = BorderStroke(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                                )
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    when (card.illustrationType) {
-                                        DemoIllustrationType.INFINITE_CANVAS -> {
-                                            InfiniteCanvasIllustration()
-                                        }
-                                        DemoIllustrationType.FLUID_STUDIO -> {
-                                            FluidStudioIllustration()
-                                        }
-                                    }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 2. HORIZONTAL PAGER (Hero + Copy per page) ---
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) { page ->
+                OnboardingPageBody(
+                    page = page,
+                    isActive = pagerState.currentPage == page,
+                    isReducedMotion = uiState.isReducedMotion
+                )
+            }
+
+            // --- 3. PAGE INDICATOR (3 dots: 8dp inactive, 24dp active theme pill) ---
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 24.dp)
+            ) {
+                repeat(uiState.totalPages) { index ->
+                    val isSelected = index == pagerState.currentPage
+                    val dotWidth by animateDpAsState(
+                        targetValue = if (isSelected) 24.dp else 8.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "indicator_dot_width"
+                    )
+                    val dotColor by animateColorAsState(
+                        targetValue = if (isSelected) primaryColor else IndicatorInactive,
+                        label = "indicator_dot_color"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .height(8.dp)
+                            .width(dotWidth)
+                            .clip(CircleShape)
+                            .background(dotColor)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            Text(
-                                text = card.title,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = card.description,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 24.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
-                }
-
-                // Page Indicator Dots
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = 20.dp)
-                ) {
-                    repeat(uiState.totalPages) { index ->
-                        val isSelected = index == uiState.currentPage
-                        val width by animateDpAsState(
-                            targetValue = if (isSelected) 28.dp else 8.dp,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            ),
-                            label = "indicator_width"
-                        )
-                        val color by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant
-                            },
-                            label = "indicator_color"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .height(8.dp)
-                                .width(width)
-                                .clip(CircleShape)
-                                .background(color)
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onEvent(OnboardingUiEvent.PageSelected(index))
-                                }
-                        )
-                    }
-                }
-
-                // Pinned 56dp Action Button
-                val isLastPage = uiState.currentPage >= uiState.totalPages - 1
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onEvent(OnboardingUiEvent.NextClicked)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    enabled = uiState.isActionEnabled,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = if (isLastPage) "Get Started" else "Continue",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(20.dp))
+            // --- 4. PRIMARY BOTTOM CTA BUTTON (56dp tall, 18dp corner radius) ---
+            val buttonText = when (pagerState.currentPage) {
+                0 -> stringResource(R.string.onboarding_btn_get_started)
+                1 -> stringResource(R.string.onboarding_btn_continue)
+                else -> stringResource(R.string.onboarding_btn_start_creating)
+            }
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onEvent(OnboardingUiEvent.NextClicked)
+                },
+                enabled = uiState.isActionEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .shadow(8.dp, RoundedCornerShape(18.dp), spotColor = primaryColor.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = primaryColor,
+                    contentColor = Color.White
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = buttonText,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * Individual Page layout containing the Hero and animated typography.
+ * Supports smooth scroll on compact/short devices so content is never clipped.
+ */
 @Composable
-private fun InfiniteCanvasIllustration(modifier: Modifier = Modifier) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val dotColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-    val cardBg = MaterialTheme.colorScheme.surface
-    val cardBorder = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+private fun OnboardingPageBody(
+    page: Int,
+    isActive: Boolean,
+    isReducedMotion: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(20.dp)
-    ) {
-        val gridSpacing = 22.dp.toPx()
-        val numCols = (size.width / gridSpacing).toInt()
-        val numRows = (size.height / gridSpacing).toInt()
+    // Upward fade-in animation: 700ms ease-out, 14dp translation
+    val headlineAnim = remember { Animatable(0f) }
+    val subtitleAnim = remember { Animatable(0f) }
 
-        // Background canvas grid dots
-        for (col in 0..numCols) {
-            for (row in 0..numRows) {
-                drawCircle(
-                    color = dotColor,
-                    radius = 1.25.dp.toPx(),
-                    center = Offset(col * gridSpacing, row * gridSpacing)
+    LaunchedEffect(isActive, isReducedMotion) {
+        if (isReducedMotion) {
+            headlineAnim.snapTo(1f)
+            subtitleAnim.snapTo(1f)
+            return@LaunchedEffect
+        }
+
+        if (isActive) {
+            headlineAnim.snapTo(0f)
+            subtitleAnim.snapTo(0f)
+
+            launch {
+                delay(200L) // 200ms delay for headline
+                headlineAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
+                )
+            }
+            launch {
+                delay(350L) // 350ms delay for supporting text
+                subtitleAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
                 )
             }
         }
+    }
 
-        // Floating Note / Canvas item
-        val noteWidth = 140.dp.toPx()
-        val noteHeight = 90.dp.toPx()
-        val noteLeft = size.width * 0.12f
-        val noteTop = size.height * 0.18f
+    val headlineText = when (page) {
+        0 -> stringResource(R.string.onboarding_welcome_title)
+        1 -> stringResource(R.string.onboarding_blocks_title)
+        else -> stringResource(R.string.onboarding_scenes_title)
+    }
 
-        drawRoundRect(
-            color = cardBg,
-            topLeft = Offset(noteLeft, noteTop),
-            size = Size(noteWidth, noteHeight),
-            cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx())
-        )
-        drawRoundRect(
-            color = cardBorder,
-            topLeft = Offset(noteLeft, noteTop),
-            size = Size(noteWidth, noteHeight),
-            cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx()),
-            style = Stroke(width = 1.5.dp.toPx())
-        )
+    val supportingText = when (page) {
+        0 -> stringResource(R.string.onboarding_welcome_desc)
+        1 -> stringResource(R.string.onboarding_blocks_desc)
+        else -> stringResource(R.string.onboarding_scenes_desc)
+    }
 
-        // Mock lines in the floating note
-        drawLine(
-            color = primaryColor.copy(alpha = 0.7f),
-            start = Offset(noteLeft + 16.dp.toPx(), noteTop + 24.dp.toPx()),
-            end = Offset(noteLeft + noteWidth - 28.dp.toPx(), noteTop + 24.dp.toPx()),
-            strokeWidth = 3.dp.toPx(),
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = tertiaryColor.copy(alpha = 0.5f),
-            start = Offset(noteLeft + 16.dp.toPx(), noteTop + 42.dp.toPx()),
-            end = Offset(noteLeft + noteWidth - 48.dp.toPx(), noteTop + 42.dp.toPx()),
-            strokeWidth = 3.dp.toPx(),
-            cap = StrokeCap.Round
-        )
-
-        // Expressive Bezier Stroke crossing the canvas
-        val strokePath = Path().apply {
-            moveTo(size.width * 0.15f, size.height * 0.78f)
-            cubicTo(
-                size.width * 0.35f, size.height * 0.45f,
-                size.width * 0.55f, size.height * 0.95f,
-                size.width * 0.88f, size.height * 0.35f
-            )
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Hero Graphic
+        when (page) {
+            0 -> WelcomeHero(isActive = isActive, isReducedMotion = isReducedMotion)
+            1 -> BlocksHero(isActive = isActive, isReducedMotion = isReducedMotion)
+            else -> ScenesHero(isActive = isActive, isReducedMotion = isReducedMotion)
         }
 
-        drawPath(
-            path = strokePath,
-            brush = Brush.horizontalGradient(
-                listOf(primaryColor, secondaryColor, tertiaryColor)
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Headline: 34sp, line height 1.1, bold, letter spacing -0.025em
+        Text(
+            text = headlineText,
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontSize = 34.sp,
+                lineHeight = 37.4.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.025).em,
+                color = TextPrimary
             ),
-            style = Stroke(
-                width = 5.dp.toPx(),
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .graphicsLayer {
+                    alpha = headlineAnim.value
+                    translationY = (14.dp * (1f - headlineAnim.value)).toPx()
+                }
+                .semantics { heading() }
         )
 
-        // Stylus touch indicator at end of stroke
-        drawCircle(
-            color = tertiaryColor,
-            radius = 6.dp.toPx(),
-            center = Offset(size.width * 0.88f, size.height * 0.35f)
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Supporting text: 16sp, line height 1.5, #6B7280
+        Text(
+            text = supportingText,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Normal,
+                color = TextSecondary
+            ),
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .graphicsLayer {
+                    alpha = subtitleAnim.value
+                    translationY = (14.dp * (1f - subtitleAnim.value)).toPx()
+                }
         )
-        drawCircle(
-            color = cardBg,
-            radius = 3.dp.toPx(),
-            center = Offset(size.width * 0.88f, size.height * 0.35f)
-        )
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
+/**
+ * Resilient check for system animator duration scale (0f = reduced motion).
+ * Safe against OEM security exceptions and preview environments.
+ */
 @Composable
-private fun FluidStudioIllustration(modifier: Modifier = Modifier) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val dockBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
-    val inactiveToolColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(20.dp)
-    ) {
-        val centerX = size.width / 2f
-
-        // Floating dynamic color droplets / swatches
-        val swatches = listOf(
-            Triple(centerX - 80.dp.toPx(), size.height * 0.30f, primaryColor),
-            Triple(centerX - 25.dp.toPx(), size.height * 0.22f, secondaryColor),
-            Triple(centerX + 35.dp.toPx(), size.height * 0.26f, tertiaryColor),
-            Triple(centerX + 85.dp.toPx(), size.height * 0.34f, primaryColor.copy(alpha = 0.85f))
-        )
-
-        swatches.forEach { (x, y, color) ->
-            drawCircle(
-                color = color.copy(alpha = 0.25f),
-                radius = 20.dp.toPx(),
-                center = Offset(x, y)
+fun rememberReducedMotionEnabled(): Boolean {
+    if (LocalInspectionMode.current) return false
+    val context = LocalContext.current
+    return remember(context) {
+        try {
+            val scale = Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1.0f
             )
-            drawCircle(
-                color = color,
-                radius = 14.dp.toPx(),
-                center = Offset(x, y)
-            )
-            drawCircle(
-                color = surfaceColor.copy(alpha = 0.85f),
-                radius = 4.dp.toPx(),
-                center = Offset(x - 3.dp.toPx(), y - 3.dp.toPx())
-            )
+            scale == 0f
+        } catch (e: Exception) {
+            false
         }
+    }
+}
 
-        // Connecting fluid curve
-        val fluidPath = Path().apply {
-            moveTo(centerX - 95.dp.toPx(), size.height * 0.36f)
-            quadraticTo(
-                centerX, size.height * 0.12f,
-                centerX + 95.dp.toPx(), size.height * 0.38f
-            )
-        }
-        drawPath(
-            path = fluidPath,
-            brush = Brush.horizontalGradient(listOf(primaryColor, tertiaryColor)),
-            style = Stroke(
-                width = 2.dp.toPx(),
-                cap = StrokeCap.Round
-            )
+@Preview(showBackground = true)
+@Composable
+private fun OnboardingContentPreview() {
+    MaterialTheme {
+        OnboardingContent(
+            uiState = OnboardingUiState(currentPage = 0, totalPages = 3),
+            pagerState = rememberPagerState(initialPage = 0) { 3 },
+            onEvent = {}
         )
-
-        // Liquid Floating Dock
-        val dockWidth = size.width * 0.82f
-        val dockHeight = 64.dp.toPx()
-        val dockLeft = (size.width - dockWidth) / 2f
-        val dockTop = size.height * 0.62f
-
-        // Dock background
-        drawRoundRect(
-            color = surfaceColor,
-            topLeft = Offset(dockLeft, dockTop),
-            size = Size(dockWidth, dockHeight),
-            cornerRadius = CornerRadius(24.dp.toPx(), 24.dp.toPx())
-        )
-        drawRoundRect(
-            color = dockBorderColor,
-            topLeft = Offset(dockLeft, dockTop),
-            size = Size(dockWidth, dockHeight),
-            cornerRadius = CornerRadius(24.dp.toPx(), 24.dp.toPx()),
-            style = Stroke(width = 1.5.dp.toPx())
-        )
-
-        // Mock Tool Items inside the Dock
-        val toolCount = 4
-        val slotWidth = dockWidth / toolCount
-        val toolCenterY = dockTop + dockHeight / 2f
-
-        for (i in 0 until toolCount) {
-            val toolCenterX = dockLeft + slotWidth * i + slotWidth / 2f
-
-            if (i == 1) {
-                // Highlighted active tool slot
-                drawRoundRect(
-                    color = primaryColor.copy(alpha = 0.16f),
-                    topLeft = Offset(toolCenterX - 18.dp.toPx(), toolCenterY - 18.dp.toPx()),
-                    size = Size(36.dp.toPx(), 36.dp.toPx()),
-                    cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
-                )
-                drawCircle(
-                    color = primaryColor,
-                    radius = 6.dp.toPx(),
-                    center = Offset(toolCenterX, toolCenterY)
-                )
-            } else {
-                drawCircle(
-                    color = inactiveToolColor,
-                    radius = 5.dp.toPx(),
-                    center = Offset(toolCenterX, toolCenterY)
-                )
-            }
-        }
     }
 }

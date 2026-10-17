@@ -2,34 +2,22 @@ package com.flash.draft.ui.onboarding
 
 import androidx.compose.runtime.Immutable
 
-enum class DemoIllustrationType {
-    INFINITE_CANVAS,
-    FLUID_STUDIO
-}
-
-@Immutable
-data class OnboardingCardData(
-    val id: String,
-    val title: String,
-    val description: String,
-    val illustrationType: DemoIllustrationType
-)
-
 @Immutable
 data class OnboardingUiState(
     val currentPage: Int = 0,
-    val totalPages: Int = 2,
-    val cards: List<OnboardingCardData> = emptyList(),
-    val isActionEnabled: Boolean = true
+    val totalPages: Int = 3,
+    val isActionEnabled: Boolean = true,
+    val isReducedMotion: Boolean = false
 )
 
 sealed interface OnboardingUiEvent {
     data object NextClicked : OnboardingUiEvent
-    data object BackClicked : OnboardingUiEvent
     data object SkipClicked : OnboardingUiEvent
     data class PageSelected(val page: Int) : OnboardingUiEvent
+    data class ReducedMotionDetected(val isReduced: Boolean) : OnboardingUiEvent
 }
 
 sealed interface OnboardingEffect {
+    data class ScrollToPage(val page: Int) : OnboardingEffect
     data object NavigateToDashboard : OnboardingEffect
 }
